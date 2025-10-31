@@ -2,6 +2,38 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Security Guidelines
+
+### CRITICAL: Never Commit Secrets
+
+**NEVER commit the following to the repository:**
+- API keys (OpenAI, Anthropic, OpenRouter, etc.)
+- Access tokens (GitHub, Gogs, etc.)
+- Passwords or credentials
+- Private keys or certificates
+- Database connection strings with passwords
+
+**Safe practices:**
+- Store secrets in `.env` files (which are in .gitignore)
+- Use environment variables for sensitive configuration
+- In documentation (todo.txt, README, etc.), write "API key configured" instead of the actual key
+- Use placeholders like `[REDACTED]` or `YOUR_API_KEY_HERE` in examples
+- If a secret is accidentally committed, use `git filter-branch` to remove it from history
+
+**GitHub Push Protection:**
+- GitHub will block pushes containing detected secrets
+- If this happens, you MUST rewrite git history to remove the secret
+- Use `git filter-branch --tree-filter` to clean all commits
+- Force push with cleaned history
+
+## Development Environment
+
+**Repository Structure:**
+- Host mount: `/Users/sp/claude/claude-docker.hephaestus/Hephaestus/Hephaestus/`
+- Container path: `/home/user/workspace/Hephaestus/Hephaestus/`
+- Note: The path contains "Hephaestus/Hephaestus/" due to repository structure
+- Git operations should be done from the host mount point
+
 ## Writing Phase YAML Files
 
 ### Critical YAML Formatting Rules
