@@ -1,0 +1,564 @@
+TASK: WRAP SQL/DATABASE IN C1 MODULE
+=====================================
+
+STATUS: Pending
+PRIORITY: High
+BRANCH: dev-haltingstate-00
+ESTIMATED TIME: 4-6 hours
+
+GOAL
+----
+
+Wrap all SQL/database operations in a C1-level module.
+Force all SQL commands to go through wrapped functions.
+Ensure no direct database access anywhere except the wrapper.
+
+MOTIVATION
+----------
+
+Problems with direct database access:
+- SQL queries scattered throughout codebase
+- Hard to audit what queries are being run
+- Difficult to add logging, monitoring, security checks
+- Cannot easily switch databases or add connection pooling
+- Testing requires real database (cannot mock easily)
+- No centralized query validation or sanitization
+
+Benefits of wrapping:
+- Single point of database access (c1_database module)
+- Easy to add logging, metrics, security checks
+- Can validate/sanitize all queries in one place
+- Simplified testing (mock one module)
+- Can implement query caching
+- Can enforce access control policies
+- Easy to switch database implementations
+
+CURRENT STATE
+-------------
+
+Database access likely uses:
+- SQLAlchemy ORM (sqlalchemy==2.0.23 in requirements)
+- Alembic for migrations (alembic==1.13.0)
+- Direct database connections scattered across files
+
+Need to audit codebase to find all database access points.
+
+DESIRED STATE
+-------------
+
+Single database wrapper module:
+- src/c1_base/c1_database.py (main wrapper)
+- src/c1_base/c1_database_models.py (data models)
+- src/c1_base/c1_database_session.py (session management)
+- src/c1_base/c1_database_queries.py (common queries)
+
+No other files directly access database.
+All operations go through c1_database wrapper API.
+
+IMPLEMENTATION STEPS
+--------------------
+
+Phase 1: Audit current database usage (1 hour)
+  [ ] Find all files importing sqlalchemy
+      grep -r "from sqlalchemy" src/
+      grep -r "import sqlalchemy" src/
+  [ ] Find all files with database connections
+      grep -r "create_engine" src/
+      grep -r "sessionmaker" src/
+  [ ] Find all files with raw SQL queries
+      grep -r "execute" src/ | grep -i sql
+      grep -r "text(" src/  # SQLAlchemy text() function
+  [ ] Document all database access patterns
+  [ ] Create database-usage-audit.txt
+
+Phase 2: Design wrapper API (1 hour)
+  [ ] Design DatabaseWrapper class
+  [ ] Design Session management API
+  [ ] Design Query builder API
+  [ ] Define data models for wrapper
+  [ ] Plan migration from direct access to wrapper
+  [ ] Document API design
+
+Phase 3: Implement wrapper module (2-3 hours)
+  [ ] Create src/c1_base/c1_database.py
+  [ ] Implement DatabaseWrapper class
+  [ ] Implement session management
+  [ ] Implement connection pooling
+  [ ] Implement query execution methods
+  [ ] Add logging and monitoring
+  [ ] Add query validation/sanitization
+  [ ] Add error handling
+  [ ] Add unit tests
+
+Phase 4: Migrate existing code (1-2 hours)
+  [ ] Replace direct database access with wrapper calls
+  [ ] Update imports
+  [ ] Remove direct sqlalchemy usage from non-wrapper files
+  [ ] Test each migration
+  [ ] Verify no direct database access remains
+
+Phase 5: Verification (30 minutes)
+  [ ] Grep for direct SQLAlchemy imports (should only be in wrapper)
+      grep -r "from sqlalchemy" src/ | grep -v c1_database
+      # Should return nothing
+  [ ] Run all tests
+  [ ] Verify functionality unchanged
+  [ ] Check logging shows all database operations
+
+Phase 6: Documentation (30 minutes)
+  [ ] Document wrapper API
+  [ ] Add usage examples
+  [ ] Document migration guide
+  [ ] Update architecture docs
+
+WRAPPER API DESIGN
+------------------
+
+### Module: c1_database.py
+
+Purpose: Single point of database access
+
+```python
+"""
+Database wrapper module - ONLY module that accesses database directly.
+
+All database operations go through this wrapper.
+No other modules should import sqlalchemy directly.
+"""
+
+from typing import List, Dict, Any, Optional
+from contextlib import contextmanager
+
+# ONLY place in codebase that imports SQLAlchemy
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker, Session as SQLSession
+from sqlalchemy.pool import QueuePool
+
+
+class DatabaseConfig:
+    """Database configuration."""
+    def __init__(
+        self,
+        database_url: str,
+        pool_size: int = 10,
+        max_overflow: int = 20,
+        echo: bool = False
+    ):
+        self.database_url = database_url
+        self.pool_size = pool_size
+        self.max_overflow = max_overflow
+        self.echo = echo
+
+
+class DatabaseWrapper:
+    """Wrapper for all database operations."""
+
+    def __init__(self, config: DatabaseConfig):
+        """Initialize database wrapper."""
+        self.config = config
+        self.engine = create_engine(
+            config.database_url,
+            poolclass=QueuePool,
+            pool_size=config.pool_size,
+            max_overflow=config.max_overflow,
+            echo=config.echo
+        )
+        self.SessionLocal = sessionmaker(
+            bind=self.engine,
+            autocommit=False,
+            autoflush=False
+        )
+
+    @contextmanager
+    def session(self) -> SQLSession:
+        """Get database session context manager."""
+        session = self.SessionLocal()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def execute_query(
+        self,
+        query: str,
+        params: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """Execute SQL query and return results."""
+        with self.session() as session:
+            result = session.execute(text(query), params or {})
+            return [dict(row._mapping) for row in result]
+
+    def execute_update(
+        self,
+        query: str,
+        params: Optional[Dict[str, Any]] = None
+    ) -> int:
+        """Execute SQL update/insert/delete and return affected rows."""
+        with self.session() as session:
+            result = session.execute(text(query), params or {})
+            return result.rowcount
+
+    def get_by_id(
+        self,
+        table: str,
+        record_id: Any,
+        id_column: str = "id"
+    ) -> Optional[Dict[str, Any]]:
+        """Get record by ID."""
+        query = f"SELECT * FROM {table} WHERE {id_column} = :id"
+        results = self.execute_query(query, {"id": record_id})
+        return results[0] if results else None
+
+    def insert(
+        self,
+        table: str,
+        data: Dict[str, Any]
+    ) -> int:
+        """Insert record and return ID."""
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join(f":{key}" for key in data.keys())
+        query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
+        self.execute_update(query, data)
+        # Return last inserted ID (implementation depends on database)
+        return self.execute_query("SELECT last_insert_rowid()")[0]["last_insert_rowid()"]
+
+    def update(
+        self,
+        table: str,
+        record_id: Any,
+        data: Dict[str, Any],
+        id_column: str = "id"
+    ) -> int:
+        """Update record by ID and return affected rows."""
+        set_clause = ", ".join(f"{key} = :{key}" for key in data.keys())
+        query = f"UPDATE {table} SET {set_clause} WHERE {id_column} = :id"
+        params = {**data, "id": record_id}
+        return self.execute_update(query, params)
+
+    def delete(
+        self,
+        table: str,
+        record_id: Any,
+        id_column: str = "id"
+    ) -> int:
+        """Delete record by ID and return affected rows."""
+        query = f"DELETE FROM {table} WHERE {id_column} = :id"
+        return self.execute_update(query, {"id": record_id})
+
+    def query_builder(self) -> 'QueryBuilder':
+        """Get query builder for complex queries."""
+        return QueryBuilder(self)
+
+
+class QueryBuilder:
+    """Builder for constructing SQL queries safely."""
+
+    def __init__(self, db: DatabaseWrapper):
+        self.db = db
+        self._select = []
+        self._from = None
+        self._where = []
+        self._params = {}
+        self._order = []
+        self._limit = None
+
+    def select(self, *columns: str) -> 'QueryBuilder':
+        """Add columns to SELECT."""
+        self._select.extend(columns)
+        return self
+
+    def from_table(self, table: str) -> 'QueryBuilder':
+        """Set FROM table."""
+        self._from = table
+        return self
+
+    def where(self, condition: str, params: Dict[str, Any]) -> 'QueryBuilder':
+        """Add WHERE condition."""
+        self._where.append(condition)
+        self._params.update(params)
+        return self
+
+    def order_by(self, column: str, direction: str = "ASC") -> 'QueryBuilder':
+        """Add ORDER BY clause."""
+        self._order.append(f"{column} {direction}")
+        return self
+
+    def limit(self, count: int) -> 'QueryBuilder':
+        """Add LIMIT clause."""
+        self._limit = count
+        return self
+
+    def execute(self) -> List[Dict[str, Any]]:
+        """Build and execute query."""
+        if not self._from:
+            raise ValueError("FROM table not specified")
+
+        select_clause = ", ".join(self._select) if self._select else "*"
+        query = f"SELECT {select_clause} FROM {self._from}"
+
+        if self._where:
+            query += " WHERE " + " AND ".join(self._where)
+
+        if self._order:
+            query += " ORDER BY " + ", ".join(self._order)
+
+        if self._limit:
+            query += f" LIMIT {self._limit}"
+
+        return self.db.execute_query(query, self._params)
+```
+
+### Module: c1_database_models.py
+
+Purpose: Data models for database wrapper (no SQLAlchemy imports)
+
+```python
+"""Data models for database wrapper API."""
+
+from dataclasses import dataclass
+from typing import Optional, Any
+
+
+@dataclass
+class DatabaseResult:
+    """Result from database query."""
+    rows: list[dict[str, Any]]
+    row_count: int
+
+
+@dataclass
+class DatabaseError:
+    """Database error information."""
+    message: str
+    query: str
+    params: dict[str, Any]
+```
+
+USAGE EXAMPLES
+--------------
+
+Before (direct SQLAlchemy):
+
+```python
+# BAD - Direct SQLAlchemy import and usage
+from sqlalchemy import create_engine, text
+
+engine = create_engine("sqlite:///db.sqlite")
+with engine.connect() as conn:
+    result = conn.execute(text("SELECT * FROM users WHERE id = :id"), {"id": 123})
+    users = [dict(row) for row in result]
+```
+
+After (using wrapper):
+
+```python
+# GOOD - Using database wrapper
+from src.c1_base.c1_database import DatabaseWrapper, DatabaseConfig
+
+config = DatabaseConfig(database_url="sqlite:///db.sqlite")
+db = DatabaseWrapper(config)
+
+# Simple query
+users = db.execute_query("SELECT * FROM users WHERE id = :id", {"id": 123})
+
+# Using convenience methods
+user = db.get_by_id("users", 123)
+
+# Using query builder
+users = (
+    db.query_builder()
+    .select("id", "name", "email")
+    .from_table("users")
+    .where("active = :active", {"active": True})
+    .order_by("created_at", "DESC")
+    .limit(10)
+    .execute()
+)
+
+# Using session context
+with db.session() as session:
+    user = session.query(User).filter_by(id=123).first()
+```
+
+VERIFICATION SCRIPT
+-------------------
+
+Create verify_database_isolation.py:
+
+```python
+#!/usr/bin/env python3
+"""Verify database access is isolated in wrapper."""
+
+import os
+import re
+from pathlib import Path
+
+
+def find_direct_sqlalchemy_imports(src_dir: Path) -> dict[str, list[str]]:
+    """Find files importing SQLAlchemy directly."""
+    imports = {}
+
+    for py_file in src_dir.rglob("*.py"):
+        # Skip wrapper module itself
+        if "c1_database" in str(py_file):
+            continue
+
+        with open(py_file, 'r') as f:
+            content = f.read()
+
+        # Find SQLAlchemy imports
+        sqlalchemy_imports = []
+        for line in content.split('\n'):
+            if re.search(r'\bfrom sqlalchemy\b', line):
+                sqlalchemy_imports.append(line.strip())
+            elif re.search(r'\bimport sqlalchemy\b', line):
+                sqlalchemy_imports.append(line.strip())
+
+        if sqlalchemy_imports:
+            imports[str(py_file)] = sqlalchemy_imports
+
+    return imports
+
+
+def main():
+    """Check for direct SQLAlchemy imports outside wrapper."""
+    src_dir = Path("src")
+
+    print("=" * 60)
+    print("DATABASE ISOLATION VERIFICATION")
+    print("=" * 60)
+
+    imports = find_direct_sqlalchemy_imports(src_dir)
+
+    if not imports:
+        print("\n✅ SUCCESS: No direct SQLAlchemy imports found outside wrapper")
+        print("\nDatabase access is properly isolated in c1_database.py")
+        return 0
+
+    print(f"\n❌ FAILURE: Found {len(imports)} files with direct SQLAlchemy imports")
+    print("\nFiles importing SQLAlchemy directly:")
+    for file_path, import_lines in imports.items():
+        print(f"\n  {file_path}:")
+        for line in import_lines:
+            print(f"    {line}")
+
+    print("\n⚠️  These files should use c1_database wrapper instead")
+    return 1
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())
+```
+
+MIGRATION CHECKLIST
+-------------------
+
+For each file with direct database access:
+  [ ] Identify database operations
+  [ ] Replace with wrapper API calls
+  [ ] Update imports
+  [ ] Remove SQLAlchemy imports
+  [ ] Test functionality
+  [ ] Commit
+
+After all files migrated:
+  [ ] Run verify_database_isolation.py
+  [ ] Should report zero direct imports
+  [ ] All tests pass
+  [ ] Final commit
+
+INTEGRATION WITH OTHER TASKS
+-----------------------------
+
+Coordinates with:
+- Task-03 (Layer Refactoring): Database wrapper is C1 layer
+- Task-07 (LangChain Isolation): Similar pattern for external dependencies
+
+Layer placement:
+- C1 (Base Layer): Database wrapper lives here
+- C2+ layers: Use database wrapper, never import SQLAlchemy directly
+
+SECURITY BENEFITS
+-----------------
+
+Wrapping database access enables security features:
+
+1. Query validation:
+   - Check for SQL injection patterns
+   - Validate table/column names
+   - Ensure parameterized queries only
+
+2. Access control:
+   - Enforce row-level security
+   - Check user permissions before queries
+   - Audit all database access
+
+3. Query logging:
+   - Log all queries with parameters
+   - Track who executed what query
+   - Monitor for suspicious patterns
+
+4. Rate limiting:
+   - Limit queries per user/session
+   - Prevent database abuse
+   - Throttle expensive queries
+
+Example with security:
+
+```python
+def execute_query(self, query: str, params: dict, user: User) -> list:
+    """Execute query with security checks."""
+    # Validate query
+    if self._is_sql_injection(query):
+        raise SecurityError("SQL injection detected")
+
+    # Check permissions
+    if not self._has_permission(user, query):
+        raise PermissionError("Access denied")
+
+    # Log query
+    self.logger.info(f"User {user.id} executing: {query}")
+
+    # Execute
+    return self._execute(query, params)
+```
+
+SUCCESS CRITERIA
+----------------
+
+✅ All database access isolated in c1_database.py
+✅ No direct SQLAlchemy imports in any other files
+✅ verify_database_isolation.py reports zero violations
+✅ All database operations go through wrapper API
+✅ All tests pass (unit, integration, e2e)
+✅ Logging shows all database queries
+✅ Documentation complete with usage examples
+
+BENEFITS
+--------
+
+1. **Security**: Centralized validation, sanitization, access control
+2. **Monitoring**: Log all queries, track performance, detect issues
+3. **Testing**: Mock one module instead of many database calls
+4. **Flexibility**: Easy to switch databases or add caching
+5. **Maintainability**: Clear database access patterns
+6. **Debugging**: See all database operations in one place
+
+TIMELINE
+--------
+
+Phase 1: Audit current usage - 1 hour
+Phase 2: Design wrapper API - 1 hour
+Phase 3: Implement wrapper - 2-3 hours
+Phase 4: Migrate existing code - 1-2 hours
+Phase 5: Verification - 30 minutes
+Phase 6: Documentation - 30 minutes
+
+Total: 6-8 hours
+
+This task isolates database access as a single point of control.
