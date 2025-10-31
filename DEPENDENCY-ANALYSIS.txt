@@ -3,7 +3,30 @@ HEPHAESTUS DEPENDENCY ANALYSIS
 
 Date: 2025-11-01
 Issue: LangChain dependency resolution conflicts
-Status: Investigating compatible versions
+Status: RESOLVED - Using 1.0.x series with --no-deps workaround
+
+SOLUTION (SUCCESSFUL)
+---------------------
+
+The issue was resolved by installing LangChain packages FIRST without dependencies,
+then installing the rest of requirements.txt.
+
+Working versions (LangChain 1.0.x series):
+- langchain==1.0.3
+- langchain-core==1.0.2
+- langchain-openai==1.0.1
+- langchain-community==0.4.1
+- langchain-groq>=0.0.1
+
+Installation steps:
+1. pip install --no-deps langchain langchain-core langchain-openai
+2. pip install -r requirements.txt (installs remaining deps)
+
+Key insight: Using --no-deps bypasses pip's backtracking resolver and installs
+the latest 1.0.x versions which are all mutually compatible.
+
+NOTE: Using langchain[llms] extras does NOT solve the issue - it still triggers
+the same backtracking behavior because it doesn't change version constraints.
 
 PROBLEM SUMMARY
 ---------------
