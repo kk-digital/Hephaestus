@@ -1,0 +1,495 @@
+TASK: MIGRATE HEPHAESTUS TO OPEN-SOURCE EMBEDDINGS
+===================================================
+
+STATUS: Pending Implementation
+PRIORITY: Medium
+ESTIMATED TIME: 2-4 hours
+
+GOAL
+----
+
+Enable Hephaestus to use open-source embeddings instead of requiring OpenAI API key.
+
+Provide THREE embedding options:
+1. LM Studio embeddings (768-dim, already available)
+2. jina-embeddings-v4-text-retrieval-GGUF (2048-dim, best quality open-source)
+3. OpenAI text-embedding-3-large (3072-dim, proprietary, current default)
+
+EMBEDDING OPTIONS COMPARISON
+-----------------------------
+
+Option 1: LM Studio nomic-embed-text-v1.5
+  Dimensions: 768
+  Quality: Good (better than OpenAI Ada-002)
+  Speed: Fast (small model)
+  Cost: FREE
+  Status: ✅ Already loaded in LM Studio
+  MTEB Score: ~62 (estimated)
+  Pros: Lightweight, fast, already available
+  Cons: Lower quality than other options
+
+Option 2: jina-embeddings-v4-text-retrieval-GGUF (RECOMMENDED)
+  Dimensions: 2048 (default), supports 128/256/512/1024/2048 via Matryoshka
+  Quality: Excellent (ranked #5 on MTEB)
+  Speed: Medium (3.8B parameters)
+  Cost: FREE (local) or $0.02 per 1M tokens (Jina API)
+  Status: ⚠️ Needs to be loaded in LM Studio or use Jina API
+  MTEB Score: 55.97 (English), 66.49 (Multilingual)
+  Pros: Best open-source quality, multimodal, multilingual
+  Cons: Requires download/setup, larger model
+
+Option 3: OpenAI text-embedding-3-large (CURRENT DEFAULT)
+  Dimensions: 3072
+  Quality: Highest (~2% better than jina-v4)
+  Speed: Fast (API call)
+  Cost: $0.13 per 1M tokens (~$0.10-1/month light usage)
+  Status: ✅ Works out of box
+  MTEB Score: ~73-74 (estimated)
+  Pros: Highest quality, no setup needed
+  Cons: Requires API key, costs money, proprietary
+
+JINA-EMBEDDINGS-V4 SPECIFICATIONS
+----------------------------------
+
+Model Details:
+- Full name: jina-embeddings-v4-text-retrieval-GGUF
+- Parameters: 3.8 billion
+- Architecture: Universal embedding model (text + images)
+- License: Apache 2.0 (open source)
+- Release: July 2024
+
+Performance (MTEB Benchmark):
+- English (MTEB-EN): 55.97 (3% better than v3)
+- Multilingual (MMTEB): 66.49 (14% better than v3)
+- Code Retrieval (CoIR): 71.59 (30% better than v3)
+- Long Documents (LongEmbed): 67.11 (21% better than v3)
+- Visual Documents (ViDoRe): 90.17 (multimodal)
+- Overall Rank: #5 on MTEB retrieval tasks (as of July 2025)
+
+Dimensions:
+- Default: 2048 dimensions
+- Matryoshka support: Can truncate to 128, 256, 512, 1024, or 2048
+- Performance: Minimal loss when truncating (e.g., 1024-dim still excellent)
+
+Context Length:
+- Maximum: 8192 tokens (same as v3)
+
+Features:
+- Multilingual: 100+ languages
+- Multimodal: Text + images
+- Long context: 8192 tokens
+- Matryoshka: Flexible dimensions
+- GGUF format: Optimized for local inference
+
+Availability:
+- HuggingFace: https://huggingface.co/jinaai/jina-embeddings-v4-text-retrieval-GGUF
+- Jina API: https://jina.ai/embeddings/ (1M tokens free, then $0.02/1M)
+- LM Studio: Can be manually loaded
+- Ollama: Available via ollama pull
+
+FILES TO MODIFY
+---------------
+
+1. hephaestus_config.yaml
+   Add embedding configuration section:
+
+   embeddings:
+     provider: "lmstudio"  # Options: "openai", "lmstudio", "jina-api"
+     model: "text-embedding-nomic-embed-text-v1.5"
+     dimensions: 768
+     base_url: "http://host.docker.internal:1234/v1"  # For LM Studio
+
+     # Alternative providers:
+     # provider: "jina-api"
+     # model: "jina-embeddings-v4-text-retrieval"
+     # dimensions: 2048  # Or 1024, 512, 256, 128
+     # base_url: "https://api.jina.ai/v1"
+
+     # provider: "openai"
+     # model: "text-embedding-3-large"
+     # dimensions: 3072
+
+   vector_store:
+     qdrant_url: "http://localhost:6333"
+     collection_prefix: "hephaestus"
+     embedding_dimension: 768  # Must match embeddings.dimensions
+
+   task_dedup:
+     enabled: true
+     similarity_threshold: 0.85
+     embedding_dimension: 768  # Must match embeddings.dimensions
+
+2. src/memory/vector_store.py
+   Make dimensions configurable instead of hardcoded:
+
+   class VectorStoreManager:
+       # BEFORE (hardcoded):
+       COLLECTIONS = {
+           "agent_memories": {
+               "size": 3072,  # OpenAI text-embedding-3-large dimension
+               ...
+           },
+       }
+
+       # AFTER (configurable):
+       def __init__(self, qdrant_url: str, collection_prefix: str, embedding_dimension: int = 768):
+           self.embedding_dimension = embedding_dimension
+           self.COLLECTIONS = {
+               "agent_memories": {
+                   "size": self.embedding_dimension,
+                   "description": "Real-time agent discoveries and learnings",
+               },
+               # ... repeat for all 7 collections
+           }
+
+3. qdrant_mcp_openai.py
+   Rename to qdrant_mcp.py and make provider configurable:
+
+   # Configuration from environment
+   EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "lmstudio")
+   EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5")
+   EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", "http://host.docker.internal:1234/v1")
+   EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "dummy-key")
+   EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "768"))
+
+   # Initialize OpenAI-compatible client (works for LM Studio, Jina API, OpenAI)
+   openai_client = AsyncOpenAI(
+       api_key=EMBEDDING_API_KEY,
+       base_url=EMBEDDING_BASE_URL
+   )
+
+4. .env.example
+   Add embedding configuration options:
+
+   # EMBEDDING CONFIGURATION
+   # Choose one provider: lmstudio, jina-api, openai
+
+   # Option 1: LM Studio (FREE, 768 dimensions)
+   EMBEDDING_PROVIDER=lmstudio
+   EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5
+   EMBEDDING_BASE_URL=http://host.docker.internal:1234/v1
+   EMBEDDING_API_KEY=dummy-key
+   EMBEDDING_DIMENSIONS=768
+
+   # Option 2: Jina API (FREE 1M tokens, then $0.02/1M, 2048 dimensions)
+   #EMBEDDING_PROVIDER=jina-api
+   #EMBEDDING_MODEL=jina-embeddings-v4-text-retrieval
+   #EMBEDDING_BASE_URL=https://api.jina.ai/v1
+   #EMBEDDING_API_KEY=jina_xxxxx  # Get from https://jina.ai/embeddings/
+   #EMBEDDING_DIMENSIONS=2048  # Or 1024, 512, 256, 128
+
+   # Option 3: OpenAI (PROPRIETARY, $0.13/1M tokens, 3072 dimensions)
+   #EMBEDDING_PROVIDER=openai
+   #EMBEDDING_MODEL=text-embedding-3-large
+   #EMBEDDING_BASE_URL=https://api.openai.com/v1
+   #EMBEDDING_API_KEY=sk-proj-xxxxx
+   #EMBEDDING_DIMENSIONS=3072
+
+5. src/core/simple_config.py
+   Update to read embedding configuration:
+
+   embeddings = config.get('embeddings', {})
+   self.embedding_provider = embeddings.get('provider', 'lmstudio')
+   self.embedding_model = embeddings.get('model', 'text-embedding-nomic-embed-text-v1.5')
+   self.embedding_dimensions = embeddings.get('dimensions', 768)
+   self.embedding_base_url = embeddings.get('base_url', 'http://host.docker.internal:1234/v1')
+
+IMPLEMENTATION STEPS
+--------------------
+
+Step 1: Backup current configuration
+  cd /home/user/workspace/Hephaestus
+  cp hephaestus_config.yaml hephaestus_config.yaml.backup
+  cp src/memory/vector_store.py src/memory/vector_store.py.backup
+  cp qdrant_mcp_openai.py qdrant_mcp_openai.py.backup
+  cp src/core/simple_config.py src/core/simple_config.py.backup
+
+Step 2: Update hephaestus_config.yaml
+  Add embeddings configuration section (see FILES TO MODIFY)
+
+Step 3: Update src/memory/vector_store.py
+  Make __init__ accept embedding_dimension parameter
+  Use self.embedding_dimension instead of hardcoded 3072
+  Update all 7 collections to use configurable dimensions
+
+Step 4: Rename and update qdrant_mcp_openai.py → qdrant_mcp.py
+  Add EMBEDDING_PROVIDER, EMBEDDING_BASE_URL configuration
+  Keep using OpenAI-compatible client (works for all providers)
+
+Step 5: Update src/core/simple_config.py
+  Add embedding configuration parsing
+
+Step 6: Create .env file with chosen provider
+  Choose: lmstudio (768-dim), jina-api (2048-dim), or openai (3072-dim)
+
+Step 7: Delete existing Qdrant database (dimension change)
+  rm -rf qdrant_storage/
+
+Step 8: Initialize new Qdrant database
+  python init_qdrant.py
+
+Step 9: Test embedding generation
+  python test_embeddings.py  # Create this test script
+
+Step 10: Start services and verify
+  bash startup-services.sh
+
+TESTING SCRIPT
+--------------
+
+Create test_embeddings.py:
+
+```python
+#!/usr/bin/env python3
+"""Test embedding generation with configured provider."""
+
+import os
+import asyncio
+from openai import AsyncOpenAI
+
+async def test_embeddings():
+    provider = os.getenv("EMBEDDING_PROVIDER", "lmstudio")
+    model = os.getenv("EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5")
+    base_url = os.getenv("EMBEDDING_BASE_URL", "http://host.docker.internal:1234/v1")
+    api_key = os.getenv("EMBEDDING_API_KEY", "dummy-key")
+    dimensions = int(os.getenv("EMBEDDING_DIMENSIONS", "768"))
+
+    print(f"Testing embeddings:")
+    print(f"  Provider: {provider}")
+    print(f"  Model: {model}")
+    print(f"  Base URL: {base_url}")
+    print(f"  Expected dimensions: {dimensions}")
+    print()
+
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+
+    test_text = "This is a test embedding"
+
+    try:
+        response = await client.embeddings.create(
+            model=model,
+            input=test_text
+        )
+
+        embedding = response.data[0].embedding
+        actual_dims = len(embedding)
+
+        print(f"✅ SUCCESS")
+        print(f"  Generated embedding for: '{test_text}'")
+        print(f"  Actual dimensions: {actual_dims}")
+        print(f"  First 5 values: {embedding[:5]}")
+
+        if actual_dims != dimensions:
+            print(f"⚠️  WARNING: Dimension mismatch!")
+            print(f"  Expected: {dimensions}, Got: {actual_dims}")
+            print(f"  Update EMBEDDING_DIMENSIONS in .env to {actual_dims}")
+        else:
+            print(f"✅ Dimensions match configuration")
+
+    except Exception as e:
+        print(f"❌ ERROR: {e}")
+        print(f"  Check that:")
+        print(f"    - {provider} is running")
+        print(f"    - Model '{model}' is loaded")
+        print(f"    - Base URL '{base_url}' is accessible")
+
+if __name__ == "__main__":
+    asyncio.run(test_embeddings())
+```
+
+Make executable:
+  chmod +x test_embeddings.py
+
+LOADING JINA-V4 IN LM STUDIO
+-----------------------------
+
+Option A: Download GGUF file manually
+  1. Download from HuggingFace:
+     https://huggingface.co/jinaai/jina-embeddings-v4-text-retrieval-GGUF
+
+  2. Choose quantization level:
+     - Q8_0 (best quality, 3.8 GB)
+     - Q6_K (good quality, smaller size)
+     - Q4_K_M (faster, reduced quality)
+
+  3. Place in LM Studio models directory:
+     ~/Library/Application Support/LM Studio/models/
+
+  4. Restart LM Studio
+
+  5. Load model in LM Studio interface
+
+Option B: Use Ollama (easier)
+  1. Install Ollama if not installed:
+     brew install ollama
+
+  2. Pull jina-embeddings-v4:
+     ollama pull jina-embeddings-v4
+
+  3. Use Ollama API endpoint:
+     EMBEDDING_BASE_URL=http://localhost:11434/v1
+     EMBEDDING_MODEL=jina-embeddings-v4
+
+Option C: Use Jina API (easiest)
+  1. Sign up at https://jina.ai/embeddings/
+
+  2. Get API key
+
+  3. Configure .env:
+     EMBEDDING_PROVIDER=jina-api
+     EMBEDDING_BASE_URL=https://api.jina.ai/v1
+     EMBEDDING_API_KEY=jina_xxxxx
+     EMBEDDING_MODEL=jina-embeddings-v4-text-retrieval
+     EMBEDDING_DIMENSIONS=2048
+
+  4. Free tier: 1M tokens per month
+
+  5. Paid tier: $0.02 per 1M tokens (15x cheaper than OpenAI)
+
+DIMENSION RECOMMENDATIONS
+--------------------------
+
+For different use cases:
+
+Development/Testing:
+  Provider: lmstudio
+  Model: nomic-embed-text-v1.5
+  Dimensions: 768
+  Rationale: Fast, lightweight, already available
+
+Production (Best Quality):
+  Provider: jina-api
+  Model: jina-embeddings-v4-text-retrieval
+  Dimensions: 2048
+  Rationale: Best open-source quality, still cheap
+
+Production (Balanced):
+  Provider: jina-api
+  Model: jina-embeddings-v4-text-retrieval
+  Dimensions: 1024 (Matryoshka truncation)
+  Rationale: Good quality, 2x smaller storage/memory
+
+Production (Maximum Quality):
+  Provider: openai
+  Model: text-embedding-3-large
+  Dimensions: 3072
+  Rationale: Highest quality, but proprietary and expensive
+
+MIGRATION CHECKLIST
+-------------------
+
+Pre-migration:
+[ ] Backup hephaestus_config.yaml
+[ ] Backup src/memory/vector_store.py
+[ ] Backup qdrant_mcp_openai.py
+[ ] Backup src/core/simple_config.py
+[ ] Document current Qdrant collections (if any data exists)
+
+Code changes:
+[ ] Update hephaestus_config.yaml with embeddings section
+[ ] Update src/memory/vector_store.py to accept configurable dimensions
+[ ] Rename qdrant_mcp_openai.py → qdrant_mcp.py
+[ ] Update qdrant_mcp.py to read provider configuration
+[ ] Update src/core/simple_config.py to parse embeddings config
+[ ] Create .env with embedding provider settings
+[ ] Create test_embeddings.py script
+
+Database migration:
+[ ] Delete old Qdrant database (rm -rf qdrant_storage/)
+[ ] Run init_qdrant.py to create new collections
+[ ] Verify collections created with correct dimensions
+
+Testing:
+[ ] Run test_embeddings.py
+[ ] Verify dimensions match configuration
+[ ] Test embedding generation for sample texts
+[ ] Check Qdrant collections: curl http://localhost:6334/collections
+[ ] Start services: bash startup-services.sh
+[ ] Test MCP server embedding endpoint
+
+Verification:
+[ ] Agent memories stored successfully
+[ ] Semantic search returns relevant results
+[ ] No dimension mismatch errors in logs
+[ ] Performance acceptable for use case
+
+ROLLBACK PLAN
+-------------
+
+If migration fails:
+
+1. Stop all services
+2. Restore backups:
+   cp hephaestus_config.yaml.backup hephaestus_config.yaml
+   cp src/memory/vector_store.py.backup src/memory/vector_store.py
+   cp qdrant_mcp_openai.py.backup qdrant_mcp_openai.py
+   cp src/core/simple_config.py.backup src/core/simple_config.py
+3. Restore Qdrant database (if backed up)
+4. Update .env to use OpenAI
+5. Restart services
+
+EXPECTED OUTCOMES
+-----------------
+
+After successful migration:
+
+✅ Hephaestus works with open-source embeddings
+✅ No OpenAI API key required (if using lmstudio or jina-api free tier)
+✅ Cost reduced to $0/month (lmstudio) or $0-0.02/month (jina-api)
+✅ Data stays private (lmstudio) or uses trusted provider (jina-api)
+✅ Minimal quality loss (<2-5% depending on provider choice)
+✅ Configurable provider selection via .env
+✅ Same functionality as before
+
+DOCUMENTATION TO UPDATE
+-----------------------
+
+After implementation:
+[ ] Update USAGE-GUIDE.txt with embedding provider options
+[ ] Update LLM-SETUP.txt with embedding configuration
+[ ] Update QUICK-REFERENCE.txt with embedding commands
+[ ] Create EMBEDDING-PROVIDERS.txt with detailed provider comparison
+[ ] Update README.txt with embedding requirements
+
+COST COMPARISON (1 MILLION EMBEDDINGS)
+---------------------------------------
+
+LM Studio (nomic-embed-text-v1.5):
+  Cost: $0 (FREE)
+  Quality: Good
+  Storage: 3 GB (768-dim × 1M × 4 bytes)
+  Time: ~15-30 minutes (local inference)
+
+Jina API (jina-embeddings-v4-text-retrieval):
+  Cost: $0 (first 1M), then $0.02 per 1M
+  Quality: Excellent
+  Storage: 8 GB (2048-dim × 1M × 4 bytes)
+  Time: ~5-10 minutes (API)
+
+OpenAI (text-embedding-3-large):
+  Cost: $130 (1M × $0.13)
+  Quality: Highest (~2% better than Jina)
+  Storage: 12 GB (3072-dim × 1M × 4 bytes)
+  Time: ~5-10 minutes (API)
+
+Savings: $130 per million embeddings by switching to open source
+
+NEXT STEPS
+----------
+
+1. Review this task file
+2. Choose embedding provider (lmstudio, jina-api, or openai)
+3. Follow implementation steps
+4. Test thoroughly
+5. Update documentation
+6. Deploy to production
+
+ESTIMATED EFFORT
+----------------
+
+Code changes: 1-2 hours
+Testing: 30-60 minutes
+Documentation: 30-60 minutes
+Total: 2-4 hours
+
+This is a one-time migration that saves ongoing costs.

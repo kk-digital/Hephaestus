@@ -1,0 +1,514 @@
+TASK: RUN HEPHAESTUS WITH LOCAL LM STUDIO FOR TESTING
+=====================================================
+
+STATUS: Pending
+PRIORITY: High
+BRANCH: dev-haltingstate-00
+ESTIMATED TIME: 3-4 hours
+
+GOAL
+----
+
+Configure Hephaestus to run completely with LM Studio for local testing.
+Use small local models for both LLM operations and embeddings.
+Enable offline development and testing without API costs.
+
+MOTIVATION
+----------
+
+Benefits of local testing:
+- No API costs during development
+- Offline development capability
+- Faster iteration (no network latency)
+- Privacy (no data sent to external APIs)
+- Test with known/controlled model behavior
+
+Use cases:
+- Unit testing and integration testing
+- Development without internet connection
+- Testing changes before deploying to production
+- Learning and experimentation
+
+CURRENT STATE
+-------------
+
+LM Studio is running with:
+- Chat models loaded (various sizes available)
+- Embedding models loaded (6 models, all 768-dim)
+- API server running at http://localhost:1234
+
+Hephaestus currently requires:
+- OpenRouter or OpenAI for LLM operations (chat/completion)
+- OpenAI for embeddings (3072-dim)
+
+Need to configure Hephaestus to use LM Studio for both.
+
+LM STUDIO MODELS AVAILABLE
+---------------------------
+
+### Chat Models (verified available in LM Studio)
+
+Small models for testing (recommend starting with these):
+- qwen2.5-0.5b-instruct (500M parameters, very fast)
+- qwen2.5-1.5b-instruct (1.5B parameters, good balance)
+- qwen2.5-3b-instruct (3B parameters, better quality)
+
+Medium models:
+- qwen2.5-7b-instruct (7B parameters, good quality)
+- llama-3.2-3b-instruct (3B parameters, Meta model)
+
+Large models (if RAM available):
+- qwen2.5-14b-instruct (14B parameters, high quality)
+- qwen2.5-32b-instruct (32B parameters, very high quality)
+
+Recommended for testing: qwen2.5-1.5b-instruct (fast, small, good enough)
+
+### Embedding Models (verified loaded)
+
+All 768-dimensional:
+1. nomic-embed-text-v1.5 (RECOMMENDED - best quality)
+2. granite-embedding-125m-english
+3. qwen3-embedding-0.6b
+4. qwen3-embedding-4b
+5. qwen3-embedding-8b
+6. embeddinggemma-300m-with-dense-modules
+
+Recommended for testing: nomic-embed-text-v1.5
+
+CONFIGURATION CHANGES NEEDED
+-----------------------------
+
+### Change 1: Update hephaestus_config.yaml
+
+Current config (uses OpenRouter/OpenAI):
+```yaml
+llm:
+  provider: openrouter
+  api_key: ${OPENROUTER_API_KEY}
+  model: anthropic/claude-3.5-sonnet
+
+embedding:
+  provider: openai
+  api_key: ${OPENAI_API_KEY}
+  model: text-embedding-3-large
+  dimensions: 3072
+```
+
+New config for local testing:
+```yaml
+llm:
+  provider: lmstudio
+  base_url: http://localhost:1234/v1
+  model: qwen2.5-1.5b-instruct
+  api_key: not-needed  # LM Studio doesn't require API key
+
+embedding:
+  provider: lmstudio
+  base_url: http://localhost:1234/v1
+  model: nomic-embed-text-v1.5
+  dimensions: 768
+```
+
+### Change 2: Update Qdrant collection configuration
+
+Current: 3072-dimensional vectors
+New: 768-dimensional vectors
+
+Options:
+1. Create new collections with 768-dim (recommended for testing)
+2. Recreate existing collections with 768-dim (destructive)
+
+Recommendation: Use separate database for local testing
+- Production: qdrant_storage/ (3072-dim, OpenAI embeddings)
+- Testing: qdrant_storage_local/ (768-dim, LM Studio embeddings)
+
+### Change 3: Update .env file
+
+Add local testing configuration:
+```bash
+# Local testing mode (LM Studio)
+HEPHAESTUS_MODE=local  # or 'production'
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+LMSTUDIO_CHAT_MODEL=qwen2.5-1.5b-instruct
+LMSTUDIO_EMBEDDING_MODEL=nomic-embed-text-v1.5
+
+# Production mode (OpenRouter/OpenAI)
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENAI_API_KEY=sk-proj-...
+```
+
+IMPLEMENTATION STEPS
+--------------------
+
+Phase 1: Verify LM Studio setup (30 minutes)
+  [ ] Check LM Studio is running: curl http://localhost:1234/v1/models
+  [ ] Verify chat model loaded: qwen2.5-1.5b-instruct
+  [ ] Verify embedding model loaded: nomic-embed-text-v1.5
+  [ ] Test chat endpoint:
+      curl http://localhost:1234/v1/chat/completions \
+        -H "Content-Type: application/json" \
+        -d '{"model": "qwen2.5-1.5b-instruct", "messages": [{"role": "user", "content": "Hello"}]}'
+  [ ] Test embedding endpoint:
+      curl http://localhost:1234/v1/embeddings \
+        -H "Content-Type: application/json" \
+        -d '{"model": "nomic-embed-text-v1.5", "input": "test"}'
+
+Phase 2: Create local testing configuration (1 hour)
+  [ ] Create config/hephaestus_config.local.yaml
+  [ ] Set provider: lmstudio
+  [ ] Set base_url: http://localhost:1234/v1
+  [ ] Set chat model: qwen2.5-1.5b-instruct
+  [ ] Set embedding model: nomic-embed-text-v1.5
+  [ ] Set embedding dimensions: 768
+  [ ] Set qdrant path: qdrant_storage_local/
+
+Phase 3: Update code to support LM Studio provider (1-2 hours)
+  [ ] Update src/core/config.py to handle lmstudio provider
+  [ ] Update src/memory/vector_store.py to handle 768-dim embeddings
+  [ ] Add LM Studio provider support (if not exists)
+  [ ] Update embedding code to use configurable dimensions
+  [ ] Handle API key not needed for local provider
+
+Phase 4: Test LLM operations (30 minutes)
+  [ ] Run simple chat test with local model
+  [ ] Verify responses are generated
+  [ ] Test streaming responses (if supported)
+  [ ] Measure response time and quality
+  [ ] Compare with OpenRouter/OpenAI responses
+
+Phase 5: Test embedding operations (30 minutes)
+  [ ] Generate test embeddings with nomic-embed-text-v1.5
+  [ ] Verify 768-dimensional vectors
+  [ ] Create test Qdrant collection
+  [ ] Store and retrieve test embeddings
+  [ ] Test semantic search
+
+Phase 6: Test full workflow (1 hour)
+  [ ] Initialize Hephaestus with local config
+  [ ] Create test agent
+  [ ] Test agent memory storage
+  [ ] Test agent retrieval
+  [ ] Test PRD workflow (if possible with small model)
+  [ ] Verify all operations work locally
+
+Phase 7: Documentation (30 minutes)
+  [ ] Document local testing setup
+  [ ] Document configuration switches
+  [ ] Document model selection
+  [ ] Add troubleshooting guide
+  [ ] Update README with local testing section
+
+TESTING SCRIPT
+--------------
+
+Create test_local_lmstudio.py:
+
+```python
+#!/usr/bin/env python3
+"""Test Hephaestus with local LM Studio."""
+
+import os
+import sys
+from pathlib import Path
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+from src.core.config import load_config
+from src.memory.vector_store import VectorStore
+from src.services.agent_service import AgentService
+
+def test_lmstudio_chat():
+    """Test chat completion with LM Studio."""
+    print("Testing LM Studio chat...")
+
+    config = load_config("config/hephaestus_config.local.yaml")
+
+    # Test simple chat
+    # (implement based on actual Hephaestus API)
+
+    print("✅ Chat test passed")
+
+def test_lmstudio_embeddings():
+    """Test embeddings with LM Studio."""
+    print("Testing LM Studio embeddings...")
+
+    config = load_config("config/hephaestus_config.local.yaml")
+    vector_store = VectorStore(config)
+
+    # Test embedding generation
+    text = "This is a test sentence for embedding."
+    embedding = vector_store.get_embedding(text)
+
+    assert len(embedding) == 768, f"Expected 768-dim, got {len(embedding)}"
+    print(f"✅ Embedding test passed (dimension: {len(embedding)})")
+
+def test_lmstudio_memory():
+    """Test agent memory with LM Studio."""
+    print("Testing LM Studio memory operations...")
+
+    config = load_config("config/hephaestus_config.local.yaml")
+    agent_service = AgentService(config)
+
+    # Create test agent
+    agent = agent_service.create_agent("test-agent-local")
+
+    # Store memory
+    agent_service.store_memory(agent.id, "Test memory content", "observation")
+
+    # Retrieve memory
+    memories = agent_service.retrieve_memories(agent.id, "test memory", k=5)
+
+    assert len(memories) > 0, "No memories retrieved"
+    print(f"✅ Memory test passed (retrieved {len(memories)} memories)")
+
+def main():
+    """Run all tests."""
+    print("=" * 60)
+    print("HEPHAESTUS LOCAL LM STUDIO TESTING")
+    print("=" * 60)
+
+    try:
+        test_lmstudio_chat()
+        test_lmstudio_embeddings()
+        test_lmstudio_memory()
+
+        print("\n" + "=" * 60)
+        print("✅ ALL TESTS PASSED")
+        print("=" * 60)
+
+    except Exception as e:
+        print(f"\n❌ TEST FAILED: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+```
+
+Run with:
+```bash
+cd /home/user/workspace/Hephaestus
+source .venv/bin/activate
+python test_local_lmstudio.py
+```
+
+MODEL SELECTION GUIDE
+---------------------
+
+Choosing the right model size for testing:
+
+**Very small (500M-1.5B params):**
+- Models: qwen2.5-0.5b, qwen2.5-1.5b
+- RAM: ~2-4 GB
+- Speed: Very fast (10-50 tokens/sec)
+- Quality: Good enough for testing
+- Use for: Unit tests, quick iteration
+
+**Small (3B params):**
+- Models: qwen2.5-3b, llama-3.2-3b
+- RAM: ~4-6 GB
+- Speed: Fast (5-20 tokens/sec)
+- Quality: Good
+- Use for: Integration tests, development
+
+**Medium (7B params):**
+- Models: qwen2.5-7b
+- RAM: ~8-12 GB
+- Speed: Moderate (2-10 tokens/sec)
+- Quality: Very good
+- Use for: Final testing before production
+
+**Large (14B+ params):**
+- Models: qwen2.5-14b, qwen2.5-32b
+- RAM: 16-32+ GB
+- Speed: Slow (1-5 tokens/sec)
+- Quality: Excellent
+- Use for: Quality comparison with production
+
+**Recommendation for this task:** Start with qwen2.5-1.5b-instruct
+- Fast enough for testing
+- Small enough to run on most machines
+- Good enough quality to verify functionality
+- Can upgrade to larger model later if needed
+
+CONFIGURATION SWITCHING
+-----------------------
+
+Support easy switching between local and production:
+
+### Option 1: Environment variable
+
+```bash
+# Use local LM Studio
+export HEPHAESTUS_MODE=local
+python run_server.py
+
+# Use production APIs
+export HEPHAESTUS_MODE=production
+python run_server.py
+```
+
+### Option 2: Config file override
+
+```bash
+# Use local config
+python run_server.py --config config/hephaestus_config.local.yaml
+
+# Use production config
+python run_server.py --config config/hephaestus_config.yaml
+```
+
+### Option 3: Separate startup scripts
+
+```bash
+# Local testing
+./run_local.sh
+
+# Production
+./run_server.sh
+```
+
+EXPECTED BEHAVIOR DIFFERENCES
+------------------------------
+
+When running with small local models vs production APIs:
+
+**Response quality:**
+- Local small models: Lower quality, simpler responses
+- Production (Claude/GPT-4): Higher quality, more nuanced
+
+**Response speed:**
+- Local: Faster (no network latency, optimized inference)
+- Production: Slower (network round-trip, API queuing)
+
+**Cost:**
+- Local: FREE (no API costs)
+- Production: ~$0.10-1/month (embeddings + LLM calls)
+
+**Reliability:**
+- Local: Depends on hardware, no rate limits
+- Production: Depends on API availability, rate limits apply
+
+**Use local for:**
+- Development and debugging
+- Unit/integration testing
+- Learning and experimentation
+- Offline work
+
+**Use production for:**
+- Final testing before release
+- Production deployments
+- When quality matters more than cost
+- When hardware is limited
+
+TROUBLESHOOTING
+---------------
+
+### Issue 1: LM Studio not responding
+
+Check:
+  [ ] LM Studio is running
+  [ ] Server started in LM Studio UI
+  [ ] Port 1234 is not blocked
+  [ ] Model is loaded (shown in LM Studio UI)
+
+Fix:
+  curl http://localhost:1234/v1/models
+  # Should return list of loaded models
+
+### Issue 2: Model not found
+
+Error: "Model qwen2.5-1.5b-instruct not found"
+
+Fix:
+  1. Check loaded models in LM Studio UI
+  2. Load the model if not loaded
+  3. Verify model name matches exactly
+  4. Update config with correct model name
+
+### Issue 3: Dimension mismatch
+
+Error: "Expected 3072-dim, got 768-dim"
+
+Fix:
+  1. Recreate Qdrant collections with 768-dim
+  2. Or use separate qdrant_storage_local/ directory
+  3. Update config embedding.dimensions: 768
+
+### Issue 4: Out of memory
+
+Error: Model loading fails or system hangs
+
+Fix:
+  1. Use smaller model (qwen2.5-0.5b instead of qwen2.5-7b)
+  2. Close other applications
+  3. Increase system RAM
+  4. Use quantized model (Q4 or Q5 instead of F16)
+
+### Issue 5: Slow responses
+
+Local model responding very slowly
+
+Check:
+  1. CPU usage (should be high during generation)
+  2. Model size (smaller = faster)
+  3. Quantization level (Q4 faster than F16)
+  4. Available RAM (swapping = slow)
+
+Fix:
+  - Use smaller model
+  - Use more aggressive quantization
+  - Reduce max_tokens in requests
+
+SUCCESS CRITERIA
+----------------
+
+✅ LM Studio verified running with test models loaded
+✅ Configuration file created for local testing
+✅ Chat completion works with local model
+✅ Embeddings work with nomic-embed-text-v1.5 (768-dim)
+✅ Qdrant collections created with 768-dim
+✅ Full agent workflow works with local models
+✅ Test script passes all tests
+✅ Documentation complete with setup guide
+✅ Can easily switch between local and production modes
+
+BENEFITS
+--------
+
+1. **Zero API costs during development**
+   - No charges for testing and experimentation
+   - Unlimited testing without budget concerns
+
+2. **Offline development**
+   - Work without internet connection
+   - No dependency on external API availability
+
+3. **Faster iteration**
+   - No network latency
+   - Immediate responses for testing
+
+4. **Privacy**
+   - No data sent to external APIs
+   - All processing local
+
+5. **Learning**
+   - Understand system behavior with different models
+   - Compare small vs large model performance
+
+TIMELINE
+--------
+
+Phase 1: Verify LM Studio setup - 30 minutes
+Phase 2: Create local configuration - 1 hour
+Phase 3: Update code for LM Studio - 1-2 hours
+Phase 4: Test LLM operations - 30 minutes
+Phase 5: Test embedding operations - 30 minutes
+Phase 6: Test full workflow - 1 hour
+Phase 7: Documentation - 30 minutes
+
+Total: 4-5 hours
+
+This task enables completely local development and testing of Hephaestus.

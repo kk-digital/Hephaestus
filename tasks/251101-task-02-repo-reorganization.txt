@@ -1,0 +1,413 @@
+TASK: REORGANIZE HEPHAESTUS REPOSITORY STRUCTURE
+================================================
+
+STATUS: Pending Analysis and Implementation
+PRIORITY: Medium
+BRANCH: dev-haltingstate-00
+ESTIMATED TIME: 3-5 hours
+
+GOAL
+----
+
+Reorganize Hephaestus repository to follow clean project structure:
+- All Python executable scripts → code/ directory
+- All configuration files (YAML, JSON, TOML) → config/ directory
+- Maintain existing src/ for library code
+- Update all imports and references
+- Test that nothing breaks after reorganization
+
+CURRENT REPOSITORY STRUCTURE
+-----------------------------
+
+Root directory contains mix of Python scripts and config files:
+├── claude_mcp_client.py          # Python script (MCP client)
+├── qdrant_mcp_openai.py          # Python script (MCP server)
+├── run_monitor.py                # Python script (monitoring)
+├── run_prd_workflow.py           # Python script (workflow runner)
+├── run_server.py                 # Python script (FastAPI server)
+├── hephaestus_config.yaml        # Config file (main config)
+├── pyproject.toml                # Config file (Python project)
+├── src/                          # Library code (KEEP HERE)
+│   ├── agents/
+│   ├── auth/
+│   ├── core/
+│   ├── interfaces/
+│   ├── mcp/
+│   ├── memory/
+│   ├── monitoring/
+│   ├── phases/
+│   ├── prompts/
+│   ├── sdk/
+│   ├── services/
+│   ├── validation/
+│   └── workflow/
+├── tests/                        # Tests (KEEP HERE)
+├── config/                       # Existing config dir (has agent_config.yaml)
+├── scripts/                      # Empty or misc scripts
+├── frontend/                     # Frontend code (KEEP HERE)
+├── website/                      # Website code (KEEP HERE)
+├── design_docs/                  # Documentation (KEEP HERE)
+├── example_workflows/            # Examples (KEEP HERE)
+└── assets/                       # Assets (KEEP HERE)
+
+PROBLEMS WITH CURRENT STRUCTURE
+--------------------------------
+
+1. Root directory cluttered with executable Python scripts
+2. Configuration files mixed with executable code
+3. No clear separation between runnable scripts and library code
+4. Hard to find entry points for the application
+5. config/ directory exists but only has one file
+
+ROOT PYTHON FILES ANALYSIS
+---------------------------
+
+Files to move to code/ directory:
+
+1. claude_mcp_client.py (54 KB)
+   Purpose: MCP client for interacting with Claude
+   Entry point: Yes (executable)
+   Dependencies: src/mcp/*, OpenAI client
+   Move to: code/claude_mcp_client.py
+
+2. qdrant_mcp_openai.py (4 KB)
+   Purpose: MCP server wrapping Qdrant with OpenAI embeddings
+   Entry point: Yes (executable)
+   Dependencies: Qdrant, OpenAI, FastMCP
+   Move to: code/qdrant_mcp_server.py  # Rename for clarity
+
+3. run_monitor.py (6 KB)
+   Purpose: Monitoring service runner
+   Entry point: Yes (executable)
+   Dependencies: src/monitoring/*
+   Move to: code/run_monitor.py
+
+4. run_prd_workflow.py (12 KB)
+   Purpose: PRD workflow runner
+   Entry point: Yes (executable)
+   Dependencies: src/workflow/*, src/phases/*
+   Move to: code/run_prd_workflow.py
+
+5. run_server.py (1.5 KB)
+   Purpose: FastAPI server entry point
+   Entry point: Yes (executable, main entry point)
+   Dependencies: src/services/*, src/core/*
+   Move to: code/run_server.py
+
+CONFIG FILES ANALYSIS
+---------------------
+
+Files to move to config/ directory:
+
+1. hephaestus_config.yaml (3.5 KB)
+   Purpose: Main Hephaestus configuration
+   Currently in: ./hephaestus_config.yaml
+   Move to: config/hephaestus_config.yaml
+
+2. pyproject.toml (1.1 KB)
+   Purpose: Python project metadata and dependencies
+   Currently in: ./pyproject.toml
+   KEEP IN ROOT: This file MUST stay in root (Python packaging standard)
+
+3. config/agent_config.yaml (1.5 KB)
+   Purpose: Agent configuration
+   Currently in: config/agent_config.yaml
+   Action: ALREADY IN CONFIG, no change needed
+
+FILES TO KEEP IN ROOT
+---------------------
+
+1. pyproject.toml - Required by Python packaging tools
+2. requirements.txt - Python dependency list (if exists)
+3. README.md - Project documentation (if exists)
+4. .gitignore - Git ignore rules
+5. .env - Environment variables (not in git)
+6. .env.example - Environment variable template
+7. setup.py - Python setup script (if exists)
+8. Dockerfile - Docker build instructions (if exists)
+
+PROPOSED NEW STRUCTURE
+----------------------
+
+Hephaestus/
+├── code/                         # NEW: All executable Python scripts
+│   ├── __init__.py              # Make it a package
+│   ├── run_server.py            # Main entry point (FastAPI server)
+│   ├── run_monitor.py           # Monitoring service
+│   ├── run_prd_workflow.py      # PRD workflow runner
+│   ├── claude_mcp_client.py     # MCP client
+│   └── qdrant_mcp_server.py     # MCP server (renamed from qdrant_mcp_openai.py)
+├── config/                       # Config files
+│   ├── hephaestus_config.yaml   # MOVED from root
+│   └── agent_config.yaml        # Already here
+├── src/                          # Library code (unchanged)
+│   ├── agents/
+│   ├── auth/
+│   ├── core/
+│   ├── interfaces/
+│   ├── mcp/
+│   ├── memory/
+│   ├── monitoring/
+│   ├── phases/
+│   ├── prompts/
+│   ├── sdk/
+│   ├── services/
+│   ├── validation/
+│   └── workflow/
+├── tests/                        # Tests (unchanged)
+├── scripts/                      # Shell scripts, utilities
+│   └── startup-services.sh      # MOVE HERE from root
+├── frontend/                     # Frontend (unchanged)
+├── website/                      # Website (unchanged)
+├── design_docs/                  # Docs (unchanged)
+├── example_workflows/            # Examples (unchanged)
+├── assets/                       # Assets (unchanged)
+├── pyproject.toml               # Python project config (KEEP IN ROOT)
+├── .env                         # Environment variables (KEEP IN ROOT)
+├── .env.example                 # Environment template (KEEP IN ROOT)
+└── README.md                    # Documentation (KEEP IN ROOT)
+
+CODE CHANGES REQUIRED
+---------------------
+
+After moving files, these code changes are needed:
+
+1. Update config file paths:
+   All references to "hephaestus_config.yaml" → "config/hephaestus_config.yaml"
+
+   Files that load config:
+   - src/core/simple_config.py
+   - src/core/llm_config.py
+   - code/run_server.py
+   - code/run_monitor.py
+   - code/run_prd_workflow.py
+
+2. Update startup-services.sh paths:
+   Change:
+     python run_server.py → python code/run_server.py
+     python run_monitor.py → python code/run_monitor.py
+     python qdrant_mcp_openai.py → python code/qdrant_mcp_server.py
+
+3. Update documentation:
+   - USAGE-GUIDE.txt: Update command paths
+   - QUICK-REFERENCE.txt: Update command paths
+   - README.md: Update command examples
+
+4. Update pyproject.toml if it has entry points:
+   [project.scripts]
+   hephaestus-server = "code.run_server:main"
+   hephaestus-monitor = "code.run_monitor:main"
+
+IMPLEMENTATION STEPS
+--------------------
+
+Phase 1: Preparation
+  [ ] Create backup branch: git checkout -b backup-before-reorg
+  [ ] Document all current command invocations
+  [ ] Test all services work before changes
+  [ ] Commit current state
+
+Phase 2: Create new directories
+  [ ] mkdir -p code
+  [ ] Ensure config/ directory exists
+  [ ] Create code/__init__.py
+
+Phase 3: Move Python scripts to code/
+  [ ] git mv claude_mcp_client.py code/
+  [ ] git mv qdrant_mcp_openai.py code/qdrant_mcp_server.py  # Rename
+  [ ] git mv run_monitor.py code/
+  [ ] git mv run_prd_workflow.py code/
+  [ ] git mv run_server.py code/
+
+Phase 4: Move config files to config/
+  [ ] git mv hephaestus_config.yaml config/
+
+Phase 5: Move shell scripts to scripts/
+  [ ] git mv startup-services.sh scripts/ (if in root)
+  [ ] git mv readme.txt scripts/ (if utility doc)
+
+Phase 6: Update config file paths in code
+  Search and replace in all files:
+  - "hephaestus_config.yaml" → "config/hephaestus_config.yaml"
+  - "./hephaestus_config.yaml" → "config/hephaestus_config.yaml"
+
+  Files to check:
+  [ ] src/core/simple_config.py
+  [ ] src/core/llm_config.py
+  [ ] code/run_server.py
+  [ ] code/run_monitor.py
+  [ ] code/run_prd_workflow.py
+  [ ] Any test files referencing config
+
+Phase 7: Update startup scripts
+  [ ] Update scripts/startup-services.sh with new paths
+  [ ] Update any systemd service files (if exist)
+  [ ] Update Docker CMD/ENTRYPOINT (if in Dockerfile)
+
+Phase 8: Update documentation
+  [ ] Update USAGE-GUIDE.txt
+  [ ] Update QUICK-REFERENCE.txt
+  [ ] Update README.md (if exists)
+  [ ] Update any setup/installation docs
+
+Phase 9: Testing
+  [ ] Test: python code/run_server.py
+  [ ] Test: python code/run_monitor.py
+  [ ] Test: python code/qdrant_mcp_server.py
+  [ ] Test: python code/claude_mcp_client.py
+  [ ] Test: python code/run_prd_workflow.py
+  [ ] Test: bash scripts/startup-services.sh
+  [ ] Test: All src/ imports still work
+  [ ] Test: Config files loaded correctly
+  [ ] Test: pytest (if tests exist)
+
+Phase 10: Commit and push
+  [ ] git add .
+  [ ] git commit -m "Reorganize repository structure: move scripts to code/, config to config/"
+  [ ] git push origin dev-haltingstate-00
+
+SEARCH AND REPLACE PATTERNS
+----------------------------
+
+Pattern 1: Config file paths
+  Find: hephaestus_config\.yaml
+  Replace: config/hephaestus_config.yaml
+  Files: *.py
+
+Pattern 2: Script paths in startup
+  Find: python run_server\.py
+  Replace: python code/run_server.py
+  Files: *.sh
+
+Pattern 3: Script paths in startup
+  Find: python run_monitor\.py
+  Replace: python code/run_monitor.py
+  Files: *.sh
+
+Pattern 4: MCP server path
+  Find: qdrant_mcp_openai\.py
+  Replace: code/qdrant_mcp_server.py
+  Files: *.sh, *.md, *.txt
+
+TESTING COMMANDS
+----------------
+
+Before reorganization:
+  python run_server.py --help
+  python run_monitor.py --help
+  python qdrant_mcp_openai.py
+  python -m pytest tests/
+
+After reorganization:
+  python code/run_server.py --help
+  python code/run_monitor.py --help
+  python code/qdrant_mcp_server.py
+  python -m pytest tests/
+
+Both should produce identical output (or work the same way).
+
+ROLLBACK PLAN
+-------------
+
+If something breaks:
+  1. git checkout backup-before-reorg
+  2. Review what broke
+  3. Fix incrementally on dev-haltingstate-00
+  4. Test again
+
+BENEFITS OF REORGANIZATION
+---------------------------
+
+1. Clearer project structure
+   - Executable scripts in code/
+   - Config files in config/
+   - Library code in src/
+
+2. Easier to find entry points
+   - All runnable scripts in one place
+   - ls code/ shows all executables
+
+3. Better for packaging
+   - Cleaner root directory
+   - Follows Python best practices
+
+4. Easier to maintain
+   - Clear separation of concerns
+   - Config changes don't affect code
+   - Code changes don't affect config
+
+5. Better for documentation
+   - Can document code/ directory as "entry points"
+   - Can document config/ directory as "configuration"
+   - Clear mental model for new contributors
+
+RELATED TASKS
+-------------
+
+After this reorganization, consider:
+1. Add __main__.py to code/ for `python -m code.run_server`
+2. Create proper Python package structure
+3. Add entry points in pyproject.toml
+4. Create CLI tool: hephaestus start, hephaestus monitor, etc.
+5. Improve logging configuration
+6. Add version management
+
+RISK ASSESSMENT
+---------------
+
+LOW RISK:
+- Moving files with git mv (preserves history)
+- Updating config paths (simple search/replace)
+- Updating documentation (no code changes)
+
+MEDIUM RISK:
+- Renaming qdrant_mcp_openai.py → qdrant_mcp_server.py
+- Imports might break if absolute imports used
+- Startup scripts need path updates
+
+HIGH RISK:
+- None identified (all changes are straightforward)
+
+MITIGATION:
+- Backup branch before changes
+- Test thoroughly after each phase
+- Commit incrementally
+- Can rollback easily with git
+
+ESTIMATED TIME
+--------------
+
+Phase 1 (Prep): 15 minutes
+Phase 2-5 (Move files): 15 minutes
+Phase 6-7 (Update paths): 30 minutes
+Phase 8 (Documentation): 30 minutes
+Phase 9 (Testing): 60-90 minutes
+Phase 10 (Commit): 15 minutes
+
+Total: 3-4 hours including thorough testing
+
+NEXT STEPS
+----------
+
+1. Review this task file
+2. Create backup branch
+3. Start with Phase 1 (Preparation)
+4. Execute phases sequentially
+5. Test after each phase
+6. Commit when all tests pass
+7. Update other documentation references
+
+SUCCESS CRITERIA
+----------------
+
+✅ All Python executable scripts in code/
+✅ All config files in config/
+✅ All services start successfully
+✅ All tests pass
+✅ Documentation updated
+✅ No broken imports
+✅ No broken file paths
+✅ Git history preserved
+✅ Rollback plan tested (checkout backup branch works)
+
+This reorganization makes the codebase cleaner and more maintainable.

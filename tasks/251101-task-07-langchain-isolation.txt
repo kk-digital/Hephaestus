@@ -1,0 +1,553 @@
+TASK: ISOLATE LANGCHAIN USAGE IN C1 WRAPPER MODULE
+===================================================
+
+STATUS: Pending
+PRIORITY: High
+BRANCH: dev-haltingstate-00
+ESTIMATED TIME: 4-6 hours
+
+GOAL
+----
+
+Concentrate all LangChain usage into a single C1-level wrapper module.
+Ensure LangChain is ONLY imported by the wrapper module, nowhere else.
+Provide clean abstraction layer so rest of codebase doesn't depend on LangChain directly.
+
+MOTIVATION
+----------
+
+Problems with current LangChain usage:
+- LangChain imported across multiple files
+- Direct dependency on LangChain API throughout codebase
+- Hard to upgrade or replace LangChain
+- Difficult to test (must mock LangChain in many places)
+- Tight coupling to external library
+
+Benefits of isolation:
+- Single point of LangChain import (c1_langchain_wrapper module)
+- Easy to replace LangChain with alternative in future
+- Simplified testing (mock one wrapper instead of many imports)
+- Clearer separation of concerns
+- Can pin LangChain version without affecting rest of codebase
+- Easy to add compatibility layer for version changes
+
+CURRENT STATE
+-------------
+
+LangChain is likely used in multiple locations:
+- Agent implementation (likely uses LangChain agents/chains)
+- LLM operations (may use LangChain LLM classes)
+- Memory/vector store (may use LangChain memory abstractions)
+- Tool/function calling (may use LangChain tools)
+- Prompt templates (may use LangChain prompt classes)
+
+Need to audit codebase to find all LangChain imports and usage.
+
+DESIRED STATE
+-------------
+
+Single wrapper module that isolates LangChain:
+- src/c1_base/c1_langchain_wrapper.py (main wrapper)
+- src/c1_base/c1_langchain_models.py (data models for wrapper)
+- src/c1_base/c1_langchain_chains.py (chain abstractions if needed)
+
+No other files import LangChain directly.
+All LangChain functionality accessed through wrapper API.
+
+IMPLEMENTATION STEPS
+--------------------
+
+Phase 1: Audit current LangChain usage (1 hour)
+  [ ] Find all files importing LangChain
+      grep -r "from langchain" src/
+      grep -r "import langchain" src/
+  [ ] Document what LangChain features are used:
+      - Agent classes
+      - LLM classes
+      - Memory classes
+      - Chain classes
+      - Tool classes
+      - Prompt templates
+      - Other utilities
+  [ ] Create usage report: langchain-usage-audit.txt
+  [ ] Identify minimum LangChain API needed
+
+Phase 2: Design wrapper API (1 hour)
+  [ ] Design clean API that wraps LangChain features
+  [ ] Define data models for wrapper inputs/outputs
+  [ ] Plan migration path from direct imports to wrapper
+  [ ] Document wrapper API design
+  [ ] Review design (ensure it covers all use cases)
+
+Phase 3: Implement wrapper module (2-3 hours)
+  [ ] Create src/c1_base/c1_langchain_wrapper.py
+  [ ] Implement LangChainWrapper class
+  [ ] Wrap agent functionality
+  [ ] Wrap LLM functionality (if separate from c1_llm_service)
+  [ ] Wrap memory functionality
+  [ ] Wrap chain functionality
+  [ ] Wrap tool functionality
+  [ ] Wrap prompt templates
+  [ ] Add error handling and logging
+  [ ] Add unit tests for wrapper
+
+Phase 4: Migrate existing code (1-2 hours)
+  [ ] Replace direct LangChain imports with wrapper imports
+  [ ] Update code to use wrapper API
+  [ ] Remove "from langchain import ..." statements
+  [ ] Add "from src.c1_base.c1_langchain_wrapper import ..."
+  [ ] Test each migration
+  [ ] Verify no direct LangChain imports remain (except wrapper)
+
+Phase 5: Verification (30 minutes)
+  [ ] Grep for remaining direct imports:
+      grep -r "from langchain" src/ | grep -v c1_langchain
+      # Should return nothing
+  [ ] Run all tests
+  [ ] Verify functionality unchanged
+  [ ] Check import graph (LangChain only imported by wrapper)
+
+Phase 6: Documentation (30 minutes)
+  [ ] Document wrapper API
+  [ ] Add usage examples
+  [ ] Document migration from direct LangChain usage
+  [ ] Update architecture docs
+
+WRAPPER API DESIGN
+------------------
+
+### Module: c1_langchain_wrapper.py
+
+Purpose: Single point of LangChain import and usage
+
+Classes:
+- LangChainWrapper (main wrapper class)
+  - Methods for agent operations
+  - Methods for chain operations
+  - Methods for memory operations
+  - Methods for tool operations
+  - Methods for prompt templates
+
+Example structure:
+
+```python
+"""
+LangChain wrapper module - ONLY module that imports LangChain.
+
+All LangChain functionality accessed through this wrapper.
+No other modules should import LangChain directly.
+"""
+
+from typing import List, Dict, Any, Optional
+
+# ONLY place in codebase that imports LangChain
+from langchain.agents import AgentExecutor, create_react_agent
+from langchain.chains import LLMChain
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts import ChatPromptTemplate
+from langchain.tools import Tool
+# ... other LangChain imports as needed
+
+
+class LangChainWrapper:
+    """Wrapper for all LangChain functionality."""
+
+    def __init__(self, config: 'LangChainConfig'):
+        """Initialize wrapper with configuration."""
+        self.config = config
+
+    # Agent operations
+    def create_agent(
+        self,
+        tools: List['ToolDefinition'],
+        system_prompt: str,
+        **kwargs
+    ) -> 'AgentHandle':
+        """Create LangChain agent."""
+        # Wrap LangChain agent creation
+        pass
+
+    def run_agent(
+        self,
+        agent: 'AgentHandle',
+        input_text: str,
+        **kwargs
+    ) -> 'AgentResponse':
+        """Run agent with input."""
+        # Wrap LangChain agent execution
+        pass
+
+    # Chain operations
+    def create_chain(
+        self,
+        prompt_template: str,
+        **kwargs
+    ) -> 'ChainHandle':
+        """Create LangChain chain."""
+        # Wrap LangChain chain creation
+        pass
+
+    def run_chain(
+        self,
+        chain: 'ChainHandle',
+        inputs: Dict[str, Any],
+        **kwargs
+    ) -> 'ChainResponse':
+        """Run chain with inputs."""
+        # Wrap LangChain chain execution
+        pass
+
+    # Memory operations
+    def create_memory(
+        self,
+        memory_type: str,
+        **kwargs
+    ) -> 'MemoryHandle':
+        """Create LangChain memory instance."""
+        # Wrap LangChain memory creation
+        pass
+
+    def add_memory(
+        self,
+        memory: 'MemoryHandle',
+        user_message: str,
+        ai_message: str
+    ) -> None:
+        """Add conversation to memory."""
+        # Wrap LangChain memory operations
+        pass
+
+    # Tool operations
+    def create_tool(
+        self,
+        name: str,
+        description: str,
+        func: callable,
+        **kwargs
+    ) -> 'ToolHandle':
+        """Create LangChain tool."""
+        # Wrap LangChain tool creation
+        pass
+
+    # Prompt operations
+    def create_prompt_template(
+        self,
+        template: str,
+        input_variables: List[str],
+        **kwargs
+    ) -> 'PromptHandle':
+        """Create LangChain prompt template."""
+        # Wrap LangChain prompt template creation
+        pass
+
+    def format_prompt(
+        self,
+        prompt: 'PromptHandle',
+        **kwargs
+    ) -> str:
+        """Format prompt with variables."""
+        # Wrap LangChain prompt formatting
+        pass
+```
+
+### Module: c1_langchain_models.py
+
+Purpose: Data models for wrapper API (no LangChain imports)
+
+```python
+"""Data models for LangChain wrapper API."""
+
+from dataclasses import dataclass
+from typing import List, Dict, Any, Optional
+
+
+@dataclass
+class LangChainConfig:
+    """Configuration for LangChain wrapper."""
+    verbose: bool = False
+    max_iterations: int = 10
+    # ... other config
+
+
+@dataclass
+class ToolDefinition:
+    """Tool definition for agents."""
+    name: str
+    description: str
+    func: callable
+    # ... other fields
+
+
+@dataclass
+class AgentHandle:
+    """Opaque handle for LangChain agent."""
+    _internal: Any  # Internal LangChain agent object
+
+
+@dataclass
+class AgentResponse:
+    """Response from agent execution."""
+    output: str
+    intermediate_steps: List[Dict[str, Any]]
+    # ... other fields
+
+
+@dataclass
+class ChainHandle:
+    """Opaque handle for LangChain chain."""
+    _internal: Any  # Internal LangChain chain object
+
+
+@dataclass
+class ChainResponse:
+    """Response from chain execution."""
+    output: str
+    # ... other fields
+
+
+# ... other data models
+```
+
+VERIFICATION SCRIPT
+-------------------
+
+Create verify_langchain_isolation.py:
+
+```python
+#!/usr/bin/env python3
+"""Verify LangChain is only imported by wrapper module."""
+
+import os
+import re
+from pathlib import Path
+
+
+def find_langchain_imports(src_dir: Path) -> Dict[str, List[str]]:
+    """Find all files importing LangChain."""
+    imports = {}
+
+    for py_file in src_dir.rglob("*.py"):
+        # Skip wrapper module itself
+        if "c1_langchain_wrapper.py" in str(py_file):
+            continue
+
+        with open(py_file, 'r') as f:
+            content = f.read()
+
+        # Find LangChain imports
+        langchain_imports = []
+        for line in content.split('\n'):
+            if re.search(r'\bfrom langchain\b', line):
+                langchain_imports.append(line.strip())
+            elif re.search(r'\bimport langchain\b', line):
+                langchain_imports.append(line.strip())
+
+        if langchain_imports:
+            imports[str(py_file)] = langchain_imports
+
+    return imports
+
+
+def main():
+    """Check for LangChain imports outside wrapper."""
+    src_dir = Path("src")
+
+    print("=" * 60)
+    print("LANGCHAIN ISOLATION VERIFICATION")
+    print("=" * 60)
+
+    imports = find_langchain_imports(src_dir)
+
+    if not imports:
+        print("\n✅ SUCCESS: No direct LangChain imports found outside wrapper")
+        print("\nLangChain is properly isolated in c1_langchain_wrapper.py")
+        return 0
+
+    print(f"\n❌ FAILURE: Found {len(imports)} files with direct LangChain imports")
+    print("\nFiles importing LangChain directly:")
+    for file_path, import_lines in imports.items():
+        print(f"\n  {file_path}:")
+        for line in import_lines:
+            print(f"    {line}")
+
+    print("\n⚠️  These files should use c1_langchain_wrapper instead")
+    return 1
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())
+```
+
+Run after migration:
+```bash
+python verify_langchain_isolation.py
+```
+
+USAGE EXAMPLE
+-------------
+
+Before (direct LangChain import):
+
+```python
+# BAD - Direct LangChain import
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain.tools import Tool
+
+def create_my_agent():
+    tools = [
+        Tool(name="search", description="Search", func=search_func)
+    ]
+    agent = create_react_agent(llm, tools, prompt)
+    executor = AgentExecutor(agent=agent, tools=tools)
+    return executor
+```
+
+After (using wrapper):
+
+```python
+# GOOD - Using wrapper
+from src.c1_base.c1_langchain_wrapper import LangChainWrapper
+from src.c1_base.c1_langchain_models import ToolDefinition
+
+def create_my_agent():
+    wrapper = LangChainWrapper.from_config()
+    tools = [
+        ToolDefinition(name="search", description="Search", func=search_func)
+    ]
+    agent = wrapper.create_agent(tools=tools, system_prompt="...")
+    return agent
+```
+
+INTEGRATION WITH OTHER TASKS
+-----------------------------
+
+Coordinates with:
+- Task-05 (LLM Service Abstraction): May share provider abstraction
+- Task-03 (Layer Refactoring): Wrapper is C1 layer module
+
+If LangChain is used for LLM operations:
+- Wrapper should delegate to c1_llm_service for LLM calls
+- LangChain wrapper focuses on agent/chain/memory abstractions
+- Avoid duplicating LLM functionality
+
+LANGCHAIN VERSION PINNING
+--------------------------
+
+After isolating LangChain to wrapper module, pin versions in requirements.txt:
+
+```txt
+# LangChain - pinned versions to avoid dependency conflicts
+langchain==0.2.17
+langchain-openai==0.0.5
+langchain-community==0.0.10
+langchain-groq==0.0.1
+langchain-core==1.0.0  # or compatible version
+```
+
+Benefits of pinning:
+- Faster pip install (no backtracking)
+- Reproducible builds
+- Controlled upgrades (test wrapper, then upgrade)
+- Isolation means version is only wrapper's concern
+
+Upgrade process:
+1. Update pinned versions in requirements.txt
+2. Update wrapper to handle API changes
+3. Run wrapper tests
+4. If tests pass, rest of codebase unaffected
+
+TESTING STRATEGY
+----------------
+
+Unit tests for wrapper:
+  [ ] Test agent creation and execution
+  [ ] Test chain creation and execution
+  [ ] Test memory operations
+  [ ] Test tool creation
+  [ ] Test prompt template operations
+  [ ] Mock LangChain to test wrapper logic
+
+Integration tests:
+  [ ] Test wrapper with real LangChain
+  [ ] Test agent workflows end-to-end
+  [ ] Verify functionality matches previous direct usage
+
+Isolation tests:
+  [ ] Run verify_langchain_isolation.py
+  [ ] Check import graph
+  [ ] Verify only wrapper imports LangChain
+
+MIGRATION CHECKLIST
+-------------------
+
+For each file with direct LangChain imports:
+  [ ] Identify what LangChain features are used
+  [ ] Check if wrapper has equivalent API
+  [ ] If not, add to wrapper
+  [ ] Replace direct import with wrapper import
+  [ ] Update code to use wrapper API
+  [ ] Test functionality
+  [ ] Remove direct LangChain import
+  [ ] Commit
+
+After all files migrated:
+  [ ] Run verify_langchain_isolation.py
+  [ ] Should report zero direct imports
+  [ ] All tests pass
+  [ ] Final commit
+
+SUCCESS CRITERIA
+----------------
+
+✅ All LangChain imports isolated in c1_langchain_wrapper.py
+✅ No direct LangChain imports in any other files
+✅ verify_langchain_isolation.py reports zero violations
+✅ Wrapper provides clean API for all LangChain features used
+✅ All existing functionality works through wrapper
+✅ All tests pass (unit, integration, e2e)
+✅ LangChain versions pinned in requirements.txt
+✅ pip install completes without backtracking
+✅ Documentation complete with migration guide
+
+BENEFITS
+--------
+
+1. **Single point of LangChain usage**
+   - Easy to find all LangChain-related code
+   - Clear separation of external dependency
+
+2. **Easy to replace or upgrade**
+   - Change wrapper implementation, rest of code unaffected
+   - Test wrapper thoroughly, upgrade with confidence
+
+3. **Simplified testing**
+   - Mock wrapper instead of LangChain
+   - Test wrapper separately from application logic
+
+4. **Clearer architecture**
+   - External dependencies isolated in C1 layer
+   - Application logic doesn't depend on LangChain API
+
+5. **Version control**
+   - Pin LangChain version without affecting rest of code
+   - Controlled upgrades through wrapper
+
+6. **Future flexibility**
+   - Can switch to alternative framework
+   - Can run with or without LangChain
+   - Can implement custom agent logic
+
+TIMELINE
+--------
+
+Phase 1: Audit current usage - 1 hour
+Phase 2: Design wrapper API - 1 hour
+Phase 3: Implement wrapper - 2-3 hours
+Phase 4: Migrate existing code - 1-2 hours
+Phase 5: Verification - 30 minutes
+Phase 6: Documentation - 30 minutes
+
+Total: 5-7 hours (depends on extent of current LangChain usage)
+
+This task isolates LangChain as external dependency, improving maintainability.
