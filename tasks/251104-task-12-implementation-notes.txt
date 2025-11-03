@@ -1,0 +1,241 @@
+TASK-12 Implementation Notes: FastAPI Lifespan Migration
+==========================================================
+
+## Progress So Far
+
+✅ Phase 1: SQLAlchemy declarative_base import (COMPLETED - commit fc2bd3a)
+- Fixed: from sqlalchemy.ext.declarative import declarative_base
+- To: from sqlalchemy.orm import declarative_base
+- Combined imports into single line for cleaner code
+
+⏳ Phase 2: FastAPI on_event to lifespan (IN PROGRESS)
+- Added contextlib.asynccontextmanager import ✅
+- Backup created: src/mcp/server.py.backup ✅
+- Need to complete the migration
+
+⏳ Phase 3: Pytest markers (NOT STARTED)
+
+## FastAPI Lifespan Migration Plan
+
+### Current Structure (src/mcp/server.py)
+
+```
+Line 39: app = FastAPI(...)  # Created early
+Line 510-599: class ServerState + async def initialize()
+Line 624: server_state = ServerState()
+Line 653-741: @app.on_event("startup") with startup logic
+Line 744-762: @app.on_event("shutdown") with shutdown logic
+```
+
+### Required Changes
+
+**Step 1: Create lifespan function (insert after line 624)**
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan (startup and shutdown)."""
+    # Startup
+    logger.info("Starting Hephaestus MCP Server...")
+    await server_state.initialize()
+
+    # Add frontend API routes
+    from src.mcp.api import create_frontend_routes
+    api_router = create_frontend_routes(
+        server_state.db_manager,
+        server_state.agent_manager,
+        server_state.phase_manager
+    )
+    app.include_router(api_router)
+
+    # Add authentication routes
+    from src.auth.auth_api import router as auth_router
+    app.include_router(auth_router)
+
+    # Load phases if folder is specified
+    import os
+    from pathlib import Path
+
+    logger.info("=== PHASE LOADING DEBUG ===")
+    logger.info(f"Current working directory: {os.getcwd()}")
+    logger.info(f"Environment variables starting with HEPHAESTUS: {[k for k in os.environ.keys() if 'HEPHAESTUS' in k]}")
+
+    phases_folder = os.environ.get("HEPHAESTUS_PHASES_FOLDER")
+    logger.info(f"HEPHAESTUS_PHASES_FOLDER value: '{phases_folder}'")
+
+    if phases_folder:
+        logger.info(f"Attempting to load workflow phases from: {phases_folder}")
+
+        # Check if folder exists
+        full_path = Path(phases_folder)
+        if not full_path.is_absolute():
+            full_path = Path(os.getcwd()) / phases_folder
+
+        logger.info(f"Full path to phases folder: {full_path}")
+        logger.info(f"Folder exists: {full_path.exists()}")
+        logger.info(f"Is directory: {full_path.is_dir() if full_path.exists() else 'N/A'}")
+
+        if full_path.exists() and full_path.is_dir():
+            # List files in directory
+            files = list(full_path.glob("*.yaml"))
+            logger.info(f"YAML files found: {len(files)}")
+            for f in files:
+                logger.info(f"  - {f.name}")
+
+        try:
+            from src.phases import PhaseLoader
+            logger.info("PhaseLoader imported successfully")
+
+            # Load phases from folder
+            logger.info(f"Calling PhaseLoader.load_phases_from_folder('{phases_folder}')")
+            workflow_def = PhaseLoader.load_phases_from_folder(phases_folder)
+            logger.info(f"Loaded workflow '{workflow_def.name}' with {len(workflow_def.phases)} phases")
+
+            # Load phases configuration
+            logger.info(f"Loading phases_config.yaml from '{phases_folder}'")
+            phases_config = PhaseLoader.load_phases_config(phases_folder)
+            logger.info(f"Loaded phases config: enable_tickets={phases_config.enable_tickets}, has_result={phases_config.has_result}")
+
+            # Initialize workflow in database
+            logger.info("Initializing workflow in database...")
+            workflow_id = server_state.phase_manager.initialize_workflow(workflow_def, phases_config)
+            logger.info(f"Initialized workflow with ID: {workflow_id}")
+
+            # Log phase names
+            logger.info("Loaded phases:")
+            for phase in workflow_def.phases:
+                logger.info(f"  Phase {phase.order}: {phase.name}")
+                logger.info(f"    - Description: {phase.description[:100]}...")
+                logger.info(f"    - Done definitions: {len(phase.done_definitions)} items")
+
+        except ImportError as e:
+            logger.error(f"Failed to import PhaseLoader: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+        except Exception as e:
+            logger.error(f"Failed to load phases: {e}")
+            import traceback
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+    else:
+        logger.info("No phases folder specified - running in standard mode")
+        logger.info("To load phases, set HEPHAESTUS_PHASES_FOLDER environment variable")
+
+    logger.info("=== END PHASE LOADING DEBUG ===")
+
+    # Start background queue processor
+    logger.info("Starting background queue processor...")
+    server_state.background_queue_processor_task = asyncio.create_task(background_queue_processor())
+    logger.info("Background queue processor task created")
+
+    logger.info("Server started successfully")
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down Hephaestus MCP Server...")
+
+    # Stop background queue processor
+    logger.info("Stopping background queue processor...")
+    server_state.shutdown_event.set()
+    if server_state.background_queue_processor_task:
+        try:
+            await asyncio.wait_for(server_state.background_queue_processor_task, timeout=5.0)
+            logger.info("Background queue processor stopped")
+        except asyncio.TimeoutError:
+            logger.warning("Background queue processor did not stop gracefully, cancelling...")
+            server_state.background_queue_processor_task.cancel()
+
+    # Close all WebSocket connections
+    for ws in server_state.active_websockets:
+        await ws.close()
+```
+
+**Step 2: Move app creation after lifespan function**
+
+Move lines 39-43 to after the lifespan function (after line 625 in modified file):
+
+```python
+# Initialize FastAPI app with lifespan
+app = FastAPI(
+    title="Hephaestus MCP Server",
+    description="Model Context Protocol server for AI agent orchestration",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+```
+
+**Step 3: Remove old on_event decorators**
+
+Delete lines 653-741 (@app.on_event("startup") and its function)
+Delete lines 744-762 (@app.on_event("shutdown") and its function)
+
+**Step 4: Move CORS middleware setup**
+
+The CORS middleware setup (lines 46-54) needs to stay after app creation.
+After moving app creation, this should remain in the same relative position.
+
+### Implementation Strategy
+
+Due to the complexity of this file, the safest approach is:
+
+1. Create a Python script to:
+   - Extract startup code (lines 653-741)
+   - Extract shutdown code (lines 744-762)
+   - Create lifespan function
+   - Insert after line 624
+   - Move app creation after lifespan
+   - Add lifespan parameter to FastAPI()
+   - Remove old on_event functions
+
+2. Test the changes:
+   - Run pytest collection to ensure no import errors
+   - Start the server to verify startup works
+   - Send SIGTERM to verify shutdown works
+
+### Alternative: Minimal Change Approach
+
+If full migration is too risky, we can use a hybrid approach:
+- Keep current structure
+- Create empty lifespan that just calls the existing on_event functions
+- This suppresses the deprecation warning while maintaining current behavior
+- Can migrate to full lifespan later
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager."""
+    await startup_event()
+    yield
+    await shutdown_event()
+
+app = FastAPI(..., lifespan=lifespan)
+
+# Keep existing functions but remove decorators
+async def startup_event():
+    """Initialize server on startup."""
+    # existing code
+
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    # existing code
+```
+
+## Files to Modify
+
+- src/mcp/server.py (lines 10, 39-43, 624-625, 653-741, 744-762)
+
+## Testing Checklist
+
+After implementation:
+- [ ] pytest collection succeeds (449 tests)
+- [ ] No deprecation warnings from FastAPI
+- [ ] Server starts successfully
+- [ ] Routes are registered correctly
+- [ ] Background tasks start
+- [ ] Graceful shutdown works (SIGTERM)
+- [ ] WebSocket connections close cleanly
+
+## References
+
+- FastAPI Lifespan Events: https://fastapi.tiangolo.com/advanced/events/
+- Task-12 specification: tasks/251104-task-12-fix-deprecation-warnings.txt
