@@ -1,0 +1,14 @@
+# Core LangChain packages - 1.0.x series (all compatible)
+langchain==1.0.3
+langchain-core==1.0.2
+langchain-openai==1.0.1
+
+# Other required packages
+fastapi>=0.115.5
+uvicorn[standard]>=0.32.1
+sqlalchemy==2.0.23
+qdrant-client>=1.12.0
+openai>=1.12.0,<2.0.0
+anthropic==0.42.0
+pydantic>=2.11.0
+pydantic-settings>=2.7.0

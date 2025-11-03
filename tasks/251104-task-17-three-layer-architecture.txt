@@ -1,0 +1,766 @@
+TASK-17: Three-Layer Flat Architecture with Modular Monolith
+=============================================================
+
+Date: 2025-11-04
+Status: ACTIVE
+Supersedes: TASK-14, TASK-15, TASK-16
+
+## Overview
+
+This task defines the final architecture:
+1. **3 layers: c1, c2, c3** (NOT 5 layers)
+2. **Flat structure**: All packages at src/ level, NO subfolders
+3. **Naming convention**: `c{N}_{noun}_{module}`
+4. **6 modular monoliths** (grouped from 17 original modules)
+
+## Naming Convention Standard
+
+### Format
+```
+c{N}_{noun}_{module}
+```
+
+Where:
+- `c{N}` = layer number (1, 2, or 3)
+- `{noun}` = object/entity type (agent, task, database, etc.)
+- `{module}` = purpose/type (models, service, routes, etc.)
+
+### Examples
+- `c1_agent_models` (Layer 1: Agent data models)
+- `c1_task_enums` (Layer 1: Task enumeration types)
+- `c1_database_session` (Layer 1: Database session management)
+- `c2_task_service` (Layer 2: Task service logic)
+- `c2_agent_manager` (Layer 2: Agent lifecycle manager)
+- `c3_task_routes` (Layer 3: Task HTTP endpoints)
+
+### Pattern Rules
+1. **Layer prefix**: c1, c2, or c3 (NOT c0, c4, or c5)
+2. **Noun first**: Entity/object type comes before module type
+3. **Underscore separation**: Use underscores between all parts
+4. **Lowercase**: All lowercase letters
+5. **Descriptive**: Clear purpose from name alone
+6. **Flat structure**: All packages directly in src/, NO nested folders
+
+## Three-Layer Architecture
+
+### Layer 1: Foundation (c1_*)
+**Purpose**: Pure data structures and low-level services
+
+**Responsibilities**:
+- Data models (Pydantic, SQLAlchemy ORM)
+- Enumerations and constants
+- Type definitions
+- Exception classes
+- Database connection and session management
+- External service clients (LLM, embedding, vector store)
+- Configuration loading
+
+**Naming pattern**: `c1_{entity}_{type}`
+
+**Example packages** (all in src/ directory):
+- `c1_agent_models`
+- `c1_agent_enums`
+- `c1_agent_exceptions`
+- `c1_task_models`
+- `c1_task_enums`
+- `c1_task_exceptions`
+- `c1_ticket_models`
+- `c1_workflow_models`
+- `c1_system_constants`
+- `c1_database_session`
+- `c1_database_models` (SQLAlchemy ORM)
+- `c1_llm_provider`
+- `c1_embedding_provider`
+- `c1_vector_store`
+- `c1_config_loader`
+
+### Layer 2: Services (c2_*)
+**Purpose**: Business logic, service coordination, algorithms
+
+**Responsibilities**:
+- Business logic and algorithms
+- Service orchestration
+- Background processing
+- Authentication and authorization
+- Task/agent/ticket/workflow management logic
+- Monitoring and health checks
+- Validation engines
+- Memory and RAG systems
+
+**Naming pattern**: `c2_{noun}_{service_type}`
+
+**Example packages** (all in src/ directory):
+- `c2_auth_manager`
+- `c2_task_service`
+- `c2_agent_service`
+- `c2_ticket_service`
+- `c2_workflow_service`
+- `c2_phase_manager`
+- `c2_queue_processor`
+- `c2_memory_engine`
+- `c2_monitoring_guardian`
+- `c2_validation_engine`
+- `c2_worktree_manager`
+
+### Layer 3: Applications (c3_*)
+**Purpose**: User-facing interfaces, HTTP endpoints, protocol implementations
+
+**Responsibilities**:
+- HTTP API endpoints (FastAPI routes)
+- MCP protocol implementation
+- WebSocket handlers
+- CLI interface
+- SDK client
+- TUI application
+- Module registry and routing
+
+**Naming pattern**: `c3_{noun}_{interface_type}`
+
+**Example packages** (all in src/ directory):
+- `c3_mcp_server` (FastAPI app, MCP protocol core)
+- `c3_module_registry`
+- `c3_orchestration_routes` (tasks, agents, queue, blocking)
+- `c3_workflow_routes` (workflows, phases, results, validation)
+- `c3_ticketing_routes` (tickets, history, search)
+- `c3_monitoring_routes` (health, monitoring, dashboard)
+- `c3_infrastructure_routes` (auth, oauth, websocket, communication)
+- `c3_memory_routes` (memories, embeddings, RAG)
+- `c3_frontend_api`
+- `c3_auth_api`
+- `c3_cli_interface`
+- `c3_sdk_client`
+- `c3_tui_app`
+
+## Dependency Rules
+
+```
+c3 (Applications/Routes)
+ ↓ depends on
+c2 (Services/Business Logic)
+ ↓ depends on
+c1 (Foundation/Models/Clients)
+```
+
+**Strict rules**:
+- c1 depends on NOTHING (except standard library and external packages)
+- c2 depends on c1 only
+- c3 depends on c2 and c1
+- NEVER: c1 imports from c2 or c3
+- NEVER: c2 imports from c3
+
+## Flat Directory Structure (NO SUBFOLDERS)
+
+```
+src/
+├── c1_agent_models/
+│   ├── __init__.py
+│   └── agent_models.py
+├── c1_agent_enums/
+│   ├── __init__.py
+│   └── agent_enums.py
+├── c1_agent_exceptions/
+│   ├── __init__.py
+│   └── agent_exceptions.py
+├── c1_task_models/
+│   ├── __init__.py
+│   └── task_models.py
+├── c1_task_enums/
+│   ├── __init__.py
+│   └── task_enums.py
+├── c1_task_exceptions/
+│   ├── __init__.py
+│   └── task_exceptions.py
+├── c1_ticket_models/
+│   ├── __init__.py
+│   └── ticket_models.py
+├── c1_workflow_models/
+│   ├── __init__.py
+│   ├── workflow_models.py
+│   └── phase_models.py
+├── c1_system_constants/
+│   ├── __init__.py
+│   └── constants.py
+├── c1_database_session/
+│   ├── __init__.py
+│   ├── base.py
+│   ├── models.py
+│   └── session.py
+├── c1_database_models/
+│   ├── __init__.py
+│   ├── task_orm.py
+│   ├── agent_orm.py
+│   └── ticket_orm.py
+├── c1_llm_provider/
+│   ├── __init__.py
+│   ├── base_provider.py
+│   ├── openai_provider.py
+│   └── anthropic_provider.py
+├── c1_embedding_provider/
+│   ├── __init__.py
+│   ├── base_provider.py
+│   ├── openai_provider.py
+│   └── lmstudio_provider.py
+├── c1_vector_store/
+│   ├── __init__.py
+│   └── qdrant_client.py
+├── c1_config_loader/
+│   ├── __init__.py
+│   └── config.py
+├── c2_auth_manager/
+│   ├── __init__.py
+│   ├── auth_config.py
+│   └── auth_utils.py
+├── c2_task_service/
+│   ├── __init__.py
+│   ├── task_service.py
+│   └── task_similarity.py
+├── c2_agent_service/
+│   ├── __init__.py
+│   ├── agent_manager.py
+│   └── agent_lifecycle.py
+├── c2_ticket_service/
+│   ├── __init__.py
+│   ├── ticket_service.py
+│   ├── ticket_history.py
+│   └── ticket_search.py
+├── c2_workflow_service/
+│   ├── __init__.py
+│   ├── workflow_engine.py
+│   └── termination_handler.py
+├── c2_phase_manager/
+│   ├── __init__.py
+│   ├── phase_loader.py
+│   └── phase_manager.py
+├── c2_queue_processor/
+│   ├── __init__.py
+│   └── background_queue.py
+├── c2_memory_engine/
+│   ├── __init__.py
+│   ├── rag_engine.py
+│   └── memory_manager.py
+├── c2_monitoring_guardian/
+│   ├── __init__.py
+│   ├── monitor_core.py
+│   ├── guardian.py
+│   └── dependency_monitor.py
+├── c2_validation_engine/
+│   ├── __init__.py
+│   ├── validator.py
+│   └── check_executors.py
+├── c2_worktree_manager/
+│   ├── __init__.py
+│   ├── worktree_ops.py
+│   └── conflict_resolver.py
+├── c3_mcp_server/
+│   ├── __init__.py
+│   ├── app.py
+│   ├── lifespan.py
+│   └── server_state.py
+├── c3_module_registry/
+│   ├── __init__.py
+│   ├── registry.py
+│   └── base_module.py
+├── c3_orchestration_routes/
+│   ├── __init__.py
+│   ├── task_routes.py
+│   ├── agent_routes.py
+│   ├── queue_routes.py
+│   └── blocking_routes.py
+├── c3_workflow_routes/
+│   ├── __init__.py
+│   ├── workflow_routes.py
+│   ├── phase_routes.py
+│   ├── result_routes.py
+│   └── validation_routes.py
+├── c3_ticketing_routes/
+│   ├── __init__.py
+│   ├── ticket_routes.py
+│   ├── ticket_history_routes.py
+│   └── ticket_search_routes.py
+├── c3_monitoring_routes/
+│   ├── __init__.py
+│   ├── health_routes.py
+│   ├── monitoring_routes.py
+│   └── dashboard_routes.py
+├── c3_infrastructure_routes/
+│   ├── __init__.py
+│   ├── auth_routes.py
+│   ├── oauth_routes.py
+│   ├── communication_routes.py
+│   └── websocket_handler.py
+├── c3_memory_routes/
+│   ├── __init__.py
+│   ├── memory_routes.py
+│   └── embedding_routes.py
+├── c3_frontend_api/
+│   ├── __init__.py
+│   └── api.py
+├── c3_auth_api/
+│   ├── __init__.py
+│   ├── auth_api.py
+│   └── auth_middleware.py
+├── c3_cli_interface/
+│   ├── __init__.py
+│   └── cli.py
+├── c3_sdk_client/
+│   ├── __init__.py
+│   └── sdk.py
+└── c3_tui_app/
+    ├── __init__.py
+    ├── app.py
+    ├── popups/
+    ├── screens/
+    └── widgets/
+```
+
+**CRITICAL**: All packages are at src/ level - NO nested layer folders like src/c1_layer/ or src/c2_layer/
+
+## Modular Monolith Grouping (6 Modules)
+
+### 1. Orchestration Module (`c3_orchestration_routes`)
+**Handles**: Task execution, agent lifecycle, queue management, blocking operations
+
+**HTTP Prefixes**:
+- `/tasks/*` (20 endpoints)
+- `/agents/*` (9 endpoints)
+- `/queue/*` (5 endpoints)
+- `/blocking/*` (3 endpoints)
+
+**Services used**:
+- `c2_task_service`
+- `c2_agent_service`
+- `c2_queue_processor`
+
+### 2. Workflow Module (`c3_workflow_routes`)
+**Handles**: Workflows, phases, results, validation
+
+**HTTP Prefixes**:
+- `/workflows/*` (5 endpoints)
+- `/phases/*` (7 endpoints)
+- `/results/*` (6 endpoints)
+- `/validation/*` (4 endpoints)
+
+**Services used**:
+- `c2_workflow_service`
+- `c2_phase_manager`
+- `c2_validation_engine`
+
+### 3. Ticketing Module (`c3_ticketing_routes`)
+**Handles**: Ticket management, history, search
+
+**HTTP Prefixes**:
+- `/tickets/*` (12 endpoints)
+- `/tickets/search/*` (4 endpoints)
+- `/tickets/history/*` (3 endpoints)
+
+**Services used**:
+- `c2_ticket_service`
+
+### 4. Monitoring Module (`c3_monitoring_routes`)
+**Handles**: System health, monitoring, dashboards
+
+**HTTP Prefixes**:
+- `/health/*` (4 endpoints)
+- `/monitoring/*` (6 endpoints)
+- `/dashboard/*` (3 endpoints)
+
+**Services used**:
+- `c2_monitoring_guardian`
+
+### 5. Infrastructure Module (`c3_infrastructure_routes`)
+**Handles**: Authentication, communication, WebSocket
+
+**HTTP Prefixes**:
+- `/auth/*` (5 endpoints)
+- `/oauth/*` (3 endpoints)
+- `/communication/*` (2 endpoints)
+- `/ws` (WebSocket endpoint)
+
+**Services used**:
+- `c2_auth_manager`
+
+### 6. Memory Module (`c3_memory_routes`)
+**Handles**: RAG, embeddings, memory storage
+
+**HTTP Prefixes**:
+- `/memories/*` (8 endpoints)
+- `/embeddings/*` (3 endpoints)
+
+**Services used**:
+- `c2_memory_engine`
+- `c1_embedding_provider`
+- `c1_vector_store`
+
+## Module Registry Pattern
+
+### Base Module Interface
+
+```python
+# src/c3_module_registry/base_module.py
+
+from abc import ABC, abstractmethod
+from fastapi import APIRouter
+
+class BaseModule(ABC):
+    """Base class for all modular monolith route modules."""
+
+    def __init__(self):
+        self.router = APIRouter()
+        self.register_routes()
+
+    @abstractmethod
+    def register_routes(self):
+        """Register all routes for this module."""
+        pass
+
+    @abstractmethod
+    def get_prefix(self) -> str:
+        """Return the HTTP prefix for this module."""
+        pass
+
+    @abstractmethod
+    def get_name(self) -> str:
+        """Return the module name for identification."""
+        pass
+
+    @abstractmethod
+    def get_tags(self) -> list[str]:
+        """Return OpenAPI tags for this module."""
+        pass
+```
+
+### Module Registry
+
+```python
+# src/c3_module_registry/registry.py
+
+from typing import Dict
+from src.c3_module_registry.base_module import BaseModule
+
+class ModuleRegistry:
+    """Central registry for all modular monolith route modules."""
+
+    def __init__(self):
+        self.modules: Dict[str, BaseModule] = {}
+
+    def register(self, module: BaseModule):
+        """Register a module with the registry."""
+        name = module.get_name()
+        if name in self.modules:
+            raise ValueError(f"Module {name} already registered")
+        self.modules[name] = module
+
+    def get_module(self, name: str) -> BaseModule:
+        """Get a module by name."""
+        return self.modules.get(name)
+
+    def get_all_modules(self) -> list[BaseModule]:
+        """Get all registered modules."""
+        return list(self.modules.values())
+
+    def get_all_routers(self):
+        """Get all routers from all modules."""
+        return [(m.get_prefix(), m.router, m.get_tags()) for m in self.modules.values()]
+```
+
+### Example Module Implementation
+
+```python
+# src/c3_orchestration_routes/__init__.py
+
+from fastapi import APIRouter
+from src.c3_module_registry.base_module import BaseModule
+from src.c2_task_service.task_service import TaskService
+from src.c2_agent_service.agent_manager import AgentManagerService
+from src.c2_queue_processor.background_queue import QueueProcessor
+from src.c1_task_models.task_models import TaskRequest, TaskResponse
+
+class OrchestrationModule(BaseModule):
+    """Module handling tasks, agents, queue, and blocking operations."""
+
+    def __init__(self,
+                 task_service: TaskService,
+                 agent_service: AgentManagerService,
+                 queue_processor: QueueProcessor):
+        self.task_service = task_service
+        self.agent_service = agent_service
+        self.queue_processor = queue_processor
+        super().__init__()
+
+    def get_name(self) -> str:
+        return "orchestration"
+
+    def get_prefix(self) -> str:
+        return ""  # Routes at root level
+
+    def get_tags(self) -> list[str]:
+        return ["tasks", "agents", "queue", "blocking"]
+
+    def register_routes(self):
+        """Register all orchestration routes."""
+
+        # Task routes
+        @self.router.post("/tasks/create", tags=["tasks"])
+        async def create_task(request: TaskRequest) -> TaskResponse:
+            return await self.task_service.create_task(request)
+
+        @self.router.get("/tasks/{task_id}", tags=["tasks"])
+        async def get_task(task_id: str):
+            return await self.task_service.get_task(task_id)
+
+        # Agent routes
+        @self.router.post("/agents/launch", tags=["agents"])
+        async def launch_agent(agent_config: dict):
+            return await self.agent_service.launch_agent(agent_config)
+
+        @self.router.get("/agents/{agent_id}", tags=["agents"])
+        async def get_agent(agent_id: str):
+            return await self.agent_service.get_agent(agent_id)
+
+        # Queue routes
+        @self.router.get("/queue/status", tags=["queue"])
+        async def get_queue_status():
+            return await self.queue_processor.get_status()
+
+        # Blocking routes
+        @self.router.post("/blocking/read", tags=["blocking"])
+        async def blocking_read(path: str):
+            return await self.task_service.blocking_read(path)
+```
+
+### Server Integration
+
+```python
+# src/c3_mcp_server/app.py
+
+from fastapi import FastAPI
+from src.c3_module_registry.registry import ModuleRegistry
+from src.c3_orchestration_routes import OrchestrationModule
+from src.c3_workflow_routes import WorkflowModule
+from src.c3_ticketing_routes import TicketingModule
+from src.c3_monitoring_routes import MonitoringModule
+from src.c3_infrastructure_routes import InfrastructureModule
+from src.c3_memory_routes import MemoryModule
+
+def create_app() -> FastAPI:
+    """Create and configure FastAPI app with all modules."""
+
+    app = FastAPI(
+        title="Hephaestus MCP Server",
+        description="Model Context Protocol server for AI agent orchestration",
+        version="1.0.0",
+    )
+
+    # Initialize module registry
+    registry = ModuleRegistry()
+
+    # Register all modules
+    registry.register(OrchestrationModule(task_service, agent_service, queue_processor))
+    registry.register(WorkflowModule(workflow_service, phase_manager, validation_engine))
+    registry.register(TicketingModule(ticket_service))
+    registry.register(MonitoringModule(monitoring_guardian))
+    registry.register(InfrastructureModule(auth_manager))
+    registry.register(MemoryModule(memory_engine, embedding_provider))
+
+    # Include all module routers
+    for prefix, router, tags in registry.get_all_routers():
+        app.include_router(router, prefix=prefix, tags=tags)
+
+    return app
+```
+
+## Import Examples
+
+### Layer 1 (Foundation) Imports
+```python
+# c1 packages import NOTHING from Hephaestus (only stdlib and external packages)
+
+# c1_agent_models/agent_models.py
+from pydantic import BaseModel
+from datetime import datetime
+
+# c1_database_session/session.py
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+# c1_llm_provider/openai_provider.py
+from openai import OpenAI
+```
+
+### Layer 2 (Services) Imports
+```python
+# c2 packages import from c1 ONLY
+
+# c2_task_service/task_service.py
+from src.c1_task_models.task_models import TaskRequest, TaskResponse
+from src.c1_task_enums.task_enums import TaskStatus
+from src.c1_database_session.session import get_db
+from src.c1_llm_provider.openai_provider import OpenAIProvider
+
+# c2_agent_service/agent_manager.py
+from src.c1_agent_models.agent_models import AgentConfig
+from src.c1_agent_enums.agent_enums import AgentStatus
+from src.c1_database_models.agent_orm import Agent
+```
+
+### Layer 3 (Applications) Imports
+```python
+# c3 packages import from c2 and c1
+
+# c3_orchestration_routes/task_routes.py
+from src.c1_task_models.task_models import TaskRequest, TaskResponse
+from src.c2_task_service.task_service import TaskService
+from fastapi import APIRouter
+
+# c3_mcp_server/app.py
+from src.c2_task_service.task_service import TaskService
+from src.c2_agent_service.agent_manager import AgentManagerService
+from src.c3_module_registry.registry import ModuleRegistry
+```
+
+## Migration Path
+
+### Phase 1: Layer 1 Foundation (c1_*)
+1. Create all `c1_*` packages at src/ level
+2. Extract models from existing code
+3. Extract enums and constants
+4. Extract exceptions
+5. Extract database session code
+6. Extract LLM/embedding/vector store clients
+7. Verify no circular dependencies
+8. Verify c1 imports nothing from Hephaestus
+
+**Estimated**: 4-6 hours
+
+### Phase 2: Layer 2 Services (c2_*)
+1. Create all `c2_*` packages at src/ level
+2. Extract business logic from current files
+3. Split large service files (server.py, api.py, etc.)
+4. Implement clean service interfaces
+5. Ensure c2 only depends on c1
+6. Verify no imports from c3
+
+**Estimated**: 6-8 hours
+
+### Phase 3: Layer 3 Applications (c3_*)
+1. Create module registry system at src/ level
+2. Implement 6 modular monolith route modules
+3. Extract routes from server.py into modules
+4. Update FastAPI app to use module registry
+5. Verify all endpoints work correctly
+6. Ensure c3 depends on c2 and c1 only
+
+**Estimated**: 4-6 hours
+
+### Phase 4: Testing & Validation
+1. Run full test suite (449 tests)
+2. Verify all API endpoints functional
+3. Check import dependencies are correct
+4. Performance testing
+5. Documentation updates
+
+**Estimated**: 2-3 hours
+
+**Total Estimated Time**: 16-23 hours
+
+## Package Count Estimate
+
+### c1 Layer (Foundation)
+- Models: 5 packages (agent, task, ticket, workflow, system)
+- Enums: 3 packages
+- Exceptions: 3 packages
+- Database: 2 packages (session, models)
+- External clients: 3 packages (llm, embedding, vector_store)
+- Config: 1 package
+**Subtotal**: ~17 packages
+
+### c2 Layer (Services)
+- Auth: 1 package
+- Task/Agent/Ticket/Workflow: 4 packages
+- Phase/Queue/Memory: 3 packages
+- Monitoring/Validation/Worktree: 3 packages
+**Subtotal**: ~11 packages
+
+### c3 Layer (Applications)
+- MCP server: 1 package
+- Module registry: 1 package
+- Route modules: 6 packages
+- Other interfaces: 4 packages (frontend, auth, cli, sdk, tui)
+**Subtotal**: ~13 packages
+
+**Total**: ~41 packages (all at src/ level, NO nesting)
+
+## Benefits of Flat Three-Layer Design
+
+1. **Simpler structure**: All packages visible at src/ level
+2. **Easier navigation**: No nested folders to traverse
+3. **Clear naming**: Layer visible in package name
+4. **3 layers only**: Foundation → Services → Applications
+5. **Maintained flexibility**: Can scale modules independently
+6. **Clean dependencies**: Strict layering prevents circular dependencies
+7. **Testability**: Each layer tested independently
+8. **IDE-friendly**: Better autocomplete and navigation
+
+## Validation Script
+
+```python
+# validate_architecture.py
+
+import sys
+from pathlib import Path
+import ast
+
+def validate_imports(src_dir: Path) -> bool:
+    """Validate that imports follow layer rules."""
+    errors = []
+
+    for py_file in src_dir.rglob("*.py"):
+        if py_file.name == "__init__.py":
+            continue
+
+        package_name = py_file.parent.name
+        layer = package_name[:2]  # c1, c2, or c3
+
+        if layer not in ["c1", "c2", "c3"]:
+            continue
+
+        with open(py_file) as f:
+            try:
+                tree = ast.parse(f.read())
+            except:
+                continue
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module and node.module.startswith("src."):
+                    imported_package = node.module.split(".")[1]
+                    imported_layer = imported_package[:2]
+
+                    # Check layer rules
+                    if layer == "c1" and imported_layer in ["c2", "c3"]:
+                        errors.append(f"{py_file}: c1 cannot import from {imported_layer}")
+                    elif layer == "c2" and imported_layer == "c3":
+                        errors.append(f"{py_file}: c2 cannot import from c3")
+
+    if errors:
+        print("❌ Layer violation errors:")
+        for error in errors:
+            print(f"  - {error}")
+        return False
+
+    print("✅ All imports follow layer rules")
+    return True
+
+if __name__ == "__main__":
+    src_dir = Path("src")
+    valid = validate_imports(src_dir)
+    sys.exit(0 if valid else 1)
+```
+
+## Next Steps
+
+1. **Review and approval**: Confirm 3-layer flat structure
+2. **Start Phase 1**: Create c1_* packages at src/ level
+3. **Incremental migration**: One layer at a time
+4. **Continuous testing**: Run tests after each phase
+5. **Documentation**: Update all docs with new structure
