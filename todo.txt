@@ -1,5 +1,51 @@
 # Hephaestus Development TODO
-# Updated: 2025-11-01
+# Updated: 2025-11-04
+
+## Current Session (2025-11-04)
+
+[DONE] Fix all dependency issues (SQLAlchemy, requests, LangChain imports)
+    - Upgraded SQLAlchemy to 2.0.44 (Python 3.13 compatible)
+    - Fixed requests version conflict (>=2.31.0)
+    - Updated LangChain imports (langchain.schema → langchain_core.documents)
+    - Added missing test dependencies
+    - All 449 tests now collected successfully
+
+[DONE] Create comprehensive .env.example with three-part configuration
+    - Part 1: Claude Code LLM Provider (Anthropic subscription/Zai/API)
+    - Part 2: Embedding Provider (OpenAI or LM Studio with nomic-embed-text-v1.5)
+    - Part 3: Code Review Provider (LM Studio with gptoss120/gpt20, or Groq)
+    - Default: LM Studio for code review
+
+[DONE] Create INSTALLATION.txt with troubleshooting documentation
+    - Complete installation steps
+    - Troubleshooting for all 5 dependency issues
+    - Verification procedures
+
+[DONE] Update .claude/CLAUDE.md with process management guidelines
+    - Added graceful shutdown requirements
+    - Added restart procedures after code changes
+
+[DONE] Create 251104-task-09-graceful-shutdown.txt
+    - Health endpoints: GET /health/live, GET /health/status
+    - Shutdown endpoints: POST /health/shutdown, POST /health/shutdown/schedule
+    - MinIO-style health check patterns
+    - Dependency health tracking with success/failure timestamps and counters
+    - Signal handling (SIGTERM/SIGINT)
+    - Resource cleanup functions
+
+[DONE] Create PR #1 and merge to main
+    - https://github.com/kk-digital/Hephaestus/pull/1
+    - Merged successfully
+    - Both GitHub and Gogs synchronized
+
+[DONE] Check if task-08-sql-wrapper exists (SQL module centralization)
+    - CONFIRMED: tasks/251101-task-08-sql-wrapper.txt exists
+    - Wraps all SQL operations in C1-level module (c1_database)
+    - Forces all SQL commands through wrapped functions
+    - STATUS: Pending implementation (6-8 hours estimated)
+
+[DONE] Export session prompts to prompt-export directory
+    - Created export-prompts-06.txt with current session prompts
 
 ## Immediate Actions
 
