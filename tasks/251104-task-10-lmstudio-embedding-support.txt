@@ -95,9 +95,11 @@ async def select_best_embedding_model(available_models: list[str]) -> dict:
     Examine available LM Studio embedding models and select best.
 
     Preference order:
-    1. nomic-embed-text-v1.5 (default, 768-dim, high quality)
-    2. nomic-embed-text-v1 (fallback)
-    3. any-instruct-embed-* (other options)
+    1. jina-embeddings-v4-text-retrieval (default, best for retrieval tasks)
+    2. text-embedding-qwen3-embedding-8b (largest Qwen, highest quality)
+    3. nomic-embed-text-v1.5 (fallback, 768-dim, good quality)
+    4. nomic-embed-text-v1 (fallback)
+    5. any-instruct-embed-* (other options)
 
     Returns:
         {
@@ -109,9 +111,11 @@ async def select_best_embedding_model(available_models: list[str]) -> dict:
     """
     # Preferred models in order
     preferred = [
-        "nomic-embed-text-v1.5",
-        "nomic-embed-text-v1",
-        "all-minilm-l6-v2"
+        "jina-embeddings-v4-text-retrieval",  # Latest Jina v4, best for retrieval
+        "text-embedding-qwen3-embedding-8b",  # Largest Qwen, highest quality
+        "nomic-embed-text-v1.5",              # Good fallback, 768-dim
+        "nomic-embed-text-v1",                # Older Nomic
+        "all-minilm-l6-v2"                    # Smaller model
     ]
 
     # Check if preferred model is available
@@ -157,7 +161,10 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-large
 
 # LM Studio configuration
 LMSTUDIO_EMBEDDING_URL=http://localhost:1234/v1
-LMSTUDIO_EMBEDDING_MODEL=nomic-embed-text-v1.5
+LMSTUDIO_EMBEDDING_MODEL=jina-embeddings-v4-text-retrieval  # Default: Jina v4 (best for retrieval)
+# Alternative models:
+# LMSTUDIO_EMBEDDING_MODEL=text-embedding-qwen3-embedding-8b  # Qwen 8B (highest quality)
+# LMSTUDIO_EMBEDDING_MODEL=nomic-embed-text-v1.5              # Nomic (good fallback)
 ```
 
 Load configuration in code:
