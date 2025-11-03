@@ -94,12 +94,15 @@ async def select_best_embedding_model(available_models: list[str]) -> dict:
     """
     Examine available LM Studio embedding models and select best.
 
-    Preference order:
-    1. jina-embeddings-v4-text-retrieval (default, best for retrieval tasks)
-    2. text-embedding-qwen3-embedding-8b (largest Qwen, highest quality)
-    3. nomic-embed-text-v1.5 (fallback, 768-dim, good quality)
-    4. nomic-embed-text-v1 (fallback)
-    5. any-instruct-embed-* (other options)
+    Preference order (VERIFIED WORKING):
+    1. text-embedding-qwen3-embedding-8b (4096-dim, BEST QUALITY) - DEFAULT
+    2. text-embedding-qwen3-embedding-4b (2560-dim, high quality)
+    3. text-embedding-qwen3-embedding-0.6b (1024-dim, good quality, fast)
+    4. text-embedding-nomic-embed-text-v1.5 (768-dim, reliable fallback)
+    5. text-embedding-granite-embedding-125m-english (768-dim)
+    6. text-embedding-embeddinggemma-300m-with-dense-modules (768-dim)
+
+    NOTE: jina-embeddings-v4-text-retrieval does NOT work (Model is not embedding error)
 
     Returns:
         {
@@ -109,13 +112,14 @@ async def select_best_embedding_model(available_models: list[str]) -> dict:
             "recommendation": "Using recommended model"
         }
     """
-    # Preferred models in order
+    # Preferred models in order (VERIFIED WORKING)
     preferred = [
-        "jina-embeddings-v4-text-retrieval",  # Latest Jina v4, best for retrieval
-        "text-embedding-qwen3-embedding-8b",  # Largest Qwen, highest quality
-        "nomic-embed-text-v1.5",              # Good fallback, 768-dim
-        "nomic-embed-text-v1",                # Older Nomic
-        "all-minilm-l6-v2"                    # Smaller model
+        "text-embedding-qwen3-embedding-8b",        # 4096-dim, BEST QUALITY (default)
+        "text-embedding-qwen3-embedding-4b",        # 2560-dim, high quality
+        "text-embedding-qwen3-embedding-0.6b",      # 1024-dim, good quality, fast
+        "text-embedding-nomic-embed-text-v1.5",     # 768-dim, reliable fallback
+        "text-embedding-granite-embedding-125m-english",  # 768-dim
+        "text-embedding-embeddinggemma-300m-with-dense-modules"  # 768-dim
     ]
 
     # Check if preferred model is available
