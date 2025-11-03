@@ -1,0 +1,487 @@
+TASK-11: Centralize All Embedding Operations in Single Module
+
+## Objective
+
+Create a centralized embedding wrapper module that concentrates ALL embedding provider calls into one location, similar to task-08 (SQL wrapper).
+
+## Background
+
+**Problem:** Embedding operations may be scattered throughout codebase
+- Direct calls to OpenAI embeddings API
+- Direct calls to LM Studio embeddings API
+- Embedding logic mixed with business logic
+- Hard to switch providers
+- Difficult to add logging, caching, monitoring
+- Cannot mock embeddings easily for testing
+
+**Solution:** Single embedding wrapper module
+- All embedding calls go through centralized module
+- Easy to switch providers (OpenAI ↔ LM Studio)
+- Single point for logging, caching, monitoring
+- Simplified testing (mock one module)
+- Can add retry logic, rate limiting, cost tracking
+
+## Desired State
+
+Single embedding wrapper module:
+- `src/core/c1_embeddings.py` - Main embedding wrapper
+- `src/core/c1_embeddings_providers.py` - Provider implementations
+- `src/core/c1_embeddings_cache.py` - Optional caching layer
+
+**NO other files directly call embedding APIs.**
+All embedding operations go through `c1_embeddings` wrapper.
+
+## Requirements
+
+### 1. Audit Current Embedding Usage
+
+Find all files that call embedding APIs:
+
+```bash
+# Find OpenAI embedding calls
+grep -r "embeddings\.create" src/
+grep -r "OpenAI" src/ | grep embed
+
+# Find LM Studio embedding calls
+grep -r "lmstudio" src/ | grep -i embed
+grep -r "/embeddings" src/
+
+# Find any embedding imports
+grep -r "from openai" src/
+grep -r "import openai" src/
+
+# Document all embedding access points
+```
+
+Create audit report: `embedding-usage-audit.txt`
+
+### 2. Design Wrapper API
+
+```python
+# src/core/c1_embeddings.py
+
+from typing import List, Optional
+from enum import Enum
+
+class EmbeddingProvider(Enum):
+    OPENAI = "openai"
+    LMSTUDIO = "lmstudio"
+
+class EmbeddingWrapper:
+    """
+    Centralized wrapper for all embedding operations.
+    All embedding calls in codebase must go through this wrapper.
+    """
+
+    def __init__(self, provider: EmbeddingProvider):
+        self.provider = provider
+        self._client = self._initialize_provider(provider)
+
+    def _initialize_provider(self, provider: EmbeddingProvider):
+        """Initialize the appropriate embedding provider"""
+        if provider == EmbeddingProvider.OPENAI:
+            return OpenAIEmbeddingProvider(
+                api_key=os.getenv("OPENAI_API_KEY"),
+                model=os.getenv("OPENAI_EMBEDDING_MODEL")
+            )
+        elif provider == EmbeddingProvider.LMSTUDIO:
+            return LMStudioEmbeddingProvider(
+                url=os.getenv("LMSTUDIO_EMBEDDING_URL"),
+                model=os.getenv("LMSTUDIO_EMBEDDING_MODEL")
+            )
+        else:
+            raise ValueError(f"Unknown provider: {provider}")
+
+    async def embed_text(self, text: str) -> List[float]:
+        """
+        Generate embedding for single text.
+
+        Args:
+            text: Input text to embed
+
+        Returns:
+            List of floats representing the embedding vector
+
+        Raises:
+            EmbeddingError: If embedding generation fails
+        """
+        try:
+            # Log embedding request
+            logger.debug(f"Generating embedding for text (len={len(text)})")
+
+            # Call provider
+            embedding = await self._client.embed_text(text)
+
+            # Log success
+            logger.debug(f"Embedding generated (dim={len(embedding)})")
+
+            return embedding
+
+        except Exception as e:
+            logger.error(f"Embedding failed: {e}")
+            raise EmbeddingError(f"Failed to generate embedding: {e}")
+
+    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """
+        Generate embeddings for batch of texts.
+
+        Args:
+            texts: List of input texts to embed
+
+        Returns:
+            List of embedding vectors (one per input text)
+
+        Raises:
+            EmbeddingError: If any embedding fails
+        """
+        try:
+            # Log batch request
+            logger.debug(f"Generating embeddings for batch (count={len(texts)})")
+
+            # Call provider
+            embeddings = await self._client.embed_batch(texts)
+
+            # Log success
+            logger.debug(f"Batch embeddings generated (count={len(embeddings)})")
+
+            return embeddings
+
+        except Exception as e:
+            logger.error(f"Batch embedding failed: {e}")
+            raise EmbeddingError(f"Failed to generate batch embeddings: {e}")
+
+    def get_dimension(self) -> int:
+        """Get embedding dimension for current provider"""
+        return self._client.get_dimension()
+
+    async def verify_service(self) -> dict:
+        """
+        Verify embedding service is accessible.
+
+        Returns:
+            {
+                "status": "available" | "unavailable",
+                "provider": "openai" | "lmstudio",
+                "model": "model-name",
+                "dimension": 768,
+                "error": None | "error message"
+            }
+        """
+        try:
+            # Test embedding generation
+            test_text = "Hello world"
+            embedding = await self.embed_text(test_text)
+
+            return {
+                "status": "available",
+                "provider": self.provider.value,
+                "model": self._client.model,
+                "dimension": len(embedding),
+                "error": None
+            }
+        except Exception as e:
+            return {
+                "status": "unavailable",
+                "provider": self.provider.value,
+                "model": self._client.model,
+                "dimension": None,
+                "error": str(e)
+            }
+
+# Global singleton instance
+_embedding_wrapper: Optional[EmbeddingWrapper] = None
+
+def get_embedding_wrapper() -> EmbeddingWrapper:
+    """
+    Get global embedding wrapper instance.
+    Initializes on first call based on .env configuration.
+    """
+    global _embedding_wrapper
+
+    if _embedding_wrapper is None:
+        provider_name = os.getenv("EMBEDDING_PROVIDER", "openai")
+        provider = EmbeddingProvider(provider_name)
+        _embedding_wrapper = EmbeddingWrapper(provider)
+
+    return _embedding_wrapper
+
+# Convenience functions (recommended API)
+async def embed_text(text: str) -> List[float]:
+    """Generate embedding for text (convenience function)"""
+    wrapper = get_embedding_wrapper()
+    return await wrapper.embed_text(text)
+
+async def embed_batch(texts: List[str]) -> List[List[float]]:
+    """Generate embeddings for batch (convenience function)"""
+    wrapper = get_embedding_wrapper()
+    return await wrapper.embed_batch(texts)
+```
+
+### 3. Provider Implementations
+
+```python
+# src/core/c1_embeddings_providers.py
+
+from abc import ABC, abstractmethod
+from typing import List
+
+class BaseEmbeddingProvider(ABC):
+    """Base class for embedding providers"""
+
+    @abstractmethod
+    async def embed_text(self, text: str) -> List[float]:
+        """Generate embedding for single text"""
+        pass
+
+    @abstractmethod
+    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for batch of texts"""
+        pass
+
+    @abstractmethod
+    def get_dimension(self) -> int:
+        """Get embedding dimension"""
+        pass
+
+class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
+    """OpenAI cloud embedding provider"""
+
+    def __init__(self, api_key: str, model: str):
+        self.api_key = api_key
+        self.model = model
+        self.client = OpenAI(api_key=api_key)
+
+    async def embed_text(self, text: str) -> List[float]:
+        response = await self.client.embeddings.create(
+            model=self.model,
+            input=text
+        )
+        return response.data[0].embedding
+
+    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        response = await self.client.embeddings.create(
+            model=self.model,
+            input=texts
+        )
+        return [item.embedding for item in response.data]
+
+    def get_dimension(self) -> int:
+        # OpenAI model dimensions
+        dimensions = {
+            "text-embedding-3-large": 3072,
+            "text-embedding-3-small": 1536,
+            "text-embedding-ada-002": 1536
+        }
+        return dimensions.get(self.model, 1536)
+
+class LMStudioEmbeddingProvider(BaseEmbeddingProvider):
+    """LM Studio local embedding provider"""
+
+    def __init__(self, url: str, model: str):
+        self.url = url
+        self.model = model
+        self.client = httpx.AsyncClient(base_url=url)
+
+    async def embed_text(self, text: str) -> List[float]:
+        response = await self.client.post(
+            "/embeddings",
+            json={"model": self.model, "input": text}
+        )
+        response.raise_for_status()
+        return response.json()["data"][0]["embedding"]
+
+    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        response = await self.client.post(
+            "/embeddings",
+            json={"model": self.model, "input": texts}
+        )
+        response.raise_for_status()
+        return [item["embedding"] for item in response.json()["data"]]
+
+    def get_dimension(self) -> int:
+        # Common open-source model dimensions
+        if "nomic" in self.model:
+            return 768
+        elif "minilm" in self.model:
+            return 384
+        else:
+            return 768  # Default assumption
+```
+
+### 4. Optional Caching Layer
+
+```python
+# src/core/c1_embeddings_cache.py
+
+from functools import lru_cache
+import hashlib
+
+class EmbeddingCache:
+    """
+    Optional caching layer for embeddings.
+    Reduces redundant API calls for frequently used texts.
+    """
+
+    def __init__(self, max_size: int = 1000):
+        self.cache = {}
+        self.max_size = max_size
+
+    def _hash_text(self, text: str) -> str:
+        """Generate cache key for text"""
+        return hashlib.sha256(text.encode()).hexdigest()
+
+    async def get_or_compute(self, text: str, compute_fn) -> List[float]:
+        """Get cached embedding or compute if not cached"""
+        key = self._hash_text(text)
+
+        if key in self.cache:
+            logger.debug(f"Cache hit for text (len={len(text)})")
+            return self.cache[key]
+
+        # Compute embedding
+        embedding = await compute_fn(text)
+
+        # Cache result (with LRU eviction)
+        if len(self.cache) >= self.max_size:
+            # Remove oldest entry
+            oldest_key = next(iter(self.cache))
+            del self.cache[oldest_key]
+
+        self.cache[key] = embedding
+        logger.debug(f"Cached embedding (len={len(text)})")
+
+        return embedding
+```
+
+## Implementation Steps
+
+### Phase 1: Audit (30 minutes)
+
+[ ] Find all files importing OpenAI
+[ ] Find all files importing LM Studio
+[ ] Find all embedding API calls
+[ ] Document current usage patterns
+[ ] Create `embedding-usage-audit.txt`
+
+### Phase 2: Design Wrapper (1 hour)
+
+[ ] Design EmbeddingWrapper class
+[ ] Design BaseEmbeddingProvider interface
+[ ] Design provider implementations
+[ ] Design caching layer (optional)
+[ ] Document API design
+
+### Phase 3: Implement Wrapper (2 hours)
+
+[ ] Create `src/core/c1_embeddings.py`
+[ ] Implement EmbeddingWrapper class
+[ ] Implement singleton pattern
+[ ] Add logging
+[ ] Add error handling
+[ ] Add service verification
+
+### Phase 4: Implement Providers (1 hour)
+
+[ ] Create `src/core/c1_embeddings_providers.py`
+[ ] Implement BaseEmbeddingProvider
+[ ] Implement OpenAIEmbeddingProvider
+[ ] Implement LMStudioEmbeddingProvider
+[ ] Add dimension detection
+
+### Phase 5: Migrate Existing Code (2 hours)
+
+[ ] Replace direct embedding calls with wrapper
+[ ] Update imports
+[ ] Remove direct API access from other files
+[ ] Test each migration
+[ ] Verify no direct embedding calls remain
+
+### Phase 6: Add Caching (1 hour, optional)
+
+[ ] Create `src/core/c1_embeddings_cache.py`
+[ ] Implement EmbeddingCache
+[ ] Integrate with wrapper
+[ ] Test cache hits/misses
+
+### Phase 7: Testing (1 hour)
+
+[ ] Add unit tests for wrapper
+[ ] Add tests for each provider
+[ ] Add integration tests
+[ ] Test provider switching
+[ ] Test caching (if implemented)
+
+### Phase 8: Documentation (30 minutes)
+
+[ ] Update docstrings
+[ ] Add usage examples
+[ ] Document migration guide
+[ ] Update architecture docs
+
+## Testing Checklist
+
+[ ] Wrapper initializes correctly
+[ ] OpenAI provider works
+[ ] LM Studio provider works
+[ ] Provider switching works
+[ ] Batch embeddings work
+[ ] Dimension detection works
+[ ] Service verification works
+[ ] Caching works (if implemented)
+[ ] Error handling works
+[ ] No direct embedding calls remain in codebase
+
+## Files to Create
+
+- `src/core/c1_embeddings.py` - Main wrapper
+- `src/core/c1_embeddings_providers.py` - Provider implementations
+- `src/core/c1_embeddings_cache.py` - Caching layer (optional)
+- `tests/test_c1_embeddings.py` - Tests
+- `embedding-usage-audit.txt` - Audit report
+
+## Files to Modify
+
+- All files currently calling embedding APIs directly
+- `src/mcp/server.py` - Update to use wrapper
+- Any files using embeddings for search/similarity
+
+## Benefits
+
+1. **Single point of control** - All embedding calls in one place
+2. **Easy provider switching** - Change provider in .env, no code changes
+3. **Logging and monitoring** - Track all embedding usage
+4. **Caching** - Reduce redundant API calls
+5. **Testing** - Mock one module instead of many
+6. **Cost tracking** - Easy to add usage metrics
+7. **Rate limiting** - Can add throttling if needed
+8. **Error handling** - Centralized retry logic
+
+## Acceptance Criteria
+
+1. ✅ All embedding operations go through wrapper
+2. ✅ No direct embedding API calls in codebase
+3. ✅ Wrapper supports both OpenAI and LM Studio
+4. ✅ Provider can be switched via .env
+5. ✅ Logging tracks all embedding operations
+6. ✅ Tests pass for both providers
+7. ✅ Documentation complete
+
+## Priority
+
+HIGH - Centralization is critical for maintainability
+
+## Estimated Time
+
+8-9 hours (7-8 hours without caching)
+
+## Dependencies
+
+- Task-10 (LM Studio support) should be completed first
+- Or can be done in parallel if coordinated
+
+## Notes
+
+- Similar pattern to task-08 (SQL wrapper)
+- Wrapper pattern allows future providers (Hugging Face, Cohere, etc.)
+- Caching can significantly reduce API costs
+- Consider adding usage metrics for cost tracking
