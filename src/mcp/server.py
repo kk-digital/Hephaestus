@@ -35,24 +35,6 @@ from src.services.ticket_search_service import TicketSearchService
 
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Hephaestus MCP Server",
-    description="Model Context Protocol server for AI agent orchestration",
-    version="1.0.0",
-)
-
-# Add CORS middleware
-config = get_config()
-if config.enable_cors:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
 
 # Request/Response Models
 class CreateTaskRequest(BaseModel):
@@ -624,43 +606,24 @@ class ServerState:
 server_state = ServerState()
 
 
-def get_single_active_workflow() -> Optional[str]:
-    """
-    Get the ID of the single active workflow in the system.
-
-    Returns:
-        workflow_id if exactly one workflow exists, None otherwise
-    """
-    try:
-        with get_db() as session:
-            workflows = session.query(Workflow).filter(
-                Workflow.status.in_(["active", "paused"])
-            ).all()
-
-            if len(workflows) == 1:
-                return workflows[0].id
-            elif len(workflows) == 0:
-                logger.warning("No active workflows found in the system")
-                return None
-            else:
-                logger.warning(f"Multiple workflows found ({len(workflows)}), cannot auto-select")
-                return None
-    except Exception as e:
-        logger.error(f"Error getting single active workflow: {e}")
-        return None
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize server on startup."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan (startup and shutdown)."""
+    # Startup
     logger.info("Starting Hephaestus MCP Server...")
     await server_state.initialize()
 
     # Add frontend API routes
-    api_router = create_frontend_routes(server_state.db_manager, server_state.agent_manager, server_state.phase_manager)
+    from src.mcp.api import create_frontend_routes
+    api_router = create_frontend_routes(
+        server_state.db_manager,
+        server_state.agent_manager,
+        server_state.phase_manager
+    )
     app.include_router(api_router)
 
     # Add authentication routes
+    from src.auth.auth_api import router as auth_router
     app.include_router(auth_router)
 
     # Load phases if folder is specified
@@ -702,7 +665,7 @@ async def startup_event():
             workflow_def = PhaseLoader.load_phases_from_folder(phases_folder)
             logger.info(f"Loaded workflow '{workflow_def.name}' with {len(workflow_def.phases)} phases")
 
-            # Load phases configuration (for ticket tracking, result handling, etc.)
+            # Load phases configuration
             logger.info(f"Loading phases_config.yaml from '{phases_folder}'")
             phases_config = PhaseLoader.load_phases_config(phases_folder)
             logger.info(f"Loaded phases config: enable_tickets={phases_config.enable_tickets}, has_result={phases_config.has_result}")
@@ -727,7 +690,6 @@ async def startup_event():
             logger.error(f"Failed to load phases: {e}")
             import traceback
             logger.error(f"Full traceback:\n{traceback.format_exc()}")
-            # Don't fail server startup, just run without phases
     else:
         logger.info("No phases folder specified - running in standard mode")
         logger.info("To load phases, set HEPHAESTUS_PHASES_FOLDER environment variable")
@@ -741,10 +703,9 @@ async def startup_event():
 
     logger.info("Server started successfully")
 
+    yield
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
+    # Shutdown
     logger.info("Shutting down Hephaestus MCP Server...")
 
     # Stop background queue processor
@@ -761,6 +722,52 @@ async def shutdown_event():
     # Close all WebSocket connections
     for ws in server_state.active_websockets:
         await ws.close()
+
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(
+    title="Hephaestus MCP Server",
+    description="Model Context Protocol server for AI agent orchestration",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# Add CORS middleware
+config = get_config()
+if config.enable_cors:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+def get_single_active_workflow() -> Optional[str]:
+    """
+    Get the ID of the single active workflow in the system.
+
+    Returns:
+        workflow_id if exactly one workflow exists, None otherwise
+    """
+    try:
+        with get_db() as session:
+            workflows = session.query(Workflow).filter(
+                Workflow.status.in_(["active", "paused"])
+            ).all()
+
+            if len(workflows) == 1:
+                return workflows[0].id
+            elif len(workflows) == 0:
+                logger.warning("No active workflows found in the system")
+                return None
+            else:
+                logger.warning(f"Multiple workflows found ({len(workflows)}), cannot auto-select")
+                return None
+    except Exception as e:
+        logger.error(f"Error getting single active workflow: {e}")
+        return None
 
 
 def verify_agent_id(agent_id: str = Header(None, alias="X-Agent-ID")) -> str:
