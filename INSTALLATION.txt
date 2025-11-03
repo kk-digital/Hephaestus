@@ -1,0 +1,264 @@
+# Hephaestus Installation Guide
+
+## Requirements
+
+- Python 3.13+
+- pip
+- Virtual environment (recommended)
+- Qdrant vector database (for embeddings)
+- API keys for LLM providers (OpenAI, Anthropic, Groq, etc.)
+
+## Installation Steps
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/kk-digital/Hephaestus.git
+cd Hephaestus
+git checkout dev-haltingstate-00  # Development branch
+```
+
+### 2. Create Virtual Environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # On Linux/Mac
+# OR
+.venv\Scripts\activate  # On Windows
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure API Keys
+
+Copy the example environment file and add your API keys:
+
+```bash
+cp .env.example .env
+```
+
+Edit .env and add your actual API keys:
+
+```
+OPENAI_API_KEY=sk-proj-your-actual-key-here
+OPENROUTER_API_KEY=sk-or-v1-your-actual-key-here
+ANTHROPIC_API_KEY=your-actual-key-here
+GROQ_API_KEY=your-actual-key-here
+```
+
+**IMPORTANT**: Never commit the .env file to git. It is already in .gitignore.
+
+### 5. Start Qdrant (Optional - for vector search features)
+
+If using Docker:
+
+```bash
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+### 6. Run Tests
+
+```bash
+pytest tests/
+```
+
+Expected output: 449 tests collected, 1 error (manual_validation_test.py requires running server)
+
+### 7. Start the MCP Server (Optional)
+
+```bash
+python -m src.mcp.server
+```
+
+## Troubleshooting
+
+### Issue 1: SQLAlchemy AssertionError (Python 3.13 Compatibility)
+
+**Symptom:**
+```
+AssertionError: Class <class 'sqlalchemy.sql.elements.SQLCoreOperations'>
+directly inherits TypingOnly but has additional attributes
+{'__static_attributes__', '__firstlineno__'}.
+```
+
+**Cause:**
+SQLAlchemy 2.0.23 and earlier versions are incompatible with Python 3.13 due to changes in the typing module's Generic class handling.
+
+**Solution:**
+Upgrade SQLAlchemy to version 2.0.35 or later:
+
+```bash
+pip install --upgrade 'sqlalchemy>=2.0.35'
+```
+
+requirements.txt already specifies sqlalchemy>=2.0.35 which installs a compatible version (2.0.44 as of 2025-11-01).
+
+**Prevention:**
+Always use requirements.txt which pins compatible versions:
+```
+sqlalchemy>=2.0.35  # Python 3.13 compatible
+```
+
+### Issue 2: requests Version Conflict with langchain-community
+
+**Symptom:**
+```
+ERROR: Cannot install -r requirements.txt (line 23) and requests==2.31.0
+because these package versions have conflicting dependencies.
+
+The conflict is caused by:
+    The user requested requests==2.31.0
+    langchain-community 0.4.1 depends on requests<3.0.0 and >=2.32.5
+```
+
+**Cause:**
+Pinned requests==2.31.0 conflicts with langchain-community's requirement for requests>=2.32.5.
+
+**Solution:**
+Use minimum version constraint instead of exact pinning:
+
+```bash
+# In requirements.txt, change:
+requests==2.31.0
+# To:
+requests>=2.31.0
+```
+
+This allows pip to install requests 2.32.5 which satisfies both requirements.
+
+requirements.txt already uses requests>=2.31.0.
+
+### Issue 3: LangChain Import Error (langchain.schema)
+
+**Symptom:**
+```
+ModuleNotFoundError: No module named 'langchain.schema'
+```
+
+**Cause:**
+LangChain 1.0.x moved the schema module to langchain_core.documents.
+
+**Solution:**
+Update imports from:
+```python
+from langchain.schema import Document
+```
+
+To:
+```python
+from langchain_core.documents import Document
+```
+
+This has been fixed in src/interfaces/langchain_llm_client.py.
+
+### Issue 4: Missing Test Dependencies
+
+**Symptom:**
+```
+ModuleNotFoundError: No module named 'jose'
+ModuleNotFoundError: No module named 'git'
+ModuleNotFoundError: No module named 'passlib'
+ModuleNotFoundError: No module named 'email_validator'
+```
+
+**Cause:**
+Test dependencies were not included in requirements.txt.
+
+**Solution:**
+All test dependencies are now included in requirements.txt:
+
+```
+pytest>=8.0.0
+pytest-asyncio>=1.0.0
+gitpython>=3.1.0
+python-jose>=3.3.0
+passlib>=1.7.0
+bcrypt>=4.0.0
+email-validator>=2.0.0
+```
+
+Simply run:
+```bash
+pip install -r requirements.txt
+```
+
+### Issue 5: Background pip Install Conflicts
+
+**Symptom:**
+Multiple pip install processes running simultaneously, some failing with dependency conflicts.
+
+**Cause:**
+Old pip install processes from previous sessions still running with cached old requirements.txt.
+
+**Solution:**
+1. Kill any running pip processes:
+```bash
+ps aux | grep pip
+kill [PID]
+```
+
+2. Reinstall with current requirements.txt:
+```bash
+pip install -r requirements.txt
+```
+
+3. Verify installation:
+```bash
+pip list | grep -E "(sqlalchemy|requests|langchain)"
+```
+
+Expected versions:
+- sqlalchemy: 2.0.44 or higher
+- requests: 2.32.5 or higher
+- langchain: 1.0.3
+- langchain-core: 1.0.2
+- langchain-openai: 1.0.1
+
+## Verification
+
+After installation, verify everything works:
+
+```bash
+# Activate virtual environment
+source .venv/bin/activate
+
+# Check Python version
+python --version  # Should be 3.13+
+
+# Check installed packages
+pip list
+
+# Run test collection
+pytest tests/ --collect-only
+
+# Expected output: 449 tests collected, 1 error (manual_validation_test.py)
+
+# Run actual tests (with API keys configured)
+pytest tests/ -v
+```
+
+## Development Workflow
+
+See .claude/CLAUDE.md for complete development guidelines including:
+- Todo list management
+- Task file format
+- Git workflow (GitHub + Gogs)
+- Testing procedures
+- API key configuration
+
+## Support
+
+- Issues: https://github.com/kk-digital/Hephaestus/issues
+- Documentation: https://ido-levi.github.io/Hephaestus/
+- Branch: dev-haltingstate-00 (development), main (stable)
+
+## Notes
+
+- This installation guide reflects the dependency fixes completed on 2025-11-01
+- All listed issues have been resolved in the current codebase
+- Python 3.13 compatibility is fully supported with correct dependency versions
+- LangChain 1.0.x series is used (not 0.x series)
