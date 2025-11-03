@@ -87,6 +87,13 @@
     - Added explicit warning that jina-v4 doesn't work
     - All models tested and confirmed working
 
+[DONE] Verify test suite with correct dependencies
+    - Cleared pytest cache to remove SQLAlchemy 2.0.23 bytecode
+    - Confirmed SQLAlchemy 2.0.44 installed (Python 3.13 compatible)
+    - Confirmed requests 2.32.5 installed (langchain-community compatible)
+    - Test collection now succeeds: 449 tests collected successfully
+    - All dependency issues resolved
+
 ## Immediate Actions
 
 [DONE] Fix pip install dependency issues
