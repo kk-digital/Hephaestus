@@ -1,0 +1,522 @@
+TASK: LAYER-BASED MODULE REFACTORING WITH C-PREFIX
+===================================================
+
+STATUS: Analysis Phase
+PRIORITY: High (Architecture improvement)
+BRANCH: dev-haltingstate-00
+ESTIMATED TIME: 20-40 hours (phased implementation)
+
+GOAL
+----
+
+Refactor Hephaestus Python modules into strict layered architecture:
+- Layer C0 (utilities): Imports nothing, pure utilities
+- Layer C1 (base): Imports only C0, foundational types
+- Layer C2 (core): Imports C0-C1, business logic foundations
+- Layer C3 (services): Imports C0-C2, application services
+- Layer C4+ (apps): Imports C0-C3, top-level applications
+
+Rules:
+- Each layer can ONLY import lower layers
+- NO circular dependencies
+- NO cross-layer imports (skip layers allowed)
+- All modules renamed with layer prefix (c0_, c1_, c2_, etc.)
+- All directories reorganized by layer
+
+LAYERING PRINCIPLES
+-------------------
+
+Layer C0 (Utilities - imports NOTHING):
+- Pure functions and utilities
+- No external dependencies on project code
+- Can import standard library only
+- Examples: string utils, math utils, validators
+
+Layer C1 (Base - imports C0 only):
+- Data models, types, schemas
+- Configuration classes
+- Constants and enums
+- No business logic
+
+Layer C2 (Core - imports C0, C1):
+- Business logic foundations
+- Core algorithms
+- Domain services
+- Repository interfaces
+
+Layer C3 (Services - imports C0, C1, C2):
+- Application services
+- External integrations
+- Service orchestration
+- API clients
+
+Layer C4+ (Applications - imports C0-C3):
+- Entry points
+- CLI applications
+- Web servers
+- Workflow runners
+
+PHASE 1: DEPENDENCY ANALYSIS
+-----------------------------
+
+Task 1.1: Analyze src/ directory structure
+  Map all Python files in src/
+  Identify what each module imports (project imports only)
+  Identify what imports each module (reverse dependencies)
+  Create dependency graph
+
+Task 1.2: Identify circular dependencies
+  Find circular import chains
+  Document problematic dependencies
+  Plan how to break cycles
+
+Task 1.3: Classify modules by layer
+  Assign each module to appropriate layer (C0-C4)
+  Identify modules that don't fit cleanly
+  Document rationale for each assignment
+
+Output: ANALYSIS-DEPENDENCIES.txt
+
+PHASE 2: LAYER CLASSIFICATION
+------------------------------
+
+Task 2.1: Create initial layer assignments
+  Review all src/ modules
+  Classify each into C0, C1, C2, C3, or C4
+  Document dependencies that violate layering
+
+Task 2.2: Resolve layer violations
+  Identify upward dependencies (lower layer imports higher)
+  Identify circular dependencies
+  Plan refactoring to fix violations
+
+Task 2.3: Design new directory structure
+  Plan src/c0_utils/, src/c1_base/, src/c2_core/, etc.
+  Design new module names with prefixes
+  Map old names to new names
+
+Output: ANALYSIS-LAYERS.txt
+
+PHASE 3: REFACTORING PLAN
+--------------------------
+
+Task 3.1: Create migration plan for each layer
+  Phase 3.1: C0 (utilities) - 4-6 hours
+  Phase 3.2: C1 (base) - 4-6 hours
+  Phase 3.3: C2 (core) - 6-8 hours
+  Phase 3.4: C3 (services) - 6-8 hours
+  Phase 3.5: C4+ (apps) - 2-4 hours
+
+Task 3.2: Plan testing strategy for each phase
+  Unit tests for each refactored module
+  Integration tests after each phase
+  Rollback plan for failures
+
+Task 3.3: Create automated migration scripts
+  Script to rename modules
+  Script to update imports
+  Script to verify no broken imports
+
+Output: REFACTORING-PLAN.txt
+
+PHASE 4: IMPLEMENTATION (PHASED)
+---------------------------------
+
+Each phase follows this pattern:
+
+Step 1: Create new layer directory
+  mkdir -p src/cN_layername/
+
+Step 2: Move and rename modules
+  git mv src/old/module.py src/cN_layername/cN_newname.py
+
+Step 3: Update imports in moved modules
+  Change internal imports to use new paths
+  Ensure only imports from lower layers
+
+Step 4: Update imports in other modules
+  Update all files that import moved modules
+  Use new import paths
+
+Step 5: Test
+  Run pytest for affected modules
+  Run integration tests
+  Fix any broken imports
+
+Step 6: Commit
+  git add .
+  git commit -m "Refactor: Move [modules] to layer CN"
+
+Step 7: Verify
+  All tests pass
+  No import errors
+  Services start successfully
+
+INITIAL MODULE ANALYSIS (TO BE COMPLETED)
+------------------------------------------
+
+Current src/ structure:
+src/
+├── agents/          # Agent management (likely C3)
+├── auth/            # Authentication (likely C2/C3)
+├── core/            # Core utilities (likely C0/C1/C2 mixed)
+├── interfaces/      # CLI interfaces (likely C4)
+├── mcp/             # MCP protocol (likely C2/C3)
+├── memory/          # Memory/vector store (likely C2/C3)
+├── monitoring/      # Monitoring services (likely C3)
+├── phases/          # Workflow phases (likely C3)
+├── prompts/         # Prompt templates (likely C1)
+├── sdk/             # SDK/client library (likely C3)
+├── services/        # Application services (likely C3)
+├── validation/      # Validation logic (likely C1/C2)
+└── workflow/        # Workflow orchestration (likely C3/C4)
+
+ANALYSIS SCRIPTS TO CREATE
+---------------------------
+
+Script 1: analyze_imports.py
+  Purpose: Analyze all imports in src/
+  Output: dependency_graph.json
+  Features:
+    - Parse all Python files
+    - Extract import statements
+    - Build dependency graph
+    - Identify circular dependencies
+    - Generate DOT file for visualization
+
+Script 2: classify_layers.py
+  Purpose: Suggest layer classification for each module
+  Input: dependency_graph.json
+  Output: layer_classification.json
+  Algorithm:
+    - Start with modules importing nothing → C0
+    - Modules importing only C0 → C1
+    - Modules importing C0-C1 → C2
+    - Continue until all classified
+    - Flag circular dependencies
+
+Script 3: generate_refactoring_plan.py
+  Purpose: Generate detailed refactoring plan
+  Input: layer_classification.json
+  Output: refactoring_plan.json
+  Features:
+    - List all file moves (old → new path)
+    - List all import updates needed
+    - Estimate time for each phase
+    - Generate git commands for migration
+
+Script 4: verify_layers.py
+  Purpose: Verify no layer violations after refactoring
+  Features:
+    - Check each module's imports
+    - Ensure only imports from lower layers
+    - Report any violations
+    - Run as pre-commit hook
+
+EXAMPLE REFACTORING (HYPOTHETICAL)
+-----------------------------------
+
+BEFORE:
+src/core/config.py              # Imports: os, yaml (no project imports)
+src/core/database.py            # Imports: sqlalchemy, src/core/config
+src/services/agent_service.py  # Imports: src/core/database, src/agents/manager
+
+AFTER:
+src/c0_utils/c0_validators.py          # Pure utilities
+src/c1_base/c1_config.py               # Config (was src/core/config.py)
+src/c1_base/c1_models.py               # Data models
+src/c2_core/c2_database.py             # Database (was src/core/database.py)
+src/c2_core/c2_agent_logic.py          # Agent business logic
+src/c3_services/c3_agent_service.py    # Agent service (was src/services/agent_service.py)
+
+LAYER DEPENDENCIES:
+C0: imports nothing
+C1: imports C0
+C2: imports C0, C1
+C3: imports C0, C1, C2
+C4: imports C0, C1, C2, C3
+
+NAMING CONVENTION
+-----------------
+
+Directory naming:
+- src/c0_utils/        # Layer 0 utilities
+- src/c1_base/         # Layer 1 base types
+- src/c2_core/         # Layer 2 core logic
+- src/c3_services/     # Layer 3 services
+- src/c4_apps/         # Layer 4 applications
+
+File naming:
+- c0_string_utils.py   # Utilities in C0
+- c0_validators.py
+- c1_config.py         # Config in C1
+- c1_models.py
+- c1_schemas.py
+- c2_database.py       # Database in C2
+- c2_agent_logic.py
+- c3_agent_service.py  # Services in C3
+- c3_mcp_client.py
+- c4_server.py         # Applications in C4
+
+Import style:
+from src.c0_utils.c0_validators import validate_email
+from src.c1_base.c1_config import Config
+from src.c2_core.c2_database import Database
+from src.c3_services.c3_agent_service import AgentService
+
+TESTING STRATEGY
+----------------
+
+Test 1: Unit tests for each module
+  Test each refactored module independently
+  Ensure functionality unchanged
+  Mock dependencies
+
+Test 2: Integration tests for each layer
+  After completing each layer refactoring
+  Test that layer integrates with lower layers
+  Test that higher layers still work
+
+Test 3: End-to-end tests
+  After all layers refactored
+  Test full application workflows
+  Ensure nothing broke
+
+Test 4: Import verification
+  Run verify_layers.py script
+  Check no circular dependencies
+  Check no upward dependencies
+
+INCREMENTAL TESTING APPROACH
+-----------------------------
+
+After moving EACH module:
+1. Run: python -m pytest tests/unit/test_<module>.py
+2. Run: python -c "import src.cN_layer.cN_module"
+3. Fix any import errors immediately
+4. Commit if tests pass
+
+After completing EACH layer:
+1. Run: python -m pytest tests/
+2. Run: python code/run_server.py --help
+3. Run: python code/run_monitor.py --help
+4. Fix any issues
+5. Commit if all tests pass
+
+After completing ALL layers:
+1. Run full test suite
+2. Start all services
+3. Run integration tests
+4. Test full workflows
+5. Create final commit
+
+ROLLBACK STRATEGY
+-----------------
+
+After each module move:
+  If tests fail:
+    git reset --hard HEAD
+    Fix issues in separate branch
+    Try again
+
+After each layer:
+  Create checkpoint branch:
+    git checkout -b checkpoint-cN-complete
+    git checkout dev-haltingstate-00
+  If major issues:
+    git reset --hard checkpoint-cN-minus-1-complete
+
+METRICS TO TRACK
+----------------
+
+Before refactoring:
+- Number of circular dependencies
+- Average module dependency count
+- Maximum dependency depth
+- Number of cross-cutting concerns
+
+After refactoring:
+- Zero circular dependencies (goal)
+- Reduced average dependency count
+- Clear dependency hierarchy
+- Isolated concerns by layer
+
+DOCUMENTATION TO UPDATE
+-----------------------
+
+After refactoring:
+- Architecture documentation
+- Developer onboarding guide
+- Import guidelines
+- Layer responsibilities
+- Module index
+
+BENEFITS OF LAYERED ARCHITECTURE
+---------------------------------
+
+1. Clear dependency hierarchy
+   - No circular dependencies
+   - Easy to understand module relationships
+   - Safe to refactor lower layers
+
+2. Better testability
+   - Mock higher layers, test lower layers
+   - Clear test boundaries
+   - Isolated unit tests
+
+3. Improved maintainability
+   - Changes propagate downward only
+   - Easier to reason about impact
+   - Clear separation of concerns
+
+4. Better modularity
+   - Each layer has specific responsibility
+   - Can replace implementations within layer
+   - Easier to extract packages
+
+5. Enforced architecture
+   - Naming convention makes violations obvious
+   - verify_layers.py script catches violations
+   - Pre-commit hooks prevent bad commits
+
+RISKS AND MITIGATION
+---------------------
+
+Risk 1: Breaking changes during refactoring
+Mitigation:
+- Incremental approach (one module at a time)
+- Test after each change
+- Commit frequently
+- Keep rollback points
+
+Risk 2: Discovering deep circular dependencies
+Mitigation:
+- Analyze dependencies first (Phase 1)
+- Plan how to break cycles (Phase 2)
+- Refactor in dependency order (Phase 4)
+- May need to create new interfaces
+
+Risk 3: Performance impact from refactoring
+Mitigation:
+- No performance impact expected (just moving files)
+- Profile before and after if concerned
+- Benchmark critical paths
+
+Risk 4: Large diff makes code review difficult
+Mitigation:
+- Break into small phases
+- Review each layer separately
+- Clear commit messages
+- Document rationale in commit messages
+
+TIMELINE
+--------
+
+Phase 1: Analysis (4-6 hours)
+- Create analysis scripts
+- Analyze all dependencies
+- Classify modules by layer
+- Document circular dependencies
+- Create refactoring plan
+
+Phase 2: Planning (2-4 hours)
+- Design new structure
+- Plan module renames
+- Write migration scripts
+- Set up testing framework
+
+Phase 3: C0 Utilities (4-6 hours)
+- Identify utility modules
+- Move to c0_utils/
+- Rename with c0_ prefix
+- Update imports
+- Test
+
+Phase 4: C1 Base (4-6 hours)
+- Move base types and models
+- Move to c1_base/
+- Rename with c1_ prefix
+- Update imports
+- Test
+
+Phase 5: C2 Core (6-8 hours)
+- Move core business logic
+- Move to c2_core/
+- Rename with c2_ prefix
+- Break circular dependencies
+- Update imports
+- Test
+
+Phase 6: C3 Services (6-8 hours)
+- Move application services
+- Move to c3_services/
+- Rename with c3_ prefix
+- Update imports
+- Test
+
+Phase 7: C4 Apps (2-4 hours)
+- Move entry points
+- Move to c4_apps/ (or keep in code/)
+- Rename with c4_ prefix
+- Update imports
+- Test
+
+Phase 8: Final Testing (4-6 hours)
+- Run full test suite
+- Integration tests
+- End-to-end tests
+- Performance testing
+- Documentation updates
+
+Total: 32-48 hours (1-2 weeks full time, or 2-4 weeks part time)
+
+NEXT STEPS
+----------
+
+Step 1: Create analysis scripts
+  - analyze_imports.py
+  - classify_layers.py
+  - generate_refactoring_plan.py
+  - verify_layers.py
+
+Step 2: Run analysis
+  - python analyze_imports.py
+  - Review dependency_graph.json
+  - python classify_layers.py
+  - Review layer_classification.json
+
+Step 3: Manual review
+  - Review automated classification
+  - Adjust classifications as needed
+  - Document rationale for changes
+
+Step 4: Generate plan
+  - python generate_refactoring_plan.py
+  - Review refactoring_plan.json
+  - Estimate time for each phase
+
+Step 5: Get approval
+  - Review plan with team (or user)
+  - Adjust based on feedback
+  - Set timeline
+
+Step 6: Execute
+  - Start with Phase 3 (C0 Utilities)
+  - Follow incremental testing approach
+  - Commit frequently
+  - Monitor for issues
+
+SUCCESS CRITERIA
+----------------
+
+✅ Zero circular dependencies
+✅ All modules classified into layers
+✅ All modules renamed with layer prefix
+✅ All imports updated correctly
+✅ All tests pass
+✅ Services start successfully
+✅ No performance degradation
+✅ Documentation updated
+✅ verify_layers.py script passes
+
+This refactoring establishes a solid architectural foundation for the project.

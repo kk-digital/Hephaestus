@@ -1,0 +1,414 @@
+TASK: CREATE C1 LLM SERVICE ABSTRACTION LAYER
+==============================================
+
+STATUS: Pending
+PRIORITY: High
+BRANCH: dev-haltingstate-00
+ESTIMATED TIME: 6-8 hours
+
+GOAL
+----
+
+Create a unified C1-level service abstraction for all LLM operations in Hephaestus.
+Centralize LLM API calls, configuration, and provider management in one or more c1_llm_* modules.
+Move all LLM-related code from scattered locations into the C1 base layer.
+
+CURRENT STATE
+-------------
+
+LLM code is scattered across multiple locations:
+- src/core/config.py contains LlmConfig class
+- src/services/agent_service.py makes LLM API calls
+- src/agent/agent.py makes LLM API calls
+- src/mcp/mcp_client.py may have LLM calls
+- Multiple files import and use LLM functionality directly
+
+Problems:
+- No centralized LLM service abstraction
+- Hard to switch between LLM providers
+- Configuration scattered across multiple files
+- No unified interface for LLM operations
+- Testing requires mocking multiple different call sites
+
+DESIRED STATE
+-------------
+
+Centralized LLM service in C1 layer:
+- src/c1_base/c1_llm_config.py (configuration classes)
+- src/c1_base/c1_llm_settings.py (settings dataclass)
+- src/c1_base/c1_llm_service.py (unified service interface)
+- src/c1_base/c1_llm_providers.py (provider implementations)
+- src/c1_base/c1_llm_models.py (data models for requests/responses)
+
+Benefits:
+- Single point of configuration for all LLM operations
+- Easy provider switching (OpenRouter, OpenAI, Anthropic, Groq, Local)
+- Simplified testing (mock one service instead of many call sites)
+- Clear separation of concerns (C1 handles LLM abstraction)
+- Easier to add new providers or features
+
+MODULES TO CREATE
+-----------------
+
+### Module 1: c1_llm_config.py
+
+Purpose: Configuration classes for LLM service
+Location: src/c1_base/c1_llm_config.py
+
+Content:
+- Move LlmConfig from src/core/config.py
+- Add provider-specific configuration classes
+- Configuration validation
+- Default values and fallbacks
+
+Classes:
+- LlmConfig (moved from src/core/config.py)
+- OpenRouterConfig (OpenRouter-specific settings)
+- OpenAIConfig (OpenAI-specific settings)
+- AnthropicConfig (Anthropic-specific settings)
+- GroqConfig (Groq-specific settings)
+- LocalLlmConfig (LM Studio and local model settings)
+
+### Module 2: c1_llm_settings.py
+
+Purpose: Settings dataclass for runtime LLM configuration
+Location: src/c1_base/c1_llm_settings.py
+
+Content:
+- LlmSettings dataclass (runtime settings)
+- Load settings from config
+- Environment variable overrides
+- Validation and defaults
+
+Classes:
+- LlmSettings (main settings dataclass)
+- ProviderSettings (provider-specific runtime settings)
+
+### Module 3: c1_llm_models.py
+
+Purpose: Data models for LLM requests and responses
+Location: src/c1_base/c1_llm_models.py
+
+Content:
+- Request models (chat, completion, streaming)
+- Response models (message, choice, usage)
+- Error models
+- Provider-agnostic data structures
+
+Classes:
+- LlmRequest (base request model)
+- ChatRequest (chat completion request)
+- ChatResponse (chat completion response)
+- StreamChunk (streaming response chunk)
+- LlmMessage (message with role and content)
+- LlmUsage (token usage statistics)
+- LlmError (error response)
+
+### Module 4: c1_llm_providers.py
+
+Purpose: Provider implementations for different LLM APIs
+Location: src/c1_base/c1_llm_providers.py
+
+Content:
+- Base provider interface
+- Provider implementations (OpenRouter, OpenAI, Anthropic, Groq, Local)
+- Request translation (convert LlmRequest to provider format)
+- Response translation (convert provider response to LlmResponse)
+- Error handling and retries
+
+Classes:
+- LlmProvider (abstract base class)
+- OpenRouterProvider (OpenRouter API implementation)
+- OpenAIProvider (OpenAI API implementation)
+- AnthropicProvider (Anthropic API implementation)
+- GroqProvider (Groq API implementation)
+- LocalLlmProvider (LM Studio and local models)
+
+### Module 5: c1_llm_service.py
+
+Purpose: Unified LLM service interface
+Location: src/c1_base/c1_llm_service.py
+
+Content:
+- LlmService class (main service interface)
+- Provider selection and routing
+- Caching and rate limiting
+- Logging and monitoring
+- Error handling and fallbacks
+
+Classes:
+- LlmService (main service class)
+  - Methods:
+    - chat(request: ChatRequest) -> ChatResponse
+    - stream_chat(request: ChatRequest) -> Iterator[StreamChunk]
+    - get_embedding(text: str) -> List[float]  # Note: may move to c1_embedding_service
+    - list_models() -> List[str]
+    - get_provider(name: str) -> LlmProvider
+
+IMPLEMENTATION STEPS
+--------------------
+
+Phase 1: Create module structure (1 hour)
+  [ ] Create src/c1_base/ directory if not exists
+  [ ] Create __init__.py in src/c1_base/
+  [ ] Create empty module files:
+      - c1_llm_config.py
+      - c1_llm_settings.py
+      - c1_llm_models.py
+      - c1_llm_providers.py
+      - c1_llm_service.py
+  [ ] Add basic imports and docstrings
+
+Phase 2: Implement data models (1-2 hours)
+  [ ] Create c1_llm_models.py
+  [ ] Define LlmRequest, ChatRequest, ChatResponse
+  [ ] Define LlmMessage, LlmUsage, LlmError
+  [ ] Define StreamChunk for streaming responses
+  [ ] Add validation using pydantic or dataclasses
+  [ ] Add unit tests for models
+
+Phase 3: Move and refactor configuration (1 hour)
+  [ ] Move LlmConfig from src/core/config.py to c1_llm_config.py
+  [ ] Create provider-specific config classes
+  [ ] Update imports in files using LlmConfig
+  [ ] Create c1_llm_settings.py
+  [ ] Implement LlmSettings dataclass
+  [ ] Add config loading and validation
+  [ ] Add unit tests for config/settings
+
+Phase 4: Implement provider abstraction (2-3 hours)
+  [ ] Create LlmProvider abstract base class
+  [ ] Implement OpenRouterProvider
+  [ ] Implement OpenAIProvider
+  [ ] Implement AnthropicProvider (if used)
+  [ ] Implement GroqProvider (if used)
+  [ ] Implement LocalLlmProvider
+  [ ] Add request/response translation
+  [ ] Add error handling and retries
+  [ ] Add unit tests for each provider
+
+Phase 5: Implement unified service (1-2 hours)
+  [ ] Create LlmService class
+  [ ] Implement chat() method
+  [ ] Implement stream_chat() method
+  [ ] Implement provider selection logic
+  [ ] Add caching (optional)
+  [ ] Add rate limiting (optional)
+  [ ] Add logging and monitoring
+  [ ] Add integration tests
+
+Phase 6: Migrate existing code (1-2 hours)
+  [ ] Find all LLM API call sites in codebase
+  [ ] Replace with LlmService calls
+  [ ] Update imports
+  [ ] Remove duplicate LLM logic
+  [ ] Test each migration
+
+Phase 7: Documentation and testing (1 hour)
+  [ ] Write usage documentation
+  [ ] Document provider configuration
+  [ ] Add examples for common use cases
+  [ ] Run full test suite
+  [ ] Update README or docs
+
+PROVIDER SUPPORT
+----------------
+
+Required Providers:
+1. OpenRouter (primary, supports multiple models)
+2. OpenAI (fallback, official API)
+3. Local LLM (LM Studio, for offline development)
+
+Optional Providers:
+4. Anthropic (direct Claude API)
+5. Groq (fast inference)
+
+Provider Configuration Example:
+
+```yaml
+llm:
+  default_provider: openrouter
+  providers:
+    openrouter:
+      api_key: ${OPENROUTER_API_KEY}
+      base_url: https://openrouter.ai/api/v1
+      default_model: anthropic/claude-3.5-sonnet
+    openai:
+      api_key: ${OPENAI_API_KEY}
+      base_url: https://api.openai.com/v1
+      default_model: gpt-4
+    local:
+      base_url: http://localhost:1234/v1
+      default_model: local-model
+```
+
+USAGE EXAMPLES
+--------------
+
+Example 1: Simple chat completion
+
+```python
+from src.c1_base.c1_llm_service import LlmService
+from src.c1_base.c1_llm_models import ChatRequest, LlmMessage
+
+# Initialize service
+llm_service = LlmService.from_config()
+
+# Create request
+request = ChatRequest(
+    messages=[
+        LlmMessage(role="user", content="What is the capital of France?")
+    ],
+    model="anthropic/claude-3.5-sonnet",
+    max_tokens=100
+)
+
+# Get response
+response = llm_service.chat(request)
+print(response.message.content)
+```
+
+Example 2: Streaming response
+
+```python
+from src.c1_base.c1_llm_service import LlmService
+from src.c1_base.c1_llm_models import ChatRequest, LlmMessage
+
+llm_service = LlmService.from_config()
+
+request = ChatRequest(
+    messages=[LlmMessage(role="user", content="Write a story.")],
+    model="anthropic/claude-3.5-sonnet",
+    stream=True
+)
+
+for chunk in llm_service.stream_chat(request):
+    print(chunk.delta, end="", flush=True)
+```
+
+Example 3: Provider switching
+
+```python
+from src.c1_base.c1_llm_service import LlmService
+
+llm_service = LlmService.from_config()
+
+# Use OpenRouter provider
+response = llm_service.chat(request, provider="openrouter")
+
+# Use OpenAI provider
+response = llm_service.chat(request, provider="openai")
+
+# Use local LLM
+response = llm_service.chat(request, provider="local")
+```
+
+MIGRATION CHECKLIST
+-------------------
+
+Files to update (find with grep -r "import.*llm" src/):
+  [ ] src/services/agent_service.py
+  [ ] src/agent/agent.py
+  [ ] src/mcp/mcp_client.py
+  [ ] src/core/config.py (move LlmConfig)
+  [ ] Any other files making LLM API calls
+
+For each file:
+  [ ] Replace direct API calls with LlmService
+  [ ] Update imports
+  [ ] Remove duplicate LLM logic
+  [ ] Test functionality
+  [ ] Commit changes
+
+TESTING STRATEGY
+----------------
+
+Unit Tests:
+  [ ] c1_llm_models: Test data model validation and serialization
+  [ ] c1_llm_config: Test configuration loading and validation
+  [ ] c1_llm_settings: Test settings override and defaults
+  [ ] c1_llm_providers: Test each provider implementation (mocked)
+  [ ] c1_llm_service: Test service logic and provider routing
+
+Integration Tests:
+  [ ] Test real API calls to OpenRouter (with test API key)
+  [ ] Test real API calls to OpenAI (with test API key)
+  [ ] Test LM Studio local provider (if running)
+  [ ] Test streaming responses
+  [ ] Test error handling and retries
+
+End-to-End Tests:
+  [ ] Test agent workflow using LlmService
+  [ ] Test MCP client using LlmService
+  [ ] Test all LLM-dependent features still work
+
+DEPENDENCIES
+------------
+
+This task depends on:
+- Task-03 (layer refactoring) for C1 layer structure
+- May overlap with Task-01 (embedding migration) for embedding service
+
+COORDINATION NOTES
+------------------
+
+If embedding service is separate (c1_embedding_service):
+- Keep LLM service focused on chat/completion
+- Embedding service handles embedding models
+- Both can share provider abstraction if needed
+
+If embedding is part of LLM service:
+- Add get_embedding() method to LlmService
+- Add embedding provider support
+
+SUCCESS CRITERIA
+----------------
+
+✅ All LLM configuration centralized in c1_llm_* modules
+✅ All LLM API calls go through LlmService
+✅ Can switch between providers (OpenRouter, OpenAI, Local) via configuration
+✅ No direct LLM API calls outside C1 layer
+✅ All tests pass (unit, integration, e2e)
+✅ Documentation complete with usage examples
+✅ Code is clean, well-documented, and follows layer rules (C1 imports only C0)
+
+BENEFITS
+--------
+
+1. Centralized LLM logic
+   - All LLM operations in one place
+   - Easy to find and modify LLM code
+
+2. Provider flexibility
+   - Switch providers without code changes
+   - Test with different providers
+   - Fallback to alternative providers on failure
+
+3. Easier testing
+   - Mock LlmService once instead of many call sites
+   - Provider implementations can be tested independently
+
+4. Better monitoring
+   - Centralized logging of all LLM requests
+   - Track token usage across all operations
+   - Monitor provider performance
+
+5. Simplified maintenance
+   - Update one service instead of scattered code
+   - Add new providers in one location
+   - Consistent error handling
+
+TIMELINE
+--------
+
+Phase 1: Create structure - 1 hour
+Phase 2: Implement models - 1-2 hours
+Phase 3: Move configuration - 1 hour
+Phase 4: Implement providers - 2-3 hours
+Phase 5: Implement service - 1-2 hours
+Phase 6: Migrate existing code - 1-2 hours
+Phase 7: Documentation and testing - 1 hour
+
+Total: 8-12 hours (depends on number of providers and migration complexity)
+
+This task creates the foundation for clean LLM abstraction in Hephaestus.

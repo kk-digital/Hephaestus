@@ -1,0 +1,498 @@
+TASK: ORGANIZE TESTS BY LAYER WITH C-PREFIX
+============================================
+
+STATUS: Pending Implementation (depends on TASK-LAYER-REFACTORING)
+PRIORITY: High
+BRANCH: dev-haltingstate-00
+ESTIMATED TIME: 6-10 hours
+
+GOAL
+----
+
+Reorganize tests to match layered architecture:
+- Tests mirror src/ structure
+- Test files prefixed with layer (c0_, c1_, c2_, etc.)
+- Tests for layer CN in tests/cN_layername/
+- Integration tests separately organized
+- Clear test hierarchy
+
+DEPENDENCY
+----------
+
+This task MUST be completed AFTER TASK-LAYER-REFACTORING.txt
+Reason: Tests must match refactored module structure
+
+CURRENT TEST STRUCTURE
+----------------------
+
+tests/
+├── integration/          # Integration tests
+├── mcp_integration/      # MCP-specific integration tests
+├── sdk/                  # SDK tests
+└── unit/                 # Unit tests
+
+Problems:
+- No clear mapping to src/ modules
+- No layer organization
+- Tests not named consistently
+- Hard to find tests for specific modules
+
+PROPOSED TEST STRUCTURE
+-----------------------
+
+tests/
+├── c0_utils/                    # Tests for C0 layer
+│   ├── test_c0_validators.py   # Unit tests for c0_validators.py
+│   ├── test_c0_string_utils.py
+│   └── ...
+├── c1_base/                     # Tests for C1 layer
+│   ├── test_c1_config.py       # Unit tests for c1_config.py
+│   ├── test_c1_models.py
+│   ├── test_c1_schemas.py
+│   └── ...
+├── c2_core/                     # Tests for C2 layer
+│   ├── test_c2_database.py     # Unit tests for c2_database.py
+│   ├── test_c2_agent_logic.py
+│   └── ...
+├── c3_services/                 # Tests for C3 layer
+│   ├── test_c3_agent_service.py
+│   ├── test_c3_mcp_client.py
+│   └── ...
+├── c4_apps/                     # Tests for C4 layer
+│   ├── test_c4_server.py
+│   └── ...
+├── integration/                 # Integration tests (cross-layer)
+│   ├── test_i_agent_workflow.py
+│   ├── test_i_mcp_protocol.py
+│   └── ...
+├── e2e/                         # End-to-end tests
+│   ├── test_e2e_full_workflow.py
+│   └── ...
+└── conftest.py                  # Shared test fixtures
+
+TEST NAMING CONVENTIONS
+-----------------------
+
+Unit test naming:
+- File: test_cN_modulename.py
+- Class: TestCNModuleName (if using classes)
+- Function: test_function_name()
+
+Examples:
+  tests/c0_utils/test_c0_validators.py:
+    def test_validate_email_valid()
+    def test_validate_email_invalid()
+    def test_validate_url_valid()
+
+  tests/c1_base/test_c1_config.py:
+    class TestC1Config:
+        def test_load_config_from_yaml()
+        def test_load_config_from_env()
+        def test_config_validation()
+
+  tests/c2_core/test_c2_database.py:
+    class TestC2Database:
+        def test_connect()
+        def test_query()
+        def test_transaction()
+
+Integration test naming:
+- File: test_i_feature_name.py
+- Prefix: test_i_ for integration
+
+End-to-end test naming:
+- File: test_e2e_workflow_name.py
+- Prefix: test_e2e_ for end-to-end
+
+TEST ORGANIZATION RULES
+-----------------------
+
+Rule 1: Test file mirrors source file
+  src/c1_base/c1_config.py → tests/c1_base/test_c1_config.py
+
+Rule 2: One test file per source file
+  One c1_config.py → One test_c1_config.py
+
+Rule 3: Test only uses imports from same or lower layers
+  tests/c2_core/ can import from src/c0_utils/, src/c1_base/, src/c2_core/
+  tests/c2_core/ CANNOT import from src/c3_services/ or src/c4_apps/
+
+Rule 4: Integration tests test cross-layer interactions
+  tests/integration/ can import from any layer
+
+Rule 5: E2E tests test full workflows
+  tests/e2e/ test complete user scenarios
+
+MAPPING CURRENT TESTS TO NEW STRUCTURE
+---------------------------------------
+
+Step 1: Identify all existing test files
+  find tests/ -name 'test_*.py' -type f | sort
+
+Step 2: Determine which layer each test belongs to
+  Read test imports
+  Match to refactored module layers
+  Assign to cN_layername/
+
+Step 3: Create mapping file
+  old_test_path → new_test_path
+  tests/unit/test_config.py → tests/c1_base/test_c1_config.py
+
+Step 4: Rename and move tests
+  Use git mv to preserve history
+  Update imports in tests
+  Update conftest.py paths
+
+IMPLEMENTATION STEPS
+--------------------
+
+Phase 1: Analysis (2 hours)
+  [ ] List all existing test files
+  [ ] Analyze what each test file tests
+  [ ] Map to corresponding layer
+  [ ] Create test_migration_plan.json
+
+Phase 2: Create new test structure (1 hour)
+  [ ] mkdir -p tests/c0_utils/
+  [ ] mkdir -p tests/c1_base/
+  [ ] mkdir -p tests/c2_core/
+  [ ] mkdir -p tests/c3_services/
+  [ ] mkdir -p tests/c4_apps/
+  [ ] mkdir -p tests/e2e/
+  [ ] Keep tests/integration/ (already exists)
+
+Phase 3: Move and rename test files (3-4 hours)
+  For each test file:
+    [ ] git mv old_path new_path
+    [ ] Rename with layer prefix
+    [ ] Update imports to match refactored modules
+    [ ] Update any hardcoded paths
+    [ ] Run test: pytest new_path
+    [ ] Fix any issues
+    [ ] Commit if test passes
+
+Phase 4: Update test configuration (1 hour)
+  [ ] Update pytest.ini (if exists)
+  [ ] Update conftest.py
+  [ ] Update CI/CD test configuration
+  [ ] Update test documentation
+
+Phase 5: Create layer-specific test utilities (1-2 hours)
+  [ ] tests/c0_utils/conftest.py (fixtures for C0 tests)
+  [ ] tests/c1_base/conftest.py (fixtures for C1 tests)
+  [ ] tests/c2_core/conftest.py (fixtures for C2 tests)
+  [ ] tests/c3_services/conftest.py (fixtures for C3 tests)
+
+Phase 6: Verification (1 hour)
+  [ ] Run: pytest tests/c0_utils/
+  [ ] Run: pytest tests/c1_base/
+  [ ] Run: pytest tests/c2_core/
+  [ ] Run: pytest tests/c3_services/
+  [ ] Run: pytest tests/c4_apps/
+  [ ] Run: pytest tests/integration/
+  [ ] Run: pytest tests/e2e/
+  [ ] Run: pytest (all tests)
+  [ ] All tests pass
+
+EXAMPLE TEST MIGRATION
+----------------------
+
+BEFORE:
+tests/unit/test_config.py
+tests/unit/test_database.py
+tests/integration/test_agent_service.py
+
+AFTER:
+tests/c1_base/test_c1_config.py
+tests/c2_core/test_c2_database.py
+tests/integration/test_i_agent_service.py
+
+TEST FILE CONTENT UPDATE
+------------------------
+
+BEFORE (tests/unit/test_config.py):
+```python
+from src.core.config import Config
+
+def test_load_config():
+    config = Config.load('config/hephaestus_config.yaml')
+    assert config is not None
+```
+
+AFTER (tests/c1_base/test_c1_config.py):
+```python
+from src.c1_base.c1_config import Config
+
+def test_load_config():
+    config = Config.load('config/hephaestus_config.yaml')
+    assert config is not None
+```
+
+LAYER-SPECIFIC TESTING STRATEGIES
+----------------------------------
+
+C0 (Utilities) tests:
+- Pure unit tests
+- No mocking needed (no dependencies)
+- Test all edge cases
+- Fast execution (<1ms per test)
+- Example: Test string validators, math utils
+
+C1 (Base) tests:
+- Unit tests with minimal mocking
+- Mock only external dependencies (filesystem, network)
+- Test data model validation
+- Test configuration loading
+- Example: Test config parsing, schema validation
+
+C2 (Core) tests:
+- Unit tests with moderate mocking
+- Mock C3 services (if any callbacks)
+- Test business logic thoroughly
+- Test edge cases and error handling
+- Example: Test database operations, domain logic
+
+C3 (Services) tests:
+- Unit tests with heavy mocking
+- Mock external APIs and databases
+- Test service orchestration
+- Test error handling and retries
+- Example: Test agent service, MCP client
+
+C4 (Apps) tests:
+- Integration-style tests
+- Test entry points work
+- Test CLI argument parsing
+- Test server startup
+- May use real dependencies or mocks
+- Example: Test run_server.py starts correctly
+
+Integration tests:
+- Test multiple layers together
+- Use real database (test DB)
+- Mock only external services
+- Test cross-layer workflows
+- Example: Test agent workflow end-to-end
+
+E2E tests:
+- Test full application workflows
+- Use real services (or close to real)
+- Test from user perspective
+- Slowest tests
+- Example: Test PRD workflow from creation to completion
+
+PYTEST CONFIGURATION
+--------------------
+
+pytest.ini:
+```ini
+[pytest]
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+
+markers =
+    c0: Tests for C0 layer (utilities)
+    c1: Tests for C1 layer (base)
+    c2: Tests for C2 layer (core)
+    c3: Tests for C3 layer (services)
+    c4: Tests for C4 layer (apps)
+    integration: Integration tests
+    e2e: End-to-end tests
+    slow: Slow tests (>1s)
+
+addopts =
+    --strict-markers
+    --verbose
+    --tb=short
+    --cov=src
+    --cov-report=html
+    --cov-report=term-missing
+```
+
+Usage:
+  pytest -m c0         # Run only C0 tests
+  pytest -m c1         # Run only C1 tests
+  pytest -m "not slow" # Skip slow tests
+  pytest tests/c2_core/ # Run C2 tests
+  pytest -m integration # Run integration tests
+  pytest -m e2e        # Run E2E tests
+
+TEST MARKERS IN CODE
+--------------------
+
+Example test with markers:
+```python
+import pytest
+
+@pytest.mark.c0
+@pytest.mark.fast
+def test_validate_email_valid():
+    """Test email validator with valid email."""
+    from src.c0_utils.c0_validators import validate_email
+    assert validate_email("test@example.com") is True
+
+@pytest.mark.c3
+@pytest.mark.slow
+def test_agent_service_create_agent(mock_database):
+    """Test agent service creates agent correctly."""
+    from src.c3_services.c3_agent_service import AgentService
+    service = AgentService(mock_database)
+    agent = service.create_agent("test-agent")
+    assert agent.name == "test-agent"
+
+@pytest.mark.integration
+@pytest.mark.slow
+def test_full_agent_workflow():
+    """Test complete agent workflow integration."""
+    # Test multiple layers together
+    pass
+```
+
+CONFTEST.PY ORGANIZATION
+------------------------
+
+Root conftest.py (tests/conftest.py):
+- Shared fixtures for all tests
+- Database fixtures
+- Common test utilities
+
+Layer-specific conftest.py:
+- tests/c0_utils/conftest.py - No fixtures needed (utilities are pure)
+- tests/c1_base/conftest.py - Config fixtures, schema fixtures
+- tests/c2_core/conftest.py - Database fixtures, mock repositories
+- tests/c3_services/conftest.py - Mock external services, API clients
+- tests/integration/conftest.py - Real service instances for integration
+
+VERIFICATION SCRIPT
+-------------------
+
+Create verify_test_structure.py:
+```python
+#!/usr/bin/env python3
+"""Verify test structure matches source structure."""
+
+import os
+from pathlib import Path
+
+def verify_test_structure():
+    """Check that each source file has corresponding test file."""
+    src_dir = Path("src")
+    tests_dir = Path("tests")
+
+    missing_tests = []
+
+    for layer_dir in src_dir.iterdir():
+        if not layer_dir.is_dir() or layer_dir.name.startswith("__"):
+            continue
+
+        layer_name = layer_dir.name  # e.g., "c0_utils"
+        test_layer_dir = tests_dir / layer_name
+
+        if not test_layer_dir.exists():
+            print(f"❌ Missing test directory: {test_layer_dir}")
+            continue
+
+        for src_file in layer_dir.glob("*.py"):
+            if src_file.name == "__init__.py":
+                continue
+
+            # c0_validators.py → test_c0_validators.py
+            test_file = test_layer_dir / f"test_{src_file.name}"
+
+            if not test_file.exists():
+                missing_tests.append((src_file, test_file))
+
+    if missing_tests:
+        print(f"❌ Found {len(missing_tests)} source files without tests:")
+        for src, test in missing_tests:
+            print(f"  {src} → {test} (missing)")
+        return False
+    else:
+        print("✅ All source files have corresponding test files")
+        return True
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(0 if verify_test_structure() else 1)
+```
+
+Run after refactoring:
+  python verify_test_structure.py
+
+TESTING CHECKLIST
+-----------------
+
+After moving each test file:
+  [ ] Test file renamed with layer prefix
+  [ ] Test file moved to correct layer directory
+  [ ] Imports updated to match refactored modules
+  [ ] Test runs successfully: pytest path/to/test_file.py
+  [ ] Test passes
+  [ ] Commit
+
+After completing each layer:
+  [ ] All tests in layer pass: pytest tests/cN_layer/
+  [ ] No import errors
+  [ ] conftest.py updated if needed
+  [ ] Commit
+
+After completing all layers:
+  [ ] All tests pass: pytest
+  [ ] verify_test_structure.py passes
+  [ ] Coverage report generated
+  [ ] No decrease in code coverage
+  [ ] Documentation updated
+  [ ] Final commit
+
+BENEFITS OF ORGANIZED TEST STRUCTURE
+-------------------------------------
+
+1. Clear test-to-source mapping
+   - Easy to find tests for any module
+   - tests/c1_base/test_c1_config.py tests src/c1_base/c1_config.py
+
+2. Layer-specific test strategies
+   - C0 tests are pure and fast
+   - C3 tests use more mocking
+   - Clear testing patterns per layer
+
+3. Faster test execution
+   - Run only tests for changed layer
+   - pytest tests/c2_core/ (run C2 tests only)
+
+4. Better test isolation
+   - Each layer tests independently
+   - Integration tests separate
+   - E2E tests separate
+
+5. Easier test maintenance
+   - Organized structure makes updates easier
+   - Clear where to add new tests
+   - Consistent naming conventions
+
+SUCCESS CRITERIA
+----------------
+
+✅ All tests organized by layer
+✅ Test file names match source file names (with test_ prefix)
+✅ All tests pass after reorganization
+✅ No decrease in code coverage
+✅ verify_test_structure.py passes
+✅ Documentation updated
+✅ CI/CD pipeline updated
+
+TIMELINE
+--------
+
+Phase 1: Analysis - 2 hours
+Phase 2: Create structure - 1 hour
+Phase 3: Move and rename - 3-4 hours
+Phase 4: Update configuration - 1 hour
+Phase 5: Create utilities - 1-2 hours
+Phase 6: Verification - 1 hour
+
+Total: 9-11 hours (depends on number of existing tests)
+
+This task ensures tests mirror the layered architecture for maintainability.

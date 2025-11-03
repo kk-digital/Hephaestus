@@ -1,0 +1,161 @@
+# Hephaestus Development TODO
+# Updated: 2025-11-01
+
+## Immediate Actions
+
+[DONE] Fix pip install dependency issues
+    - LangChain dependency resolution conflicts - RESOLVED
+    - Solution: Install LangChain 1.0.x series first with --no-deps
+    - Working versions:
+      - langchain==1.0.3
+      - langchain-core==1.0.2
+      - langchain-openai==1.0.1
+      - langchain-community==0.4.1
+    - Installation steps:
+      1. pip install --no-deps langchain langchain-core langchain-openai
+      2. pip install -r requirements.txt (installs remaining dependencies)
+    - Key insight: --no-deps bypasses pip backtracking, installs latest compatible versions
+    - Updated DEPENDENCY-ANALYSIS.txt with solution
+    - Committed: 3a09cc4 "Resolve LangChain dependency conflicts with 1.0.x series"
+
+[DONE] Initialize git repository
+    - Repository already initialized
+    - Remote configured: origin (git@github.com:kk-digital/Hephaestus.git)
+    - Branch: dev-haltingstate-00
+
+[ ] Push commits to GitHub
+    - 3 commits ready to push (00d8cc6, 3a09cc4, 8a9d3d0)
+    - BLOCKED: SSH keys need to be configured in container
+    - Command: git push origin dev-haltingstate-00
+    - After push, consider setting up Gogs remote for backup
+
+[DONE] Commit task files and documentation
+    - Task files created: 251101-task-01 through 251101-task-08 (8 tasks total)
+    - Configuration files created: .env, testing-keys.txt, .gitignore
+    - Documentation created: EMBEDDINGS-EXPLAINED.txt, DEPENDENCY-ANALYSIS.txt, etc.
+    - All commits completed on dev-haltingstate-00 branch
+    - Session summary created: SESSION-SUMMARY-251101.txt
+
+## Task Files Created (Ready for Commit)
+
+[DONE] 251101-task-01-embedding-migration.txt
+    - Migrate to open-source embeddings (LM Studio, jina-v4, or OpenAI)
+    - Three embedding options documented with implementation steps
+
+[DONE] 251101-task-02-repo-reorganization.txt
+    - Reorganize repository: Python code → code/, config → config/
+    - Update imports and paths
+
+[DONE] 251101-task-03-layer-refactoring.txt
+    - Layer-based refactoring with c0-c4 prefixes
+    - c0 (utils) → c1 (base) → c2 (core) → c3 (services) → c4 (apps)
+    - Analysis scripts and migration plan
+
+[DONE] 251101-task-04-test-organization.txt
+    - Organize tests to match layer structure
+    - tests/cN_layer/ directories mirror src/cN_layer/
+
+[DONE] 251101-task-05-llm-service-abstraction.txt
+    - Create C1 LLM service abstraction layer
+    - Centralize all LLM operations in c1_llm_* modules
+    - Support multiple providers (OpenRouter, OpenAI, Anthropic, Groq, Local)
+
+[DONE] 251101-task-06-local-llmstudio-testing.txt
+    - Run Hephaestus completely with LM Studio for local testing
+    - Use small models (qwen2.5-1.5b-instruct) for development
+    - FREE testing without API costs
+
+[DONE] 251101-task-07-langchain-isolation.txt
+    - Isolate all LangChain usage in C1 wrapper module
+    - Only c1_langchain_wrapper.py imports LangChain
+    - Provides clean abstraction for rest of codebase
+    - Makes LangChain version pinning easier
+    - Facilitates future replacement or upgrade
+
+## Documentation Created
+
+[DONE] EMBEDDINGS-EXPLAINED.txt
+    - Comprehensive explanation of embeddings in Hephaestus
+    - Why OpenAI is needed, cost estimates, alternatives
+
+[DONE] LMSTUDIO-EMBEDDINGS.txt
+    - Guide for using LM Studio embeddings instead of OpenAI
+    - Migration steps, code changes, trade-offs
+
+[DONE] OPEN-SOURCE-EMBEDDINGS-3072.txt
+    - Analysis of open-source embedding landscape
+    - NO 3072-dim models exist, best options: 768/1024/2048-dim
+
+[DONE] TASK-FILE-FORMAT.txt
+    - Task file naming conventions and format specification
+
+[DONE] RENAME-TO-LOWERCASE.txt
+    - Documentation about keeping "Hephaestus" with capital H
+
+## Configuration Files Created
+
+[DONE] .env
+    - OpenAI API key configured
+    - OpenRouter API key configured
+
+[DONE] testing-keys.txt
+    - Reference copy of API keys for testing
+
+[DONE] .gitignore
+    - Protect secrets (.env, testing-keys.txt)
+    - Ignore Python artifacts, IDE files, logs, qdrant_storage/
+
+[DONE] .claude/CLAUDE.md
+    - Local development guidelines
+    - Work inside container at /home/user/workspace/Hephaestus/
+    - todo.txt and tasks/ locations documented
+    - Session start/end checklists
+
+## Cleanup and Organization
+
+[ ] Clean up project folder - move documentation files to proper locations
+    - Create /cleanup/ directory for temporary/one-time cleanup files
+    - Create /reports/ directory for analysis reports and documentation
+    - Move scattered documentation files from docker-hephaestus/ to proper locations
+    - Organize: EMBEDDINGS-EXPLAINED.txt, LMSTUDIO-EMBEDDINGS.txt, etc.
+
+## Testing and Verification
+
+[ ] Verify test suite runs successfully
+    - Check if pytest is installed in .venv
+    - Run pytest to see current test status
+    - Identify any failing tests
+    - Document test coverage
+    - Fix any broken tests if needed
+    - Verify all tests pass before refactoring
+    - Create baseline test report for comparison after refactoring
+
+## Next Steps After Git Setup
+
+1. Initialize git repository
+2. Create .gitignore (already done)
+3. Initial commit with task files and documentation
+4. Create dev-haltingstate-00 branch
+5. Push to GitHub remote: kk-digital/Hephaestus
+6. Fix pip install issues
+7. Run test suite to establish baseline
+8. Begin refactoring work following task files
+
+## Dependencies and Blockers
+
+BLOCKER: pip install failing on LangChain dependencies
+  - Needs resolution before proceeding with development
+  - May need to simplify requirements or pin versions
+  - Consider removing or replacing problematic dependencies
+
+BLOCKER: Repository not initialized with git
+  - Prevents committing and pushing work
+  - Easy fix: git init && git remote add origin [url]
+
+## Notes
+
+- Development happens inside Docker container at /home/user/workspace/Hephaestus/
+- SSH into container: ssh user@localhost -p 2224
+- Git branch: dev-haltingstate-00 (for development)
+- Task files use naming: yymmdd-task-NN-description.txt
+- Status suffixes: .done.txt (completed), .failed.txt (failed)

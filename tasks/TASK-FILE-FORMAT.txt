@@ -1,0 +1,272 @@
+TASK FILE NAMING CONVENTION AND FORMAT
+=======================================
+
+OVERVIEW
+--------
+
+Task files document planned work, implementation steps, and track progress.
+All task files live in /tasks/ directory in the repository.
+
+NAMING CONVENTION
+-----------------
+
+Format: yymmdd-task-NN-description.txt
+
+Components:
+- yymmdd: Date task created (6 digits: year month day)
+- task: Literal word "task"
+- NN: Sequential number (01, 02, 03, ..., 99) - zero-padded two digits
+- description: Hyphen-separated lowercase description
+- .txt: Plain text file extension
+
+Examples:
+- 251101-task-01-embedding-migration.txt
+- 251101-task-02-repo-reorganization.txt
+- 251101-task-03-layer-refactoring.txt
+- 251101-task-04-test-organization.txt
+
+STATUS SUFFIXES
+---------------
+
+When task is completed or fails, rename file with status suffix:
+
+Active (no suffix):
+- 251101-task-01-embedding-migration.txt
+- Task in progress or pending
+
+Completed (.done.txt):
+- 251101-task-01-embedding-migration.done.txt
+- Task successfully completed
+- Rename: mv 251101-task-01-foo.txt 251101-task-01-foo.done.txt
+
+Failed (.failed.txt):
+- 251101-task-02-repo-reorganization.failed.txt
+- Task failed or abandoned
+- Rename: mv 251101-task-02-foo.txt 251101-task-02-foo.failed.txt
+
+Pending (.pending.txt):
+- 251101-task-05-new-feature.pending.txt
+- Task planned but not yet started
+- Optional, can omit suffix for pending
+
+Sequential numbering:
+- NN continues incrementing regardless of status
+- 251101-task-01-foo.done.txt
+- 251101-task-02-bar.txt (active)
+- 251101-task-03-baz.pending.txt
+- Next task: 251101-task-04-new.txt
+
+TASK FILE FORMAT
+----------------
+
+All task files MUST include these sections:
+
+1. Title (first line)
+   TASK: [FULL TASK TITLE IN CAPS]
+   ========================================
+
+2. Metadata section
+   STATUS: Pending | In Progress | Completed | Failed
+   PRIORITY: Low | Medium | High | Critical
+   BRANCH: dev-haltingstate-00 (git branch for this task)
+   ESTIMATED TIME: X-Y hours
+   DEPENDENCIES: Task NN (if depends on other tasks)
+
+3. GOAL section
+   Clear, concise statement of what task accomplishes
+
+4. Implementation sections (as needed)
+   - CURRENT STATE
+   - PROPOSED CHANGES
+   - IMPLEMENTATION STEPS
+   - FILES TO MODIFY
+   - TESTING STRATEGY
+   - ROLLBACK PLAN
+   - SUCCESS CRITERIA
+
+5. Timeline (optional but recommended)
+   Phase-by-phase breakdown with time estimates
+
+EXAMPLE TASK FILE
+-----------------
+
+
+
+TASK WORKFLOW
+-------------
+
+1. Create new task file:
+   Create: tasks/yymmdd-task-NN-description.txt
+   Set STATUS: Pending Implementation
+
+2. Start work on task:
+   Update STATUS: In Progress
+   Create git branch if needed
+   Begin implementation
+
+3. Complete task:
+   Verify all success criteria met
+   Rename: mv yymmdd-task-NN-foo.txt yymmdd-task-NN-foo.done.txt
+   Update STATUS: Completed
+   Commit changes
+
+4. If task fails:
+   Document reason for failure in task file
+   Rename: mv yymmdd-task-NN-foo.txt yymmdd-task-NN-foo.failed.txt
+   Update STATUS: Failed
+   Note lessons learned
+
+GIT OPERATIONS
+--------------
+
+Add new task file:
+  git add tasks/yymmdd-task-NN-description.txt
+  git commit -m "Add task: description"
+
+Update task status:
+  Update STATUS field in task file
+  git add tasks/yymmdd-task-NN-description.txt
+  git commit -m "Update task NN: status change"
+
+Complete task:
+  git mv tasks/yymmdd-task-NN-foo.txt tasks/yymmdd-task-NN-foo.done.txt
+  git commit -m "Complete task NN: description"
+
+TASK NUMBERING RULES
+---------------------
+
+Rule 1: Sequential numbering
+  Tasks numbered sequentially: 01, 02, 03, 04, ...
+  Do NOT skip numbers
+
+Rule 2: Date prefix indicates creation date
+  All tasks created on same date share same yymmdd prefix
+  Example: 251101-task-01, 251101-task-02, 251101-task-03
+
+Rule 3: New day starts new sequence (optional)
+  Can continue sequence: 251101-task-01, 251102-task-02, 251103-task-03
+  Or restart sequence: 251101-task-01, 251102-task-01, 251103-task-01
+  RECOMMENDED: Continue sequence for continuity
+
+Rule 4: Zero-padding required
+  CORRECT: task-01, task-02, ..., task-09, task-10
+  INCORRECT: task-1, task-2, ..., task-9, task-10
+
+Rule 5: Maximum 99 tasks per sequence
+  If exceed 99, start new date: 251102-task-01
+  Or use 3 digits: task-100, task-101
+
+TASK DESCRIPTION NAMING
+-----------------------
+
+Guidelines:
+- Use hyphen-separated lowercase words
+- Keep description concise (2-5 words)
+- Describe what task does, not how
+- Be specific but brief
+
+Good examples:
+- embedding-migration
+- repo-reorganization
+- layer-refactoring
+- test-organization
+- database-schema-update
+
+Bad examples:
+- embeddings_migration (use hyphens, not underscores)
+- EMBEDDING-MIGRATION (use lowercase)
+- migrate-to-use-jina-embeddings-v4-instead-of-openai (too long)
+- task1 (not descriptive)
+- fix (too vague)
+
+TASK DEPENDENCIES
+-----------------
+
+If task depends on other tasks, document in DEPENDENCIES field:
+
+Example:
+
+
+ARCHIVING COMPLETED TASKS
+--------------------------
+
+Option 1: Keep in /tasks/ directory
+  All tasks remain in /tasks/ with .done.txt suffix
+  Provides complete task history
+  RECOMMENDED for transparency
+
+Option 2: Move to /tasks/archive/
+  Create: /tasks/archive/yymmdd/
+  Move: mv 251101-task-01-foo.done.txt tasks/archive/251101/
+  Keeps /tasks/ clean
+  Use if many completed tasks
+
+Option 3: Delete completed tasks
+  NOT RECOMMENDED
+  Loses history and documentation
+
+SEARCHING TASKS
+---------------
+
+Find all active tasks:
+  ls tasks/*.txt | grep -v '\.done\.txt' | grep -v '\.failed\.txt'
+
+Find all completed tasks:
+  ls tasks/*.done.txt
+
+Find all failed tasks:
+  ls tasks/*.failed.txt
+
+Find task by number:
+  ls tasks/*-task-03-*.txt
+
+Find task by description:
+  ls tasks/*-layer-refactoring*.txt
+
+Find tasks created on date:
+  ls tasks/251101-task-*.txt
+
+TASK FILE CHECKLIST
+-------------------
+
+Before creating task file:
+[ ] File name follows format: yymmdd-task-NN-description.txt
+[ ] Sequential number is next in sequence
+[ ] Description is concise and descriptive
+[ ] Title section formatted correctly
+[ ] Metadata section complete (STATUS, PRIORITY, BRANCH, TIME)
+[ ] GOAL section clear and concise
+[ ] Implementation sections appropriate for task
+[ ] SUCCESS CRITERIA defined
+[ ] File committed to git
+
+Before marking task complete:
+[ ] All success criteria met
+[ ] All tests pass
+[ ] Documentation updated
+[ ] Changes committed to git
+[ ] File renamed with .done.txt suffix
+[ ] Final commit with completion message
+
+INTEGRATION WITH CLAUDE.MD
+---------------------------
+
+This task file format integrates with global Claude.md conventions:
+
+- Task numbering: Uses NN format (same as claude.md task numbering)
+- Status suffixes: .pending.txt, .done.txt, .failed.txt (matches claude.md)
+- Date format: yymmdd (consistent with claude.md report naming)
+- Location: /tasks/ in repository (similar to sprint organization)
+
+See ~/.claude/CLAUDE.md for broader project management conventions.
+
+SUMMARY
+-------
+
+Format: yymmdd-task-NN-description.txt
+Status: Rename to .done.txt when complete, .failed.txt when failed
+Location: /tasks/ directory in repository
+Numbering: Sequential (01, 02, 03, ...)
+Content: Title, metadata, GOAL, implementation sections, success criteria
+
+This format ensures consistent, trackable, and well-documented task management.
