@@ -94,6 +94,11 @@
     - Test collection now succeeds: 449 tests collected successfully
     - All dependency issues resolved
 
+[IN_PROGRESS] Task-12: Fix deprecation warnings
+    - [DONE] Fixed SQLAlchemy declarative_base import (commit fc2bd3a)
+    - [ ] TODO: Migrate FastAPI from on_event to lifespan pattern
+    - [ ] TODO: Register pytest custom markers (integration, slow, unit)
+
 ## Immediate Actions
 
 [DONE] Fix pip install dependency issues
