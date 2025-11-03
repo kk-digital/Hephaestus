@@ -1,0 +1,423 @@
+TASK-10: Add LM Studio Embedding Provider Support
+
+## Objective
+
+Add full support for LM Studio as an embedding provider alongside OpenAI, allowing users to choose between cloud (OpenAI) or local (LM Studio) embeddings.
+
+## Background
+
+**Current State:**
+- .env.example documents LM Studio as an embedding option
+- Configuration exists: EMBEDDING_PROVIDER, LMSTUDIO_EMBEDDING_URL, LMSTUDIO_EMBEDDING_MODEL
+- Default embedding model specified: nomic-embed-text-v1.5
+- Implementation status: Unknown, needs verification
+
+**Why LM Studio:**
+- FREE local embeddings (no API costs)
+- Privacy (data never leaves local machine)
+- No internet required for embeddings
+- Good for development and testing
+- nomic-embed-text-v1.5 is high-quality open-source model
+
+## Requirements
+
+### 1. Verify LM Studio Configuration
+
+Check if LM Studio support already exists in codebase:
+```bash
+# Search for existing LM Studio embedding code
+grep -r "lmstudio" src/ --include="*.py"
+grep -r "EMBEDDING_PROVIDER" src/ --include="*.py"
+grep -r "nomic-embed" src/ --include="*.py"
+```
+
+Document findings:
+- Which files handle embedding provider selection?
+- Is LM Studio already implemented?
+- What needs to be added/fixed?
+
+### 2. LM Studio Runtime Verification
+
+Create function to verify LM Studio is running and accessible:
+
+```python
+async def verify_lmstudio_embedding_service() -> dict:
+    """
+    Verify LM Studio is running and accessible for embeddings.
+
+    Returns:
+        {
+            "status": "available" | "unavailable",
+            "url": "http://localhost:1234/v1",
+            "models": ["nomic-embed-text-v1.5", ...],
+            "error": None | "error message"
+        }
+    """
+    url = os.getenv("LMSTUDIO_EMBEDDING_URL", "http://localhost:1234/v1")
+
+    try:
+        # Test connection to LM Studio
+        response = await httpx.get(f"{url}/models", timeout=5.0)
+
+        if response.status_code == 200:
+            models = response.json().get("data", [])
+            model_ids = [m["id"] for m in models]
+
+            return {
+                "status": "available",
+                "url": url,
+                "models": model_ids,
+                "error": None
+            }
+        else:
+            return {
+                "status": "unavailable",
+                "url": url,
+                "models": [],
+                "error": f"HTTP {response.status_code}"
+            }
+    except Exception as e:
+        return {
+            "status": "unavailable",
+            "url": url,
+            "models": [],
+            "error": str(e)
+        }
+```
+
+### 3. Embedding Model Selection
+
+Create function to examine and select best embedding model:
+
+```python
+async def select_best_embedding_model(available_models: list[str]) -> dict:
+    """
+    Examine available LM Studio embedding models and select best.
+
+    Preference order:
+    1. nomic-embed-text-v1.5 (default, 768-dim, high quality)
+    2. nomic-embed-text-v1 (fallback)
+    3. any-instruct-embed-* (other options)
+
+    Returns:
+        {
+            "selected_model": "nomic-embed-text-v1.5",
+            "model_dim": 768,
+            "available_models": [...],
+            "recommendation": "Using recommended model"
+        }
+    """
+    # Preferred models in order
+    preferred = [
+        "nomic-embed-text-v1.5",
+        "nomic-embed-text-v1",
+        "all-minilm-l6-v2"
+    ]
+
+    # Check if preferred model is available
+    for model in preferred:
+        if model in available_models:
+            return {
+                "selected_model": model,
+                "model_dim": 768,  # nomic models are 768-dim
+                "available_models": available_models,
+                "recommendation": f"Using recommended model: {model}"
+            }
+
+    # Fallback to first available embedding model
+    embedding_models = [m for m in available_models if "embed" in m.lower()]
+
+    if embedding_models:
+        return {
+            "selected_model": embedding_models[0],
+            "model_dim": None,  # Unknown
+            "available_models": available_models,
+            "recommendation": f"Using first available: {embedding_models[0]}"
+        }
+
+    return {
+        "selected_model": None,
+        "model_dim": None,
+        "available_models": available_models,
+        "recommendation": "ERROR: No embedding models available"
+    }
+```
+
+### 4. Configuration Loading
+
+Ensure .env supports both providers:
+
+```python
+# .env configuration (already in .env.example)
+EMBEDDING_PROVIDER=openai  # or "lmstudio"
+
+# OpenAI configuration
+OPENAI_API_KEY=sk-proj-your-key-here
+OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+
+# LM Studio configuration
+LMSTUDIO_EMBEDDING_URL=http://localhost:1234/v1
+LMSTUDIO_EMBEDDING_MODEL=nomic-embed-text-v1.5
+```
+
+Load configuration in code:
+
+```python
+def load_embedding_config():
+    """Load embedding provider configuration from .env"""
+    provider = os.getenv("EMBEDDING_PROVIDER", "openai")
+
+    if provider == "openai":
+        return {
+            "provider": "openai",
+            "api_key": os.getenv("OPENAI_API_KEY"),
+            "model": os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-large")
+        }
+    elif provider == "lmstudio":
+        return {
+            "provider": "lmstudio",
+            "url": os.getenv("LMSTUDIO_EMBEDDING_URL", "http://localhost:1234/v1"),
+            "model": os.getenv("LMSTUDIO_EMBEDDING_MODEL", "nomic-embed-text-v1.5")
+        }
+    else:
+        raise ValueError(f"Unknown embedding provider: {provider}")
+```
+
+### 5. Embedding Provider Abstraction
+
+Create unified interface for both providers:
+
+```python
+class EmbeddingProvider:
+    """Abstract base for embedding providers"""
+
+    async def embed_text(self, text: str) -> list[float]:
+        """Generate embedding for text"""
+        raise NotImplementedError
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings for batch of texts"""
+        raise NotImplementedError
+
+    def get_dimension(self) -> int:
+        """Get embedding dimension"""
+        raise NotImplementedError
+
+class OpenAIEmbeddingProvider(EmbeddingProvider):
+    """OpenAI embeddings (cloud)"""
+
+    def __init__(self, api_key: str, model: str):
+        self.client = OpenAI(api_key=api_key)
+        self.model = model
+
+    async def embed_text(self, text: str) -> list[float]:
+        response = await self.client.embeddings.create(
+            model=self.model,
+            input=text
+        )
+        return response.data[0].embedding
+
+    def get_dimension(self) -> int:
+        if "3-large" in self.model:
+            return 3072
+        elif "3-small" in self.model:
+            return 1536
+        else:
+            return 1536  # Default
+
+class LMStudioEmbeddingProvider(EmbeddingProvider):
+    """LM Studio embeddings (local)"""
+
+    def __init__(self, url: str, model: str):
+        self.url = url
+        self.model = model
+        self.client = httpx.AsyncClient(base_url=url)
+
+    async def embed_text(self, text: str) -> list[float]:
+        response = await self.client.post(
+            "/embeddings",
+            json={"model": self.model, "input": text}
+        )
+        response.raise_for_status()
+        return response.json()["data"][0]["embedding"]
+
+    def get_dimension(self) -> int:
+        if "nomic" in self.model:
+            return 768
+        else:
+            return 768  # Default for most open models
+```
+
+### 6. Testing
+
+Add tests for LM Studio embeddings when enabled:
+
+```python
+@pytest.mark.skipif(
+    os.getenv("EMBEDDING_PROVIDER") != "lmstudio",
+    reason="LM Studio not configured"
+)
+async def test_lmstudio_embedding_service():
+    """Test LM Studio service is accessible"""
+    result = await verify_lmstudio_embedding_service()
+
+    assert result["status"] == "available"
+    assert len(result["models"]) > 0
+    assert result["error"] is None
+
+@pytest.mark.skipif(
+    os.getenv("EMBEDDING_PROVIDER") != "lmstudio",
+    reason="LM Studio not configured"
+)
+async def test_lmstudio_embeddings():
+    """Test LM Studio can generate embeddings"""
+    provider = LMStudioEmbeddingProvider(
+        url=os.getenv("LMSTUDIO_EMBEDDING_URL"),
+        model=os.getenv("LMSTUDIO_EMBEDDING_MODEL")
+    )
+
+    # Test single embedding
+    embedding = await provider.embed_text("Hello world")
+
+    assert isinstance(embedding, list)
+    assert len(embedding) == 768  # nomic-embed-text-v1.5 dimension
+    assert all(isinstance(x, float) for x in embedding)
+
+    # Test batch embeddings
+    embeddings = await provider.embed_batch(["Hello", "World"])
+
+    assert len(embeddings) == 2
+    assert all(len(e) == 768 for e in embeddings)
+```
+
+## Implementation Steps
+
+### Phase 1: Investigation (30 minutes)
+
+[ ] Search codebase for existing embedding provider code
+[ ] Identify files that need modification
+[ ] Document current implementation status
+[ ] Create investigation report
+
+### Phase 2: LM Studio Verification (1 hour)
+
+[ ] Implement verify_lmstudio_embedding_service()
+[ ] Add to health check endpoint (/health/status)
+[ ] Test with LM Studio running
+[ ] Test with LM Studio not running
+[ ] Document error cases
+
+### Phase 3: Model Selection (30 minutes)
+
+[ ] Implement select_best_embedding_model()
+[ ] Test with various available models
+[ ] Add fallback logic for missing preferred models
+[ ] Document model recommendations
+
+### Phase 4: Configuration (30 minutes)
+
+[ ] Verify .env.example has correct LM Studio config
+[ ] Implement load_embedding_config()
+[ ] Add validation for required fields
+[ ] Test with both providers
+
+### Phase 5: Provider Abstraction (2 hours)
+
+[ ] Implement EmbeddingProvider base class
+[ ] Implement OpenAIEmbeddingProvider
+[ ] Implement LMStudioEmbeddingProvider
+[ ] Add dimension detection
+[ ] Add batch processing
+[ ] Add error handling
+
+### Phase 6: Integration (1 hour)
+
+[ ] Update existing code to use EmbeddingProvider
+[ ] Replace direct OpenAI calls with abstraction
+[ ] Add provider selection based on .env
+[ ] Test provider switching
+
+### Phase 7: Testing (1 hour)
+
+[ ] Add LM Studio embedding tests
+[ ] Add provider selection tests
+[ ] Add fallback tests
+[ ] Test with both providers
+[ ] Document test requirements
+
+### Phase 8: Documentation (30 minutes)
+
+[ ] Update INSTALLATION.txt with LM Studio setup
+[ ] Update .env.example comments
+[ ] Add LM Studio download instructions
+[ ] Document model recommendations
+[ ] Add troubleshooting section
+
+## Testing Checklist
+
+[ ] LM Studio service accessible
+[ ] Available models can be listed
+[ ] Best model is selected correctly
+[ ] Embeddings generated successfully
+[ ] Batch embeddings work
+[ ] Dimension detection works
+[ ] Provider switching works (OpenAI ↔ LM Studio)
+[ ] Error handling works (LM Studio down)
+[ ] Tests pass with EMBEDDING_PROVIDER=openai
+[ ] Tests pass with EMBEDDING_PROVIDER=lmstudio
+[ ] Health endpoint shows LM Studio status
+
+## Files to Modify
+
+- src/core/embedding.py (or create if doesn't exist)
+- src/mcp/server.py (add LM Studio to health check)
+- tests/test_embeddings.py (or create)
+- .env.example (verify configuration)
+- INSTALLATION.txt (add LM Studio setup)
+
+## Configuration Example
+
+```bash
+# .env with LM Studio
+EMBEDDING_PROVIDER=lmstudio
+LMSTUDIO_EMBEDDING_URL=http://localhost:1234/v1
+LMSTUDIO_EMBEDDING_MODEL=nomic-embed-text-v1.5
+
+# .env with OpenAI
+EMBEDDING_PROVIDER=openai
+OPENAI_API_KEY=sk-proj-your-key-here
+OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+```
+
+## LM Studio Setup Instructions
+
+1. Download LM Studio from https://lmstudio.ai/
+2. Install and launch LM Studio
+3. Download embedding model: nomic-embed-text-v1.5
+4. Start local server (usually port 1234)
+5. Load the embedding model
+6. Verify accessibility: `curl http://localhost:1234/v1/models`
+
+## Acceptance Criteria
+
+1. ✅ LM Studio can be selected as embedding provider
+2. ✅ Service accessibility is verified at startup
+3. ✅ Available models are examined and best is selected
+4. ✅ Embeddings are generated successfully
+5. ✅ Provider can be switched between OpenAI and LM Studio
+6. ✅ Health endpoint shows LM Studio status
+7. ✅ Tests pass for both providers
+8. ✅ Documentation is complete
+
+## Priority
+
+MEDIUM - Nice to have for local development, not blocking
+
+## Estimated Time
+
+6-7 hours
+
+## Dependencies
+
+- LM Studio installed and running (for testing)
+- nomic-embed-text-v1.5 model downloaded in LM Studio

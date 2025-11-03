@@ -47,6 +47,22 @@
 [DONE] Export session prompts to prompt-export directory
     - Created export-prompts-06.txt with current session prompts
 
+[DONE] Update README.md with .env setup instructions
+    - Added prominent "Quick Setup" section
+    - Explains cp .env.example .env requirement
+    - Clarifies why .env is not committed (secrets)
+    - Links to INSTALLATION.txt for full details
+
+[ ] Create task-10: LM Studio embedding provider support
+    - Add LM Studio as embedding provider option (alongside OpenAI)
+    - Confirm LM Studio running on localhost
+    - Test accessibility to LM Studio API
+    - Examine available embedding models
+    - Choose best embedding model (nomic-embed-text-v1.5 recommended)
+    - Add configuration to .env
+    - Add tests for LM Studio embedding if enabled
+    - See: tasks/251104-task-10-lmstudio-embedding-support.txt
+
 ## Immediate Actions
 
 [DONE] Fix pip install dependency issues

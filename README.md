@@ -15,6 +15,32 @@
 
 ---
 
+## ⚡ Quick Setup (First Time)
+
+**IMPORTANT:** After cloning the repository, you must configure your API keys before running Hephaestus.
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/kk-digital/Hephaestus.git
+cd Hephaestus
+
+# 2. Copy the environment template
+cp .env.example .env
+
+# 3. Edit .env with your actual API keys
+# Add your OpenAI, Anthropic, or other provider keys
+nano .env  # or use your preferred editor
+```
+
+**Why this step is required:**
+- `.env` contains your secret API keys and is **never committed to git** (it's in `.gitignore`)
+- `.env.example` is a template showing what configuration is needed
+- This is standard practice for projects with secrets - keeps your keys safe
+
+See [INSTALLATION.txt](INSTALLATION.txt) for complete setup instructions and troubleshooting.
+
+---
+
 ## 🎥 See Hephaestus in Action
 
 <div align="center">
