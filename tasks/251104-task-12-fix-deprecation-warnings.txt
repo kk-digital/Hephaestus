@@ -1,0 +1,427 @@
+TASK-12: Fix Deprecation Warnings and Library Version Issues
+
+## Objective
+
+Fix all deprecation warnings and upgrade library usage to current best practices for the versions we're using.
+
+## Background
+
+**Current Issues:**
+Test suite shows several deprecation warnings that need to be addressed:
+
+1. **SQLAlchemy MovedIn20Warning** - Using old import path for `declarative_base()`
+2. **FastAPI DeprecationWarning** - Using deprecated `@app.on_event()` decorators
+3. **Pytest Unknown Mark Warning** - Missing pytest mark registration for `@pytest.mark.integration`
+
+**Why Fix These:**
+- Deprecation warnings indicate code that will break in future versions
+- Clean test output (no warnings) indicates healthy codebase
+- Future-proof code against breaking changes
+- Best practices for current library versions
+
+## Issues to Fix
+
+### Issue 1: SQLAlchemy declarative_base() Import (MovedIn20Warning)
+
+**Current Code (DEPRECATED):**
+```python
+# src/core/database.py:24
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+```
+
+**Warning Message:**
+```
+MovedIn20Warning: The ``declarative_base()`` function is now available as
+sqlalchemy.orm.declarative_base(). (deprecated since: 2.0)
+```
+
+**Fixed Code:**
+```python
+# src/core/database.py:24
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()
+```
+
+**Files to Update:**
+- `src/core/database.py` - Line 24
+
+**Verification:**
+```bash
+grep -n "from sqlalchemy.ext.declarative import" src/core/database.py
+# Should return nothing after fix
+
+grep -n "from sqlalchemy.orm import declarative_base" src/core/database.py
+# Should show the corrected import
+```
+
+### Issue 2: FastAPI on_event() Decorator (DeprecationWarning)
+
+**Current Code (DEPRECATED):**
+```python
+# src/mcp/server.py:652 and :744
+@app.on_event("startup")
+async def startup():
+    # startup logic
+    pass
+
+@app.on_event("shutdown")
+async def shutdown():
+    # shutdown logic
+    pass
+```
+
+**Warning Message:**
+```
+DeprecationWarning: on_event is deprecated, use lifespan event handlers instead.
+Read more: https://fastapi.tiangolo.com/advanced/events/
+```
+
+**Fixed Code (Lifespan Pattern):**
+```python
+# src/mcp/server.py
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    logger.info("Starting up...")
+    # Initialize resources, connections, etc.
+
+    yield
+
+    # Shutdown logic
+    logger.info("Shutting down...")
+    # Clean up resources, close connections, etc.
+
+app = FastAPI(lifespan=lifespan)
+```
+
+**Alternative (Multiple Lifespans):**
+```python
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def db_lifespan(app: FastAPI):
+    """Database connection lifespan"""
+    # Connect to database
+    await db.connect()
+    yield
+    # Disconnect from database
+    await db.disconnect()
+
+@asynccontextmanager
+async def cache_lifespan(app: FastAPI):
+    """Cache connection lifespan"""
+    # Connect to cache
+    await cache.connect()
+    yield
+    # Disconnect from cache
+    await cache.disconnect()
+
+# Combine lifespans
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with db_lifespan(app):
+        async with cache_lifespan(app):
+            yield
+
+app = FastAPI(lifespan=lifespan)
+```
+
+**Files to Update:**
+- `src/mcp/server.py` - Lines 652, 744
+
+**Migration Steps:**
+1. Find all `@app.on_event("startup")` decorators
+2. Find all `@app.on_event("shutdown")` decorators
+3. Extract startup logic
+4. Extract shutdown logic
+5. Create lifespan context manager
+6. Replace app initialization to use lifespan
+7. Remove old on_event decorators
+
+**Verification:**
+```bash
+# Should return nothing after fix
+grep -n "on_event" src/mcp/server.py
+
+# Should show lifespan usage
+grep -n "lifespan" src/mcp/server.py
+```
+
+### Issue 3: Pytest Unknown Mark Warning
+
+**Current Code:**
+```python
+# tests/test_agent_output_integration.py:15
+@pytest.mark.integration
+async def test_something():
+    pass
+```
+
+**Warning Message:**
+```
+PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?
+You can register custom marks to avoid this warning.
+```
+
+**Fixed Code (Register Custom Marks):**
+
+Add to `pyproject.toml`:
+```toml
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "unit: marks tests as unit tests",
+]
+```
+
+**OR** create `pytest.ini`:
+```ini
+[pytest]
+markers =
+    integration: marks tests as integration tests
+    slow: marks tests as slow
+    unit: marks tests as unit tests
+```
+
+**Files to Update:**
+- `pyproject.toml` - Add markers section
+- OR `pytest.ini` - Create if doesn't exist
+
+**Verification:**
+```bash
+# List registered marks
+pytest --markers | grep integration
+
+# Should show: @pytest.mark.integration: marks tests as integration tests
+```
+
+## Implementation Steps
+
+### Phase 1: SQLAlchemy Import Fix (15 minutes)
+
+[ ] Find all occurrences of `from sqlalchemy.ext.declarative import declarative_base`
+[ ] Replace with `from sqlalchemy.orm import declarative_base`
+[ ] Verify no other sqlalchemy.ext.declarative imports exist
+[ ] Run tests to confirm fix
+[ ] Commit: "Fix SQLAlchemy declarative_base import deprecation"
+
+**Commands:**
+```bash
+# Find all occurrences
+grep -r "sqlalchemy.ext.declarative" src/
+
+# Make the change
+# Edit src/core/database.py line 24
+
+# Verify fix
+pytest tests/ --collect-only 2>&1 | grep "MovedIn20Warning"
+# Should return nothing
+```
+
+### Phase 2: FastAPI Lifespan Migration (1-2 hours)
+
+[ ] Identify all startup event handlers in src/mcp/server.py
+[ ] Identify all shutdown event handlers in src/mcp/server.py
+[ ] Document startup logic flow
+[ ] Document shutdown logic flow
+[ ] Create lifespan context manager
+[ ] Move startup logic into lifespan (before yield)
+[ ] Move shutdown logic into lifespan (after yield)
+[ ] Update FastAPI app initialization to use lifespan
+[ ] Remove old @app.on_event decorators
+[ ] Test application startup
+[ ] Test application shutdown
+[ ] Verify no on_event deprecation warnings
+[ ] Commit: "Migrate from on_event to lifespan pattern in FastAPI"
+
+**Migration Template:**
+```python
+# BEFORE (src/mcp/server.py)
+@app.on_event("startup")
+async def startup():
+    logger.info("Starting up...")
+    # startup code here
+
+@app.on_event("shutdown")
+async def shutdown():
+    logger.info("Shutting down...")
+    # shutdown code here
+
+# AFTER
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting up...")
+    # startup code here
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down...")
+    # shutdown code here
+
+app = FastAPI(lifespan=lifespan)
+```
+
+**Testing:**
+```bash
+# Test that server starts correctly
+python -m src.mcp.server &
+SERVER_PID=$!
+
+# Wait for startup
+sleep 2
+
+# Test health endpoint
+curl http://localhost:8000/health/live
+
+# Shutdown
+kill -TERM $SERVER_PID
+
+# Verify clean shutdown
+wait $SERVER_PID
+echo "Exit code: $?"  # Should be 0
+```
+
+### Phase 3: Pytest Marks Registration (15 minutes)
+
+[ ] Check if pyproject.toml exists
+[ ] Add markers section to pyproject.toml
+[ ] Register 'integration' marker
+[ ] Register 'slow' marker (if used)
+[ ] Register 'unit' marker (if used)
+[ ] Verify marks are registered
+[ ] Run tests to confirm warning is gone
+[ ] Commit: "Register custom pytest markers to fix warnings"
+
+**Commands:**
+```bash
+# Check for pyproject.toml
+ls -la pyproject.toml
+
+# Edit pyproject.toml to add markers
+
+# Verify registration
+pytest --markers | grep integration
+
+# Test collection without warnings
+pytest tests/ --collect-only 2>&1 | grep "PytestUnknownMarkWarning"
+# Should return nothing
+```
+
+### Phase 4: Verification (30 minutes)
+
+[ ] Run full test suite with pytest
+[ ] Verify no deprecation warnings
+[ ] Verify no MovedIn20Warning
+[ ] Verify no FastAPI on_event warnings
+[ ] Verify no pytest unknown mark warnings
+[ ] Check application startup/shutdown works
+[ ] Verify health endpoints work
+[ ] Document any remaining warnings
+[ ] Update INSTALLATION.txt if needed
+
+**Verification Commands:**
+```bash
+# Collect tests and check for warnings
+pytest tests/ --collect-only 2>&1 | grep -E 'Warning|DeprecationWarning'
+
+# Should return only legitimate warnings (if any), not the ones we fixed
+
+# Run subset of tests
+pytest tests/test_authentication.py -v
+
+# Full test run (may take time)
+pytest tests/ -v --tb=short
+```
+
+## Files to Modify
+
+- `src/core/database.py` - Fix SQLAlchemy import (line 24)
+- `src/mcp/server.py` - Migrate to lifespan pattern (lines 652, 744)
+- `pyproject.toml` - Add pytest markers registration
+- `tests/test_agent_output_integration.py` - Already using @pytest.mark.integration (no changes needed after registration)
+
+## Testing Checklist
+
+[ ] SQLAlchemy import uses `sqlalchemy.orm.declarative_base`
+[ ] No MovedIn20Warning in test output
+[ ] FastAPI uses lifespan pattern (no on_event decorators)
+[ ] Application starts successfully with lifespan
+[ ] Application shuts down cleanly with lifespan
+[ ] No FastAPI DeprecationWarning in test output
+[ ] Pytest markers registered in pyproject.toml
+[ ] No PytestUnknownMarkWarning in test output
+[ ] All 449 tests still collected successfully
+[ ] No new errors introduced
+
+## Expected Results
+
+**Before Fix:**
+```
+pytest tests/ --collect-only 2>&1 | grep -c "Warning"
+# Returns: 4-5 warnings
+```
+
+**After Fix:**
+```
+pytest tests/ --collect-only 2>&1 | grep -c "Warning"
+# Returns: 0 warnings (or only legitimate ones we can't control)
+```
+
+## Documentation Updates
+
+After fixing, update:
+- `INSTALLATION.txt` - Mention no deprecation warnings
+- `.claude/CLAUDE.md` - Note lifespan pattern for new endpoints
+- Code comments where lifespan is used
+
+## Priority
+
+MEDIUM - Not blocking, but important for code health
+
+## Estimated Time
+
+2-3 hours total
+- Phase 1 (SQLAlchemy): 15 minutes
+- Phase 2 (FastAPI): 1-2 hours
+- Phase 3 (Pytest): 15 minutes
+- Phase 4 (Verification): 30 minutes
+
+## Dependencies
+
+None - can be done independently
+
+## Notes
+
+- FastAPI lifespan migration is the most complex change
+- Ensure graceful shutdown still works after migration
+- Lifespan pattern is more powerful than on_event (supports nesting)
+- Consider adding health check to lifespan to verify startup success
+- SQLAlchemy fix is trivial (just import path change)
+- Pytest markers fix is trivial (just configuration)
+
+## References
+
+- FastAPI Lifespan: https://fastapi.tiangolo.com/advanced/events/
+- SQLAlchemy 2.0 Migration: https://docs.sqlalchemy.org/en/20/changelog/migration_20.html
+- Pytest Custom Markers: https://docs.pytest.org/en/stable/how-to/mark.html
+
+## Acceptance Criteria
+
+1. ✅ No MovedIn20Warning from SQLAlchemy
+2. ✅ No DeprecationWarning from FastAPI on_event
+3. ✅ No PytestUnknownMarkWarning
+4. ✅ Application starts and shuts down correctly
+5. ✅ All 449 tests still collected
+6. ✅ Clean test output (no warnings)
+7. ✅ Documentation updated

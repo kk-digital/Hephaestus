@@ -53,15 +53,24 @@
     - Clarifies why .env is not committed (secrets)
     - Links to INSTALLATION.txt for full details
 
-[ ] Create task-10: LM Studio embedding provider support
+[DONE] Create task-10: LM Studio embedding provider support
     - Add LM Studio as embedding provider option (alongside OpenAI)
-    - Confirm LM Studio running on localhost
-    - Test accessibility to LM Studio API
-    - Examine available embedding models
-    - Choose best embedding model (nomic-embed-text-v1.5 recommended)
-    - Add configuration to .env
-    - Add tests for LM Studio embedding if enabled
+    - Default to jina-embeddings-v4-text-retrieval (best for retrieval)
+    - Alternative: text-embedding-qwen3-embedding-8b (highest quality)
+    - Fallback: nomic-embed-text-v1.5 (good quality, 768-dim)
     - See: tasks/251104-task-10-lmstudio-embedding-support.txt
+
+[DONE] Create task-11: Embedding wrapper module centralization
+    - Wrap ALL embedding provider calls in single module
+    - Similar to task-08 (SQL wrapper pattern)
+    - Support OpenAI and LM Studio providers
+    - See: tasks/251104-task-11-embedding-wrapper-module.txt
+
+[ ] Create task-12: Fix deprecation warnings
+    - Fix SQLAlchemy declarative_base import (MovedIn20Warning)
+    - Migrate FastAPI from on_event to lifespan pattern
+    - Register pytest custom markers (integration, slow, unit)
+    - See: tasks/251104-task-12-fix-deprecation-warnings.txt
 
 ## Immediate Actions
 
