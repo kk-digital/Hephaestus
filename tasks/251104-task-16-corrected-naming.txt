@@ -1,0 +1,590 @@
+TASK-16: Corrected Layer and Module Naming Convention
+====================================================
+
+Date: 2025-11-04
+Status: CORRECTION TO TASK-14 AND TASK-15
+
+## Python Module Naming Rules
+
+### Valid Characters
+- **Underscore (_)** - RECOMMENDED by PEP 8
+- **Letters (a-z, A-Z)** - Required, lowercase preferred
+- **Numbers (0-9)** - Allowed (except at start)
+
+### Invalid Characters
+- **Hyphen (-)** - Python interprets as minus operator
+- **Dot (.)** - Reserved for subpackage notation (e.g., `c1.database.models`)
+- **Spaces** - Not allowed
+- **Special characters** - Not allowed
+
+### PEP 8 Recommendations
+- Use **lowercase** module names
+- Use **underscores** to separate words (snake_case)
+- Keep names short and meaningful
+- Avoid name collisions with standard library
+
+## Corrected Layer Naming Convention
+
+### Format
+```
+c{N}_{domain}
+```
+
+Where:
+- `c{N}` = layer number (0, 1, 2, 3, 4)
+- `{domain}` = functional domain (database, health, tasks, etc.)
+
+### Examples
+- `c0_models` (not c0-models or c0.models)
+- `c1_database` (not c1-database or c1.database)
+- `c2_health` (not c2-health or c2.health)
+- `c3_task_service` (not c3-task-service)
+
+## Corrected Directory Structure
+
+```
+src/
+├── c0_models/
+│   ├── __init__.py
+│   ├── agent_models.py
+│   ├── task_models.py
+│   └── ticket_models.py
+│
+├── c0_enums/
+│   ├── __init__.py
+│   ├── agent_enums.py
+│   └── task_enums.py
+│
+├── c0_exceptions/
+│   ├── __init__.py
+│   ├── agent_exceptions.py
+│   └── task_exceptions.py
+│
+├── c0_constants/
+│   ├── __init__.py
+│   └── system_constants.py
+│
+├── c1_database/
+│   ├── __init__.py
+│   ├── base.py
+│   ├── models.py
+│   └── session.py
+│
+├── c1_llm/
+│   ├── __init__.py
+│   ├── openai_provider.py
+│   └── anthropic_provider.py
+│
+├── c1_embedding/
+│   ├── __init__.py
+│   ├── openai_provider.py
+│   └── lmstudio_provider.py
+│
+├── c1_config/
+│   ├── __init__.py
+│   └── config_loader.py
+│
+├── c1_auth/
+│   ├── __init__.py
+│   ├── auth_config.py
+│   └── auth_utils.py
+│
+├── c1_vector_store/
+│   ├── __init__.py
+│   └── qdrant_client.py
+│
+├── c2_tasks/
+│   ├── __init__.py
+│   ├── task_logic.py
+│   └── task_similarity.py
+│
+├── c2_agents/
+│   ├── __init__.py
+│   ├── agent_lifecycle.py
+│   └── agent_coordinator.py
+│
+├── c2_tickets/
+│   ├── __init__.py
+│   ├── ticket_logic.py
+│   └── ticket_queries.py
+│
+├── c2_phases/
+│   ├── __init__.py
+│   ├── phase_loader.py
+│   └── phase_manager.py
+│
+├── c2_monitoring/
+│   ├── __init__.py
+│   ├── monitor_core.py
+│   └── guardian.py
+│
+├── c2_validation/
+│   ├── __init__.py
+│   ├── validator_logic.py
+│   └── check_executors.py
+│
+├── c2_worktree/
+│   ├── __init__.py
+│   ├── worktree_manager.py
+│   └── conflict_resolver.py
+│
+├── c2_workflow/
+│   ├── __init__.py
+│   └── termination_handler.py
+│
+├── c2_memory/
+│   ├── __init__.py
+│   ├── rag_engine.py
+│   └── memory_manager.py
+│
+├── c2_health/
+│   ├── __init__.py
+│   ├── health_checker.py
+│   └── dependency_monitor.py
+│
+├── c3_task_service/
+│   ├── __init__.py
+│   └── task_service.py
+│
+├── c3_agent_service/
+│   ├── __init__.py
+│   └── agent_manager_service.py
+│
+├── c3_ticket_service/
+│   ├── __init__.py
+│   ├── ticket_service.py
+│   ├── ticket_history_service.py
+│   └── ticket_search_service.py
+│
+├── c3_phase_service/
+│   ├── __init__.py
+│   └── phase_manager_service.py
+│
+├── c3_queue_service/
+│   ├── __init__.py
+│   └── queue_service.py
+│
+├── c3_result_service/
+│   ├── __init__.py
+│   ├── result_service.py
+│   └── result_validator_service.py
+│
+├── c3_workflow_service/
+│   ├── __init__.py
+│   └── workflow_result_service.py
+│
+├── c3_embedding_service/
+│   ├── __init__.py
+│   └── embedding_service.py
+│
+├── c3_health_service/
+│   ├── __init__.py
+│   └── health_service.py
+│
+├── c4_mcp_server/
+│   ├── __init__.py
+│   ├── app.py
+│   └── module_registry.py
+│
+├── c4_modules/
+│   ├── __init__.py
+│   ├── base_module.py
+│   ├── task_module.py
+│   ├── agent_module.py
+│   ├── ticket_module.py
+│   ├── health_module.py
+│   ├── memory_module.py
+│   ├── workflow_module.py
+│   ├── phase_module.py
+│   ├── result_module.py
+│   ├── validation_module.py
+│   ├── monitoring_module.py
+│   ├── queue_module.py
+│   ├── blocking_module.py
+│   ├── communication_module.py
+│   ├── auth_module.py
+│   ├── dashboard_module.py
+│   └── websocket_module.py
+│
+├── c4_frontend_api/
+│   ├── __init__.py
+│   └── api.py
+│
+├── c4_auth_api/
+│   ├── __init__.py
+│   ├── auth_api.py
+│   └── auth_middleware.py
+│
+├── c4_cli/
+│   ├── __init__.py
+│   ├── cli_interface.py
+│   └── process_manager.py
+│
+├── c4_sdk/
+│   ├── __init__.py
+│   └── sdk_client.py
+│
+└── c4_tui/
+    ├── __init__.py
+    ├── app.py
+    ├── popups/
+    ├── screens/
+    └── widgets/
+```
+
+## Import Examples
+
+### Correct Imports (using underscores)
+```python
+# c0 layer imports
+from src.c0_models.task_models import TaskRequest, TaskResponse
+from src.c0_enums.task_enums import TaskStatus
+from src.c0_exceptions.task_exceptions import TaskNotFoundError
+
+# c1 layer imports
+from src.c1_database.models import Task, Agent
+from src.c1_llm.openai_provider import OpenAIProvider
+from src.c1_config.config_loader import get_config
+
+# c2 layer imports
+from src.c2_tasks.task_logic import validate_task
+from src.c2_agents.agent_lifecycle import start_agent
+from src.c2_health.health_checker import check_system_health
+
+# c3 layer imports
+from src.c3_task_service.task_service import TaskService
+from src.c3_agent_service.agent_manager_service import AgentManagerService
+from src.c3_health_service.health_service import HealthService
+
+# c4 layer imports
+from src.c4_mcp_server.app import app
+from src.c4_modules.task_module import TaskModule
+from src.c4_modules.health_module import HealthModule
+```
+
+### Incorrect Imports (would not work with hyphens)
+```python
+# These would fail with syntax errors
+from src.c1-database.models import Task  # ERROR: invalid syntax
+from src.c2-health.health-checker import check  # ERROR: invalid syntax
+from src.c3-task-service.task-service import TaskService  # ERROR: invalid syntax
+```
+
+## Module Count Update
+
+### Revised Counts by Layer
+
+**c0 Layer (Foundation):**
+```
+c0_models/           (15 model files)
+c0_enums/            (8 enum files)
+c0_exceptions/       (10 exception files)
+c0_constants/        (3 constant files)
+c0_types/            (3 type files)
+
+Total: 5 packages, 39 files
+```
+
+**c1 Layer (External Services):**
+```
+c1_database/         (4 files)
+c1_llm/              (7 files)
+c1_embedding/        (4 files)
+c1_config/           (5 files)
+c1_auth/             (3 files)
+c1_vector_store/     (3 files)
+
+Total: 6 packages, 26 files
+```
+
+**c2 Layer (Business Logic):**
+```
+c2_tasks/            (4 files)
+c2_agents/           (4 files)
+c2_tickets/          (4 files)
+c2_phases/           (4 files)
+c2_monitoring/       (7 files)
+c2_validation/       (7 files)
+c2_worktree/         (4 files)
+c2_workflow/         (3 files)
+c2_memory/           (3 files)
+c2_health/           (3 files)
+
+Total: 10 packages, 43 files
+```
+
+**c3 Layer (Service Coordination):**
+```
+c3_task_service/         (2 files)
+c3_agent_service/        (2 files)
+c3_ticket_service/       (4 files)
+c3_phase_service/        (2 files)
+c3_queue_service/        (2 files)
+c3_result_service/       (4 files)
+c3_workflow_service/     (2 files)
+c3_embedding_service/    (2 files)
+c3_health_service/       (2 files)
+
+Total: 9 packages, 22 files
+```
+
+**c4 Layer (Applications):**
+```
+c4_mcp_server/       (3 files: app, module_registry, lifespan)
+c4_modules/          (18 module files)
+c4_frontend_api/     (2 files)
+c4_auth_api/         (3 files)
+c4_cli/              (3 files)
+c4_sdk/              (2 files)
+c4_tui/              (20 files: app + popups + screens + widgets)
+
+Total: 7 packages, 51 files
+```
+
+### Grand Total
+```
+c0: 39 files (5 packages)
+c1: 26 files (6 packages)
+c2: 43 files (10 packages)
+c3: 22 files (9 packages)
+c4: 51 files (7 packages)
+
+Total: 181 files in 37 packages
+```
+
+## Comparison: Hyphen vs Underscore Naming
+
+### Hyphens (INCORRECT - won't work in Python)
+```
+src/c1-database/models.py
+```
+
+**Problem:** Python sees this as:
+```python
+from src.c1 import database  # ERROR: No module named 'src.c1'
+```
+
+### Underscores (CORRECT - Python standard)
+```
+src/c1_database/models.py
+```
+
+**Works correctly:**
+```python
+from src.c1_database.models import Task  # ✓ Works
+```
+
+## Using Dots for Subpackages
+
+Dots (.) are valid in **import paths** but not **folder names**:
+
+**Folder structure:**
+```
+src/c1_database/models.py
+```
+
+**Import path:**
+```python
+from src.c1_database.models import Task  # Dot separates packages
+```
+
+The dot represents the hierarchy, not the actual folder name.
+
+## Alternative Organization Strategies
+
+### Option 1: Flat Structure (RECOMMENDED)
+```
+src/
+├── c1_database/
+├── c1_llm/
+├── c1_embedding/
+└── c1_config/
+```
+
+**Pros:** Simple, clear, easy imports
+**Cons:** All packages at same level
+
+### Option 2: Nested Structure
+```
+src/
+└── c1_layer/
+    ├── database/
+    ├── llm/
+    ├── embedding/
+    └── config/
+```
+
+**Imports:**
+```python
+from src.c1_layer.database.models import Task
+```
+
+**Pros:** Explicit layer grouping
+**Cons:** Longer import paths
+
+### Option 3: Hybrid (BEST)
+```
+src/
+├── c0_models/
+├── c0_enums/
+├── c1_database/
+├── c1_llm/
+├── c2_tasks/
+├── c2_agents/
+├── c3_task_service/
+├── c4_mcp_server/
+└── c4_modules/
+```
+
+**Imports:**
+```python
+from src.c1_database.models import Task
+from src.c2_tasks.task_logic import validate_task
+from src.c4_modules.health_module import HealthModule
+```
+
+**Pros:** Clear layer prefix, short imports, flat structure
+**Cons:** Many packages at src/ level (but organized alphabetically)
+
+## Recommended Structure: Hybrid with Underscores
+
+**This is the RECOMMENDED structure** (combines best of all approaches):
+
+```
+src/
+├── c0_constants/
+├── c0_enums/
+├── c0_exceptions/
+├── c0_models/
+├── c0_types/
+├── c1_auth/
+├── c1_config/
+├── c1_database/
+├── c1_embedding/
+├── c1_llm/
+├── c1_vector_store/
+├── c2_agents/
+├── c2_health/
+├── c2_memory/
+├── c2_monitoring/
+├── c2_phases/
+├── c2_tasks/
+├── c2_tickets/
+├── c2_validation/
+├── c2_workflow/
+├── c2_worktree/
+├── c3_agent_service/
+├── c3_embedding_service/
+├── c3_health_service/
+├── c3_phase_service/
+├── c3_queue_service/
+├── c3_result_service/
+├── c3_task_service/
+├── c3_ticket_service/
+├── c3_workflow_service/
+├── c4_auth_api/
+├── c4_cli/
+├── c4_frontend_api/
+├── c4_mcp_server/
+├── c4_modules/
+├── c4_sdk/
+└── c4_tui/
+```
+
+**Benefits:**
+1. ✅ Valid Python syntax (underscores)
+2. ✅ Clear layer identification (c0, c1, c2, c3, c4 prefix)
+3. ✅ Alphabetical ordering within each layer
+4. ✅ Short import paths
+5. ✅ IDE-friendly (autocomplete works well)
+6. ✅ PEP 8 compliant
+
+## Migration Commands
+
+### Create All Package Directories
+```bash
+cd src/
+
+# c0 layer
+mkdir -p c0_constants c0_enums c0_exceptions c0_models c0_types
+
+# c1 layer
+mkdir -p c1_auth c1_config c1_database c1_embedding c1_llm c1_vector_store
+
+# c2 layer
+mkdir -p c2_agents c2_health c2_memory c2_monitoring c2_phases c2_tasks c2_tickets c2_validation c2_workflow c2_worktree
+
+# c3 layer
+mkdir -p c3_agent_service c3_embedding_service c3_health_service c3_phase_service c3_queue_service c3_result_service c3_task_service c3_ticket_service c3_workflow_service
+
+# c4 layer
+mkdir -p c4_auth_api c4_cli c4_frontend_api c4_mcp_server c4_modules c4_sdk c4_tui
+```
+
+### Create __init__.py Files
+```bash
+find src/c*_* -type d -exec touch {}/__init__.py \;
+```
+
+## Validation Script
+
+```python
+# validate_naming.py
+
+import sys
+from pathlib import Path
+
+def validate_package_names(src_dir: Path) -> bool:
+    """Validate that all package names follow the convention."""
+    errors = []
+
+    for package in src_dir.iterdir():
+        if not package.is_dir():
+            continue
+
+        name = package.name
+
+        # Check for invalid characters
+        if '-' in name:
+            errors.append(f"Package '{name}' contains hyphen (use underscore)")
+
+        if '.' in name and name != '__pycache__':
+            errors.append(f"Package '{name}' contains dot (invalid)")
+
+        # Check layer prefix format
+        if name.startswith('c') and name[1].isdigit():
+            if name[2] != '_':
+                errors.append(f"Package '{name}' should use underscore after layer number")
+
+    if errors:
+        print("❌ Validation errors found:")
+        for error in errors:
+            print(f"  - {error}")
+        return False
+
+    print("✅ All package names valid")
+    return True
+
+if __name__ == '__main__':
+    src_dir = Path('src')
+    valid = validate_package_names(src_dir)
+    sys.exit(0 if valid else 1)
+```
+
+## Summary
+
+**Key Points:**
+1. ✅ Use **underscores** (c1_database, c2_health)
+2. ❌ Don't use **hyphens** (c1-database will not work)
+3. ❌ Don't use **dots** in folder names (reserved for imports)
+4. ✅ Use **lowercase** for all package names
+5. ✅ Use **layer prefix** (c0_, c1_, c2_, c3_, c4_)
+6. ✅ Follow **PEP 8** naming conventions
+
+**Server Language:** Python (FastAPI framework)
+
+**Total Structure:**
+- 181 files in 37 packages
+- Clear layer separation
+- Modular organization
+- Valid Python syntax
