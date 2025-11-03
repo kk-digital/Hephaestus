@@ -12,66 +12,185 @@ Implement graceful shutdown endpoints and signal handling for all long-running p
 
 ## Requirements
 
-### 1. Health Endpoint
+### 0. Centralized Server State
 
-All services must implement `GET /health`:
+All services must maintain centralized state:
 
+```python
+from datetime import datetime
+
+class ServerState:
+    """Centralized server state (singleton)"""
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.start_time = datetime.utcnow()
+            cls._instance.should_shutdown = False
+        return cls._instance
+
+    @property
+    def uptime_seconds(self) -> float:
+        return (datetime.utcnow() - self.start_time).total_seconds()
+
+    def request_shutdown(self):
+        """Set shutdown flag"""
+        self.should_shutdown = True
+
+# Global singleton
+server_state = ServerState()
+```
+
+### 1. Health Endpoints (MinIO-style)
+
+All services must implement multiple health endpoints:
+
+**Basic health check:**
 ```python
 @app.get("/health")
 async def health():
     return {
-        "status": "healthy",
-        "uptime_seconds": get_uptime(),
+        "status": "healthy" if not server_state.should_shutdown else "shutting_down",
+        "uptime_seconds": server_state.uptime_seconds,
+        "start_time": server_state.start_time.isoformat(),
         "version": __version__,
         "service": "hephaestus-mcp"
     }
 ```
 
+**Detailed status (MinIO-style):**
+```python
+@app.get("/health/status")
+async def health_status():
+    return {
+        "status": "healthy" if not server_state.should_shutdown else "shutting_down",
+        "uptime_seconds": server_state.uptime_seconds,
+        "start_time": server_state.start_time.isoformat(),
+        "version": __version__,
+        "service": "hephaestus-mcp",
+        "should_shutdown": server_state.should_shutdown,
+        "database": {
+            "connected": await check_database_connection(),
+            "pool_size": await get_connection_pool_size()
+        },
+        "qdrant": {
+            "connected": await check_qdrant_connection(),
+            "collections": await get_collection_count()
+        },
+        "resources": {
+            "open_connections": await get_open_connections(),
+            "background_tasks": await get_background_task_count()
+        }
+    }
+```
+
 **Returns:**
-- status: "healthy" or "degraded"
+- status: "healthy", "degraded", or "shutting_down"
 - uptime_seconds: Time since service started
+- start_time: ISO 8601 timestamp when service started
 - version: Service version
 - service: Service name
+- should_shutdown: Boolean flag indicating shutdown requested
 
-### 2. Shutdown Endpoint
+### 2. Shutdown Endpoints (Two Options)
 
-All services must implement `POST /shutdown`:
+**Option A: Immediate blocking shutdown - `POST /shutdown`**
+
+Blocks until shutdown is complete:
 
 ```python
 @app.post("/shutdown")
 async def shutdown():
     """
-    Gracefully shutdown the service.
+    Gracefully shutdown the service immediately.
     Blocks until shutdown is complete.
     """
-    logger.info("Shutdown requested via /shutdown endpoint")
+    logger.info("Immediate shutdown requested via /shutdown endpoint")
 
-    # 1. Stop accepting new requests
+    # 1. Set shutdown flag
+    server_state.request_shutdown()
+
+    # 2. Stop accepting new requests
     await set_service_state("shutting_down")
 
-    # 2. Wait for in-flight requests to complete (with timeout)
+    # 3. Wait for in-flight requests to complete (with timeout)
     await wait_for_requests(timeout=30)
 
-    # 3. Clean up resources
+    # 4. Clean up resources
     await cleanup_database_connections()
     await cleanup_file_handles()
     await cleanup_background_tasks()
 
-    # 4. Flush logs
+    # 5. Flush logs
     await flush_logs()
 
-    # 5. Return success (blocks until complete)
+    # 6. Return success (blocks until complete)
     return {
         "status": "shutdown_complete",
-        "cleanup_duration_seconds": cleanup_time
+        "cleanup_duration_seconds": cleanup_time,
+        "mode": "immediate"
     }
 ```
 
 **Behavior:**
+- Sets should_shutdown flag immediately
 - Blocks until shutdown is complete
 - Returns HTTP 200 when ready to terminate
 - Ensures all cleanup is done before returning
 - Logs shutdown progress
+
+**Option B: Scheduled shutdown - `POST /shutdown/schedule`**
+
+Sets shutdown flag and returns immediately:
+
+```python
+@app.post("/shutdown/schedule")
+async def shutdown_schedule():
+    """
+    Schedule graceful shutdown.
+    Returns immediately, shutdown happens asynchronously.
+    """
+    logger.info("Scheduled shutdown requested via /shutdown/schedule endpoint")
+
+    # Set shutdown flag
+    server_state.request_shutdown()
+
+    # Schedule shutdown in background
+    asyncio.create_task(perform_graceful_shutdown())
+
+    # Return immediately
+    return {
+        "status": "shutdown_scheduled",
+        "should_shutdown": True,
+        "mode": "scheduled",
+        "message": "Shutdown will occur after current requests complete"
+    }
+
+async def perform_graceful_shutdown():
+    """Background task to perform shutdown"""
+    # Wait for in-flight requests
+    await wait_for_requests(timeout=30)
+
+    # Clean up resources
+    await cleanup_database_connections()
+    await cleanup_file_handles()
+    await cleanup_background_tasks()
+
+    # Flush logs
+    await flush_logs()
+
+    # Exit
+    logger.info("Scheduled shutdown complete, exiting")
+    sys.exit(0)
+```
+
+**Behavior:**
+- Sets should_shutdown flag immediately
+- Returns HTTP 200 immediately
+- Shutdown happens in background
+- Allows monitoring via /health (shows "shutting_down" status)
+- Good for graceful shutdown without blocking client
 
 ### 3. Signal Handling
 
@@ -174,14 +293,37 @@ All services must implement cleanup for:
 6. Services can be restarted cleanly
 7. Documentation updated
 
+## Endpoint Summary
+
+All services must implement these endpoints:
+
+1. **GET /health** - Basic health check (uptime, status, start_time)
+2. **GET /health/status** - Detailed status (MinIO-style with resource info)
+3. **POST /shutdown** - Immediate graceful shutdown (blocks until complete)
+4. **POST /shutdown/schedule** - Scheduled shutdown (returns immediately, sets flag)
+
 ## Testing
 
 ```bash
-# Test health endpoint
+# Test basic health endpoint
 curl http://localhost:8000/health
+# Expected: {"status":"healthy","uptime_seconds":123.45,"start_time":"2025-11-04T12:00:00",...}
 
-# Test graceful shutdown
+# Test detailed status endpoint
+curl http://localhost:8000/health/status
+# Expected: Full status with database, qdrant, and resource info
+
+# Test scheduled shutdown (non-blocking)
+curl -X POST http://localhost:8000/shutdown/schedule
+# Expected: {"status":"shutdown_scheduled","should_shutdown":true,"mode":"scheduled"}
+
+# Verify shutdown flag was set
+curl http://localhost:8000/health
+# Expected: {"status":"shutting_down",...}
+
+# Test immediate shutdown (blocking)
 curl -X POST http://localhost:8000/shutdown
+# Expected: Blocks until shutdown complete, then returns {"status":"shutdown_complete",...}
 
 # Test signal handling
 kill -TERM <pid>
