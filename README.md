@@ -41,6 +41,48 @@ See [INSTALLATION.txt](INSTALLATION.txt) for complete setup instructions and tro
 
 ---
 
+## 📊 Embedding Models
+
+Hephaestus supports multiple embedding providers for semantic search and vector operations.
+
+### OpenAI Embeddings (Cloud)
+
+| Model | Dimension | Cost | Quality | Use Case |
+|-------|-----------|------|---------|----------|
+| text-embedding-3-large | 3072 | $0.13/1M tokens | Highest | Production |
+| text-embedding-3-small | 1536 | $0.02/1M tokens | High | Cost-sensitive |
+| text-embedding-ada-002 | 1536 | $0.10/1M tokens | Good | Legacy |
+
+### LM Studio Embeddings (Local, Free) - VERIFIED WORKING
+
+| Model | Size | Dimension | Quality | Use Case |
+|-------|------|-----------|---------|----------|
+| text-embedding-qwen3-embedding-8b ⭐ | 8B | 4096 | ★★★★★ | **Best quality** |
+| text-embedding-qwen3-embedding-4b | 4B | 2560 | ★★★★ | High quality |
+| text-embedding-qwen3-embedding-0.6b | 600M | 1024 | ★★★★ | Good & fast |
+| text-embedding-nomic-embed-text-v1.5 | 137M | 768 | ★★★ | Reliable fallback |
+| text-embedding-granite-embedding-125m-english | 125M | 768 | ★★★ | Alternative |
+| text-embedding-embeddinggemma-300m-with-dense-modules | 300M | 768 | ★★★ | Alternative |
+
+⭐ **Recommended default for LM Studio** - Best quality with 4096 dimensions
+
+**Note:** `jina-embeddings-v4-text-retrieval` does NOT work in LM Studio (returns "Model is not embedding" error).
+
+**Configuration:**
+```bash
+# OpenAI
+EMBEDDING_PROVIDER=openai
+OPENAI_EMBEDDING_MODEL=text-embedding-3-large  # 3072-dim
+
+# LM Studio
+EMBEDDING_PROVIDER=lmstudio
+LMSTUDIO_EMBEDDING_MODEL=text-embedding-qwen3-embedding-8b  # 4096-dim (best quality)
+```
+
+All models have been verified working in LM Studio through actual testing.
+
+---
+
 ## 🎥 See Hephaestus in Action
 
 <div align="center">

@@ -66,20 +66,26 @@
     - Support OpenAI and LM Studio providers
     - See: tasks/251104-task-11-embedding-wrapper-module.txt
 
-[ ] Create task-12: Fix deprecation warnings
+[DONE] Create task-12: Fix deprecation warnings
     - Fix SQLAlchemy declarative_base import (MovedIn20Warning)
     - Migrate FastAPI from on_event to lifespan pattern
     - Register pytest custom markers (integration, slow, unit)
     - See: tasks/251104-task-12-fix-deprecation-warnings.txt
 
-[ ] Document embedding model specifications everywhere
-    - Add to README.md: Model name, size, embedding dimensionality
-    - Add to .env.example: Full model specs for each option
-    - Add to INSTALLATION.txt: Model comparison table
-    - Add to task files: Dimension specs for each model
-    - Include: exact model name, model size (parameters), embedding dimension
-    - Example format: "jina-embeddings-v4-text-retrieval (137M params, 1024-dim)"
-    - Document all supported models: Jina v4, Qwen3-8B, Nomic v1.5, OpenAI models
+[DONE] Create task-13: Document embedding specifications everywhere
+    - See: tasks/251104-task-13-document-embedding-specs.txt
+
+[DONE] Update README.md with verified embedding model specifications
+    - Added embedding models section with 6 VERIFIED WORKING LM Studio models
+    - Corrected dimensions: qwen3-8b (4096-dim), qwen3-4b (2560-dim), qwen3-0.6b (1024-dim)
+    - Added explicit note that jina-v4 does NOT work in LM Studio
+    - Listed all working models with parameters and dimensions
+
+[DONE] Update .env.example with verified LM Studio models
+    - Changed default from jina-v4 to text-embedding-qwen3-embedding-8b (4096-dim)
+    - Added all 6 verified working models with specifications
+    - Added explicit warning that jina-v4 doesn't work
+    - All models tested and confirmed working
 
 ## Immediate Actions
 
