@@ -1,0 +1,217 @@
+TASK-09: Implement Graceful Shutdown for All Services
+
+## Objective
+
+Implement graceful shutdown endpoints and signal handling for all long-running processes in Hephaestus to ensure clean restarts after code changes.
+
+## Background
+
+**Problem:** Stale processes running old code after changes to source files, configuration, or dependencies.
+
+**Solution:** Implement standard health and shutdown endpoints that allow processes to be gracefully stopped and restarted.
+
+## Requirements
+
+### 1. Health Endpoint
+
+All services must implement `GET /health`:
+
+```python
+@app.get("/health")
+async def health():
+    return {
+        "status": "healthy",
+        "uptime_seconds": get_uptime(),
+        "version": __version__,
+        "service": "hephaestus-mcp"
+    }
+```
+
+**Returns:**
+- status: "healthy" or "degraded"
+- uptime_seconds: Time since service started
+- version: Service version
+- service: Service name
+
+### 2. Shutdown Endpoint
+
+All services must implement `POST /shutdown`:
+
+```python
+@app.post("/shutdown")
+async def shutdown():
+    """
+    Gracefully shutdown the service.
+    Blocks until shutdown is complete.
+    """
+    logger.info("Shutdown requested via /shutdown endpoint")
+
+    # 1. Stop accepting new requests
+    await set_service_state("shutting_down")
+
+    # 2. Wait for in-flight requests to complete (with timeout)
+    await wait_for_requests(timeout=30)
+
+    # 3. Clean up resources
+    await cleanup_database_connections()
+    await cleanup_file_handles()
+    await cleanup_background_tasks()
+
+    # 4. Flush logs
+    await flush_logs()
+
+    # 5. Return success (blocks until complete)
+    return {
+        "status": "shutdown_complete",
+        "cleanup_duration_seconds": cleanup_time
+    }
+```
+
+**Behavior:**
+- Blocks until shutdown is complete
+- Returns HTTP 200 when ready to terminate
+- Ensures all cleanup is done before returning
+- Logs shutdown progress
+
+### 3. Signal Handling
+
+All services must handle SIGTERM and SIGINT:
+
+```python
+import signal
+import asyncio
+
+async def graceful_shutdown(signum, frame):
+    """Handle shutdown signals"""
+    logger.info(f"Received signal {signum}, initiating graceful shutdown")
+
+    # Same cleanup as /shutdown endpoint
+    await cleanup_resources()
+    await shutdown_server()
+
+    # Exit cleanly
+    sys.exit(0)
+
+# Register signal handlers
+signal.signal(signal.SIGTERM, lambda s, f: asyncio.create_task(graceful_shutdown(s, f)))
+signal.signal(signal.SIGINT, lambda s, f: asyncio.create_task(graceful_shutdown(s, f)))
+```
+
+### 4. Resource Cleanup
+
+All services must implement cleanup for:
+
+1. **Database connections:**
+   ```python
+   async def cleanup_database_connections():
+       await db_manager.close_all_connections()
+       await db_manager.dispose_engine()
+   ```
+
+2. **File handles:**
+   ```python
+   async def cleanup_file_handles():
+       for handle in open_file_handles:
+           await handle.close()
+   ```
+
+3. **Background tasks:**
+   ```python
+   async def cleanup_background_tasks():
+       for task in background_tasks:
+           task.cancel()
+           try:
+               await task
+           except asyncio.CancelledError:
+               pass
+   ```
+
+4. **Log flushing:**
+   ```python
+   async def flush_logs():
+       for handler in logging.root.handlers:
+           handler.flush()
+   ```
+
+## Implementation Plan
+
+### Phase 1: MCP Server (src/mcp/server.py)
+
+1. Add /health endpoint
+2. Add /shutdown endpoint
+3. Implement signal handlers
+4. Implement resource cleanup functions
+5. Test graceful shutdown
+
+### Phase 2: Background Services
+
+1. Identify all long-running background services
+2. Implement health/shutdown for each
+3. Add signal handling
+4. Test graceful shutdown
+
+### Phase 3: Testing
+
+1. Test /health endpoint returns correct status
+2. Test /shutdown blocks until complete
+3. Test SIGTERM triggers graceful shutdown
+4. Test resource cleanup (no leaked connections/files)
+5. Test restart after shutdown
+
+### Phase 4: Documentation
+
+1. Update CLAUDE.md with shutdown procedures
+2. Document standard endpoints
+3. Add examples to README
+
+## Acceptance Criteria
+
+1. All services respond to GET /health
+2. All services respond to POST /shutdown
+3. /shutdown blocks until cleanup is complete
+4. SIGTERM/SIGINT trigger graceful shutdown
+5. No resource leaks after shutdown
+6. Services can be restarted cleanly
+7. Documentation updated
+
+## Testing
+
+```bash
+# Test health endpoint
+curl http://localhost:8000/health
+
+# Test graceful shutdown
+curl -X POST http://localhost:8000/shutdown
+
+# Test signal handling
+kill -TERM <pid>
+
+# Verify clean exit
+echo $?  # Should be 0
+```
+
+## Files to Modify
+
+- src/mcp/server.py
+- src/monitoring/monitor.py (if applicable)
+- src/agents/manager.py (if applicable)
+- .claude/CLAUDE.md (already updated)
+
+## Notes
+
+- Shutdown timeout: 30 seconds for in-flight requests
+- Health check interval: Should be configurable
+- Graceful shutdown is CRITICAL for clean restarts
+- Never kill -9 (SIGKILL) - always use SIGTERM first
+
+## Estimated Time
+
+4-6 hours
+
+## Priority
+
+HIGH - Required for reliable development workflow
+
+## Dependencies
+
+None

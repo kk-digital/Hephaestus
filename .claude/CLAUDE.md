@@ -111,6 +111,56 @@ Hephaestus/
 - `.failed.txt`: Failed/abandoned
 - `.pending.txt`: Planned
 
+## Process Management
+
+**CRITICAL: Restart processes after code changes**
+
+After making changes to source code, configuration, or dependencies:
+
+1. **Stop running processes gracefully:**
+   ```bash
+   # For MCP server (if running)
+   curl -X POST http://localhost:8000/shutdown
+
+   # Or send SIGTERM signal
+   kill -TERM <pid>
+   ```
+
+2. **Wait for graceful shutdown to complete**
+   - Server should finish current requests
+   - Clean up resources (database connections, file handles)
+   - Exit cleanly
+
+3. **Restart with new code:**
+   ```bash
+   # Inside container
+   cd /home/user/workspace/Hephaestus/Hephaestus
+   source .venv/bin/activate
+   python -m src.mcp.server
+   ```
+
+**Graceful Shutdown Requirements:**
+
+All long-running processes MUST implement graceful shutdown:
+- **Health endpoint:** `GET /health` - Returns server status
+- **Shutdown endpoint:** `POST /shutdown` - Initiates graceful shutdown (blocks until complete)
+- **Signal handling:** Respond to SIGTERM/SIGINT signals
+- **Cleanup:** Close database connections, flush logs, complete in-flight requests
+
+**Standard health/shutdown endpoints:**
+```python
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "uptime": uptime_seconds}
+
+@app.post("/shutdown")
+async def shutdown():
+    # Block until shutdown completes
+    await cleanup_resources()
+    await shutdown_server()
+    return {"status": "shutdown_complete"}
+```
+
 ## Important Notes
 
 - Always update todo.txt before ending session
@@ -118,3 +168,5 @@ Hephaestus/
 - Never commit secrets (.env file)
 - Use Python 3.13 compatible packages
 - Keep requirements.txt complete and up-to-date
+- **ALWAYS restart processes after making code changes**
+- **NEVER leave stale processes running with old code**
