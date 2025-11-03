@@ -1,0 +1,375 @@
+TASK-14: Layered Architecture Refactoring
+=========================================
+
+## Overview
+
+Break Hephaestus application into clear architectural layers with one folder per layer, following the pattern:
+- c0-layer/ (base utilities, no imports)
+- c1-layer/ (foundational, imports only c0)
+- c2-layer/ (core business logic, imports c0-c1)
+- c3-layer/ (services, imports c0-c2)
+- c4-layer/ (applications, imports c0-c3)
+
+Lower layers cannot import higher layers. This enforces dependency direction and prevents circular dependencies.
+
+## Motivation
+
+From user feedback: "add a todo task; to figure out how to break application into layers like c1- c2- c3- and have one folder per layer; lower layers cannot import higher layers; base/utility and things that import nothing should be at lower layers and logging at higher layers"
+
+Current issues:
+- No clear separation between utility code, business logic, and services
+- Potential circular dependencies
+- Difficult to understand module relationships
+- Hard to test individual layers in isolation
+
+## Benefits
+
+1. **Dependency Direction**: Clear import hierarchy prevents circular dependencies
+2. **Testability**: Each layer can be tested independently
+3. **Maintainability**: Easy to understand what depends on what
+4. **Modularity**: Clear boundaries between different concerns
+5. **Scalability**: Easy to add new modules at appropriate layers
+
+## Layer Definitions
+
+### c0-layer/ (Base Utilities)
+**Characteristics:**
+- NO external project imports (only standard library and third-party packages)
+- Pure utility functions
+- Data structures and types
+- Constants and configuration schemas
+
+**Examples:**
+- String utilities
+- File path operations
+- Date/time utilities
+- Type definitions
+- Exception classes
+
+**Dependencies:**
+- Python standard library
+- Third-party packages (typing, pydantic, etc.)
+- NO internal project imports
+
+### c1-layer/ (Foundational)
+**Characteristics:**
+- Database access (SQLAlchemy models, sessions)
+- External service wrappers (Qdrant, OpenAI, etc.)
+- Configuration loading
+- Logging setup
+
+**Examples:**
+- c1-database/ (SQLAlchemy setup, models, base queries)
+- c1-qdrant/ (Qdrant client wrapper)
+- c1-llm/ (LLM provider abstractions)
+- c1-embedding/ (Embedding provider abstractions)
+- c1-config/ (Configuration loading)
+
+**Dependencies:**
+- c0-layer/
+- Python standard library
+- Third-party packages (sqlalchemy, qdrant-client, openai, etc.)
+
+### c2-layer/ (Core Business Logic)
+**Characteristics:**
+- Domain models and entities
+- Business rules and validation
+- Core algorithms
+- Data processing
+
+**Examples:**
+- c2-tasks/ (Task entities, validation, business rules)
+- c2-phases/ (Phase workflow logic)
+- c2-agents/ (Agent orchestration logic)
+- c2-tickets/ (Ticket management logic)
+
+**Dependencies:**
+- c0-layer/
+- c1-layer/
+- Python standard library
+- Third-party packages
+
+### c3-layer/ (Services)
+**Characteristics:**
+- High-level services coordinating multiple c2 modules
+- Service interfaces
+- Integration logic
+
+**Examples:**
+- c3-task-service/ (TaskService coordinating tasks, validation, phases)
+- c3-agent-manager/ (AgentManager coordinating agents, worktrees)
+- c3-phase-manager/ (PhaseManager coordinating phases, workflows)
+- c3-ticket-service/ (TicketService coordinating tickets, history, search)
+
+**Dependencies:**
+- c0-layer/
+- c1-layer/
+- c2-layer/
+- Python standard library
+- Third-party packages
+
+### c4-layer/ (Applications)
+**Characteristics:**
+- FastAPI endpoints and routers
+- MCP server setup
+- CLI applications
+- WebSocket handlers
+- Frontend integration
+
+**Examples:**
+- c4-mcp-server/ (FastAPI app, routes, WebSocket endpoints)
+- c4-frontend-api/ (Frontend-specific routes)
+- c4-auth-api/ (Authentication routes)
+- c4-cli/ (CLI entry points)
+
+**Dependencies:**
+- c0-layer/
+- c1-layer/
+- c2-layer/
+- c3-layer/
+- Python standard library
+- Third-party packages (fastapi, uvicorn, etc.)
+
+## Current Structure (To Be Reorganized)
+
+```
+src/
+├── auth/                    → c4-layer? (authentication API)
+├── core/                    → Split across c1 (database) and c2 (business logic)
+├── mcp/                     → c4-layer (MCP server, routes)
+├── models/                  → c0-layer (data models, types)
+├── phases/                  → c2-layer (phase workflow logic)
+├── sdk/                     → c0-layer or c1-layer (SDK utilities)
+├── services/                → c3-layer (high-level services)
+├── tasks/                   → c2-layer (task entities, logic)
+└── utils/                   → c0-layer (utilities)
+```
+
+## Implementation Plan
+
+### Phase 1: Analysis and Mapping (Est: 2-4 hours)
+1. Analyze all existing modules in src/
+2. Determine which layer each module belongs to
+3. Identify circular dependencies
+4. Create mapping document: module → target layer
+5. Identify modules that need to be split across layers
+
+### Phase 2: Create Layer Structure (Est: 1-2 hours)
+1. Create new layer directories: c0-layer/ through c4-layer/
+2. Create __init__.py files for each layer
+3. Update .gitignore if needed
+4. Document layer responsibilities in README.md
+
+### Phase 3: Move Utilities First (c0-layer) (Est: 2-3 hours)
+1. Move utils/ → c0-layer/c0-utils/
+2. Move pure data models → c0-layer/c0-models/
+3. Move exception classes → c0-layer/c0-exceptions/
+4. Move constants → c0-layer/c0-constants/
+5. Update imports in all files
+6. Run tests to verify
+
+### Phase 4: Move Foundation Layer (c1-layer) (Est: 3-4 hours)
+1. Extract database setup → c1-layer/c1-database/
+2. Extract Qdrant client → c1-layer/c1-qdrant/
+3. Extract LLM providers → c1-layer/c1-llm/
+4. Extract embedding providers → c1-layer/c1-embedding/
+5. Extract configuration → c1-layer/c1-config/
+6. Update imports in all files
+7. Run tests to verify
+
+### Phase 5: Move Core Business Logic (c2-layer) (Est: 4-6 hours)
+1. Move tasks/ → c2-layer/c2-tasks/
+2. Move phases/ → c2-layer/c2-phases/
+3. Extract agent logic → c2-layer/c2-agents/
+4. Extract ticket logic → c2-layer/c2-tickets/
+5. Update imports in all files
+6. Run tests to verify
+
+### Phase 6: Move Services (c3-layer) (Est: 3-4 hours)
+1. Move services/ → c3-layer/
+2. Rename: TaskService → c3-layer/c3-task-service/
+3. Rename: AgentManager → c3-layer/c3-agent-manager/
+4. Rename: PhaseManager → c3-layer/c3-phase-manager/
+5. Update imports in all files
+6. Run tests to verify
+
+### Phase 7: Move Applications (c4-layer) (Est: 3-4 hours)
+1. Move mcp/ → c4-layer/c4-mcp-server/
+2. Move auth/ → c4-layer/c4-auth-api/
+3. Extract frontend routes → c4-layer/c4-frontend-api/
+4. Update imports in all files
+5. Run tests to verify
+
+### Phase 8: Validation and Testing (Est: 2-3 hours)
+1. Run full test suite
+2. Verify no circular dependencies
+3. Use import analysis tools (e.g., pydeps)
+4. Update documentation
+5. Update INSTALLATION.txt if needed
+
+## Import Rules Enforcement
+
+### Manual Enforcement (Initial)
+- Code review: Check imports follow layer rules
+- Documentation: Clear layer rules in README.md
+- Example imports in each layer's __init__.py
+
+### Automated Enforcement (Future)
+- Pre-commit hook to check imports
+- Custom pytest plugin to validate layer imports
+- CI/CD check for import violations
+
+### Example Import Validation Script
+```python
+# scripts/validate_layer_imports.py
+import ast
+import sys
+from pathlib import Path
+
+LAYERS = ["c0", "c1", "c2", "c3", "c4"]
+
+def get_layer(module_path):
+    """Extract layer from module path."""
+    parts = module_path.parts
+    for part in parts:
+        if part.startswith("c") and part[1].isdigit():
+            return int(part[1])
+    return None
+
+def check_imports(file_path):
+    """Check if imports follow layer rules."""
+    with open(file_path) as f:
+        tree = ast.parse(f.read())
+
+    file_layer = get_layer(Path(file_path))
+    if file_layer is None:
+        return []
+
+    violations = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            if isinstance(node, ast.ImportFrom):
+                module = node.module
+            else:
+                module = node.names[0].name
+
+            if module and module.startswith("src.c"):
+                import_layer = int(module.split(".")[1][1])
+                if import_layer > file_layer:
+                    violations.append(
+                        f"{file_path}: Layer c{file_layer} cannot import from c{import_layer} ({module})"
+                    )
+
+    return violations
+
+# Usage: python scripts/validate_layer_imports.py src/
+```
+
+## Testing Strategy
+
+### Layer-Specific Tests
+- c0-layer: Unit tests only (no dependencies)
+- c1-layer: Unit tests + integration tests (with external services)
+- c2-layer: Unit tests + integration tests (with c1 services)
+- c3-layer: Unit tests + integration tests (with c2 logic)
+- c4-layer: API tests + end-to-end tests
+
+### Test Organization
+```
+tests/
+├── c0_layer/           # Unit tests for c0-layer
+├── c1_layer/           # Unit + integration tests for c1-layer
+├── c2_layer/           # Unit + integration tests for c2-layer
+├── c3_layer/           # Unit + integration tests for c3-layer
+├── c4_layer/           # API + E2E tests for c4-layer
+└── integration/        # Cross-layer integration tests
+```
+
+## Migration Strategy
+
+### Option 1: Big Bang (NOT RECOMMENDED)
+- Move all modules at once
+- High risk of breaking everything
+- Difficult to debug
+
+### Option 2: Incremental Migration (RECOMMENDED)
+- Move one layer at a time
+- Start with c0-layer (fewest dependencies)
+- Run tests after each layer migration
+- Keep old structure alongside new until complete
+- Use symlinks during transition if needed
+
+### Option 3: Parallel Structure (SAFEST)
+- Create new layer structure in parallel
+- Gradually move modules with symlinks
+- Maintain backward compatibility
+- Remove old structure when complete
+
+## Risks and Mitigations
+
+### Risk 1: Circular Dependencies
+**Mitigation:**
+- Analyze dependencies before moving
+- Use import validation script
+- Break circular deps by extracting interfaces
+
+### Risk 2: Test Breakage
+**Mitigation:**
+- Run tests after each layer migration
+- Have comprehensive test coverage before starting
+- Use pytest markers to run layer-specific tests
+
+### Risk 3: Import Path Changes
+**Mitigation:**
+- Use absolute imports throughout
+- Update all imports atomically per layer
+- Use find-and-replace carefully
+
+### Risk 4: Lost Context
+**Mitigation:**
+- Document all moves in git commits
+- Use git mv to preserve history
+- Create migration notes for each layer
+
+## Success Criteria
+
+1. ✅ All code organized into c0-c4 layers
+2. ✅ No imports from higher layers to lower layers
+3. ✅ All tests passing (449 tests)
+4. ✅ No circular dependencies detected
+5. ✅ Documentation updated
+6. ✅ Import validation script working
+
+## Timeline Estimate
+
+- Phase 1 (Analysis): 2-4 hours
+- Phase 2 (Structure): 1-2 hours
+- Phase 3 (c0-layer): 2-3 hours
+- Phase 4 (c1-layer): 3-4 hours
+- Phase 5 (c2-layer): 4-6 hours
+- Phase 6 (c3-layer): 3-4 hours
+- Phase 7 (c4-layer): 3-4 hours
+- Phase 8 (Validation): 2-3 hours
+
+**Total: 20-30 hours**
+
+## References
+
+- Similar pattern: Clean Architecture (Uncle Bob)
+- Similar pattern: Hexagonal Architecture (Ports & Adapters)
+- Similar pattern: Onion Architecture
+- Layer naming inspired by: c0-c4 progression (dependency levels)
+
+## Next Steps
+
+1. Create Phase 1 analysis document
+2. Analyze current src/ structure
+3. Identify all dependencies
+4. Create module → layer mapping
+5. Begin incremental migration starting with c0-layer
+
+## Related Tasks
+
+- Task-08: SQL wrapper module (should go in c1-layer)
+- Task-11: Embedding wrapper module (should go in c1-layer)
+- Task-09: Graceful shutdown (affects c4-layer MCP server)

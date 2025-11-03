@@ -94,10 +94,23 @@
     - Test collection now succeeds: 449 tests collected successfully
     - All dependency issues resolved
 
-[IN_PROGRESS] Task-12: Fix deprecation warnings
+[DONE] Task-12: Fix deprecation warnings
     - [DONE] Fixed SQLAlchemy declarative_base import (commit fc2bd3a)
-    - [ ] TODO: Migrate FastAPI from on_event to lifespan pattern
-    - [ ] TODO: Register pytest custom markers (integration, slow, unit)
+    - [DONE] Migrated FastAPI from on_event to lifespan pattern (commit 63fb930)
+    - [DONE] Registered pytest custom markers (integration, slow, unit) (commit 6741a1f)
+    - NO SQLAlchemy or FastAPI deprecation warnings remaining
+    - Only Pydantic v2 warning remains (out of scope for Task-12)
+
+[CREATED] Task-14: Layered architecture refactoring
+    - Break application into c0-c4 layers (one folder per layer)
+    - Lower layers cannot import higher layers
+    - c0-layer: base/utilities (no imports)
+    - c1-layer: foundational (database, external services)
+    - c2-layer: core business logic
+    - c3-layer: services
+    - c4-layer: applications (FastAPI, CLI)
+    - See: tasks/251104-task-14-layered-architecture.txt
+    - Estimated: 20-30 hours total
 
 ## Immediate Actions
 
