@@ -17,8 +17,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 Base = declarative_base()
