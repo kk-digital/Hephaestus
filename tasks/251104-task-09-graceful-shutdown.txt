@@ -48,8 +48,8 @@ All services must implement multiple health endpoints:
 
 **Basic health check:**
 ```python
-@app.get("/health")
-async def health():
+@app.get("/health/live")
+async def health_live():
     return {
         "status": "healthy" if not server_state.should_shutdown else "shutting_down",
         "uptime_seconds": server_state.uptime_seconds,
@@ -63,6 +63,10 @@ async def health():
 ```python
 @app.get("/health/status")
 async def health_status():
+    """
+    Detailed status showing state of all dependencies.
+    Each dependency reports: "working", "error", or "not_used"
+    """
     return {
         "status": "healthy" if not server_state.should_shutdown else "shutting_down",
         "uptime_seconds": server_state.uptime_seconds,
@@ -70,13 +74,62 @@ async def health_status():
         "version": __version__,
         "service": "hephaestus-mcp",
         "should_shutdown": server_state.should_shutdown,
-        "database": {
-            "connected": await check_database_connection(),
-            "pool_size": await get_connection_pool_size()
-        },
-        "qdrant": {
-            "connected": await check_qdrant_connection(),
-            "collections": await get_collection_count()
+        "dependencies": {
+            "database": {
+                "status": await get_database_status(),  # "working", "error", or "not_used"
+                "pool_size": await get_connection_pool_size() if database_enabled else None,
+                "error": await get_database_error() if database_error else None,
+                "last_success_seconds": await get_database_last_success(),  # seconds since success, or -1 if never
+                "last_failure_seconds": await get_database_last_failure(),  # seconds since failure, or -1 if never
+                "success_count": await get_database_success_count(),  # total successes since startup
+                "failure_count": await get_database_failure_count()   # total failures since startup
+            },
+            "qdrant": {
+                "status": await get_qdrant_status(),  # "working", "error", or "not_used"
+                "collections": await get_collection_count() if qdrant_enabled else None,
+                "error": await get_qdrant_error() if qdrant_error else None,
+                "last_success_seconds": await get_qdrant_last_success(),
+                "last_failure_seconds": await get_qdrant_last_failure(),
+                "success_count": await get_qdrant_success_count(),
+                "failure_count": await get_qdrant_failure_count()
+            },
+            "openai": {
+                "status": await get_openai_status(),  # "working", "error", or "not_used"
+                "embedding_model": config.openai_embedding_model if openai_enabled else None,
+                "error": await get_openai_error() if openai_error else None,
+                "last_success_seconds": await get_openai_last_success(),
+                "last_failure_seconds": await get_openai_last_failure(),
+                "success_count": await get_openai_success_count(),
+                "failure_count": await get_openai_failure_count()
+            },
+            "anthropic": {
+                "status": await get_anthropic_status(),  # "working", "error", or "not_used"
+                "provider": config.claude_code_provider if anthropic_enabled else None,
+                "error": await get_anthropic_error() if anthropic_error else None,
+                "last_success_seconds": await get_anthropic_last_success(),
+                "last_failure_seconds": await get_anthropic_last_failure(),
+                "success_count": await get_anthropic_success_count(),
+                "failure_count": await get_anthropic_failure_count()
+            },
+            "lmstudio": {
+                "status": await get_lmstudio_status(),  # "working", "error", or "not_used"
+                "embedding_enabled": config.embedding_provider == "lmstudio",
+                "review_enabled": config.code_review_provider == "lmstudio",
+                "error": await get_lmstudio_error() if lmstudio_error else None,
+                "last_success_seconds": await get_lmstudio_last_success(),
+                "last_failure_seconds": await get_lmstudio_last_failure(),
+                "success_count": await get_lmstudio_success_count(),
+                "failure_count": await get_lmstudio_failure_count()
+            },
+            "groq": {
+                "status": await get_groq_status(),  # "working", "error", or "not_used"
+                "review_enabled": config.code_review_provider == "groq",
+                "error": await get_groq_error() if groq_error else None,
+                "last_success_seconds": await get_groq_last_success(),
+                "last_failure_seconds": await get_groq_last_failure(),
+                "success_count": await get_groq_success_count(),
+                "failure_count": await get_groq_failure_count()
+            }
         },
         "resources": {
             "open_connections": await get_open_connections(),
@@ -86,21 +139,29 @@ async def health_status():
 ```
 
 **Returns:**
-- status: "healthy", "degraded", or "shutting_down"
+- status: "healthy" or "shutting_down" (NOT "degraded" - use dependency status instead)
 - uptime_seconds: Time since service started
 - start_time: ISO 8601 timestamp when service started
 - version: Service version
 - service: Service name
 - should_shutdown: Boolean flag indicating shutdown requested
+- dependencies: Object with status for each dependency
+  - Each dependency has status: "working", "error", or "not_used"
+  - If error, includes error field with details
+  - If not_used, other fields are null/omitted
+  - last_success_seconds: Seconds since last successful operation (-1 if never succeeded)
+  - last_failure_seconds: Seconds since last failed operation (-1 if never failed)
+  - success_count: Total successful operations since startup
+  - failure_count: Total failed operations since startup
 
 ### 2. Shutdown Endpoints (Two Options)
 
-**Option A: Immediate blocking shutdown - `POST /shutdown`**
+**Option A: Immediate blocking shutdown - `POST /health/shutdown`**
 
 Blocks until shutdown is complete:
 
 ```python
-@app.post("/shutdown")
+@app.post("/health/shutdown")
 async def shutdown():
     """
     Gracefully shutdown the service immediately.
@@ -140,12 +201,12 @@ async def shutdown():
 - Ensures all cleanup is done before returning
 - Logs shutdown progress
 
-**Option B: Scheduled shutdown - `POST /shutdown/schedule`**
+**Option B: Scheduled shutdown - `POST /health/shutdown/schedule`**
 
 Sets shutdown flag and returns immediately:
 
 ```python
-@app.post("/shutdown/schedule")
+@app.post("/health/shutdown/schedule")
 async def shutdown_schedule():
     """
     Schedule graceful shutdown.
@@ -297,16 +358,16 @@ All services must implement cleanup for:
 
 All services must implement these endpoints:
 
-1. **GET /health** - Basic health check (uptime, status, start_time)
+1. **GET /health/live** - Basic health check (uptime, status, start_time)
 2. **GET /health/status** - Detailed status (MinIO-style with resource info)
-3. **POST /shutdown** - Immediate graceful shutdown (blocks until complete)
-4. **POST /shutdown/schedule** - Scheduled shutdown (returns immediately, sets flag)
+3. **POST /health/shutdown** - Immediate graceful shutdown (blocks until complete)
+4. **POST /health/shutdown/schedule** - Scheduled shutdown (returns immediately, sets flag)
 
 ## Testing
 
 ```bash
 # Test basic health endpoint
-curl http://localhost:8000/health
+curl http://localhost:8000/health/live
 # Expected: {"status":"healthy","uptime_seconds":123.45,"start_time":"2025-11-04T12:00:00",...}
 
 # Test detailed status endpoint
@@ -314,15 +375,15 @@ curl http://localhost:8000/health/status
 # Expected: Full status with database, qdrant, and resource info
 
 # Test scheduled shutdown (non-blocking)
-curl -X POST http://localhost:8000/shutdown/schedule
+curl -X POST http://localhost:8000/health/shutdown/schedule
 # Expected: {"status":"shutdown_scheduled","should_shutdown":true,"mode":"scheduled"}
 
 # Verify shutdown flag was set
-curl http://localhost:8000/health
+curl http://localhost:8000/health/live
 # Expected: {"status":"shutting_down",...}
 
 # Test immediate shutdown (blocking)
-curl -X POST http://localhost:8000/shutdown
+curl -X POST http://localhost:8000/health/shutdown
 # Expected: Blocks until shutdown complete, then returns {"status":"shutdown_complete",...}
 
 # Test signal handling
