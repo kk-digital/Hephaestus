@@ -170,9 +170,14 @@
     - Prerequisites: All planning documents complete ✓
     - Dependency fixes committed (commit b4bbdb3) ✓
     - Test suite verified working (449 tests collect, 16/17 SDK tests pass) ✓
-    - Current stage: Stage 0 (Preparation and setup)
+    - [DONE] Stage 0: Preparation and setup (commit d5ce392) ✓
+      - Created refactoring branch: refactor/three-layer-architecture
+      - Documented test baseline: 449 tests collected
+      - Created architecture validator: scripts/validate_architecture.py
+      - Baseline commit: d5ce392
+    - Current stage: Stage 1 (Split large files)
     - Estimated: 24-34 hours total across 6 stages
-    - Next immediate action: Create refactoring branch
+    - Next immediate action: Split database.py (987 lines → 8 files)
     - See planning docs: tasks/251104-task-{17,18,19,20}-*.txt
 
 ## Immediate Actions
