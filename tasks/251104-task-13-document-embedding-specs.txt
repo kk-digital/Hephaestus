@@ -1,0 +1,405 @@
+TASK-13: Document Embedding Model Specifications Everywhere
+
+## Objective
+
+Add comprehensive embedding model specifications (exact name, model size, embedding dimensionality) to all documentation, configuration files, and reference materials.
+
+## Background
+
+**Problem:**
+- Users don't know the embedding dimensions of each model
+- Model sizes (parameter counts) not documented
+- Can't compare models without this information
+- Dimension mismatches cause runtime errors
+- Important for Qdrant collection configuration
+
+**Solution:**
+Document complete specifications for ALL embedding models in:
+- README.md
+- .env.example
+- INSTALLATION.txt
+- Task files
+- Code comments
+
+## Model Specifications to Document
+
+### OpenAI Models
+
+**text-embedding-3-large:**
+- Model size: N/A (API only)
+- Embedding dimension: 3072
+- Cost: $0.13 per 1M tokens
+- Quality: Highest
+- Use case: Production, best quality
+
+**text-embedding-3-small:**
+- Model size: N/A (API only)
+- Embedding dimension: 1536
+- Cost: $0.02 per 1M tokens
+- Quality: High
+- Use case: Cost-sensitive production
+
+**text-embedding-ada-002:**
+- Model size: N/A (API only)
+- Embedding dimension: 1536
+- Cost: $0.10 per 1M tokens
+- Quality: Good (older model)
+- Use case: Legacy applications
+
+### LM Studio / Local Models
+
+**jina-embeddings-v4-text-retrieval (RECOMMENDED DEFAULT):**
+- Model size: 137M parameters
+- Embedding dimension: 1024
+- Context window: 8192 tokens
+- Model file size: ~275 MB
+- Quality: Excellent for retrieval tasks
+- Use case: Default for LM Studio, best retrieval performance
+- Download: Available in LM Studio model library
+
+**text-embedding-qwen3-embedding-8b:**
+- Model size: 8B parameters
+- Embedding dimension: 1024
+- Context window: 32768 tokens
+- Model file size: ~8 GB
+- Quality: Highest quality local model
+- Use case: Maximum quality when resources available
+- Download: Available in LM Studio model library
+
+**nomic-embed-text-v1.5:**
+- Model size: 137M parameters
+- Embedding dimension: 768
+- Context window: 8192 tokens
+- Model file size: ~275 MB
+- Quality: Good, reliable fallback
+- Use case: Reliable fallback option
+- Download: Available in LM Studio model library
+
+**nomic-embed-text-v1 (older):**
+- Model size: 137M parameters
+- Embedding dimension: 768
+- Context window: 8192 tokens
+- Model file size: ~275 MB
+- Quality: Good (older version)
+- Use case: Compatibility with v1 embeddings
+
+**all-minilm-l6-v2:**
+- Model size: 23M parameters
+- Embedding dimension: 384
+- Context window: 256 tokens
+- Model file size: ~90 MB
+- Quality: Basic
+- Use case: Very fast, resource-constrained environments
+
+## Documentation Updates
+
+### 1. README.md
+
+Add "Embedding Models" section after Quick Setup:
+
+```markdown
+## 📊 Embedding Models
+
+Hephaestus supports multiple embedding providers for semantic search and vector operations.
+
+### OpenAI Embeddings (Cloud)
+
+| Model | Dimension | Cost | Quality | Use Case |
+|-------|-----------|------|---------|----------|
+| text-embedding-3-large | 3072 | $0.13/1M tokens | Highest | Production |
+| text-embedding-3-small | 1536 | $0.02/1M tokens | High | Cost-sensitive |
+| text-embedding-ada-002 | 1536 | $0.10/1M tokens | Good | Legacy |
+
+### LM Studio Embeddings (Local, Free)
+
+| Model | Size | Dimension | File Size | Quality | Use Case |
+|-------|------|-----------|-----------|---------|----------|
+| jina-embeddings-v4-text-retrieval ⭐ | 137M | 1024 | 275 MB | Excellent | **Default** |
+| text-embedding-qwen3-embedding-8b | 8B | 1024 | 8 GB | Highest | Max quality |
+| nomic-embed-text-v1.5 | 137M | 768 | 275 MB | Good | Fallback |
+
+⭐ **Recommended default for LM Studio** - Best balance of quality and performance
+
+**Configuration:**
+```bash
+# OpenAI
+EMBEDDING_PROVIDER=openai
+OPENAI_EMBEDDING_MODEL=text-embedding-3-large  # 3072-dim
+
+# LM Studio
+EMBEDDING_PROVIDER=lmstudio
+LMSTUDIO_EMBEDDING_MODEL=jina-embeddings-v4-text-retrieval  # 1024-dim
+```
+```
+
+### 2. .env.example
+
+Update embedding provider sections with full specifications:
+
+```bash
+# ============================================================================
+# PART 2: EMBEDDING PROVIDER (Vector Search)
+# ============================================================================
+
+# Option A: OpenAI Embeddings (Cloud, Recommended for Production)
+EMBEDDING_PROVIDER=openai
+OPENAI_API_KEY=sk-proj-your-key-here
+OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+
+# OpenAI Embedding Models:
+#   - text-embedding-3-large (3072-dim, $0.13/1M tokens): Highest quality
+#   - text-embedding-3-small (1536-dim, $0.02/1M tokens): Cost-effective
+#   - text-embedding-ada-002 (1536-dim, $0.10/1M tokens): Legacy
+
+# Option B: LM Studio Embeddings (Local, Free)
+# EMBEDDING_PROVIDER=lmstudio
+# LMSTUDIO_EMBEDDING_URL=http://localhost:1234/v1
+# LMSTUDIO_EMBEDDING_MODEL=jina-embeddings-v4-text-retrieval
+
+# LM Studio Embedding Models (in preference order):
+#   1. jina-embeddings-v4-text-retrieval (137M, 1024-dim, 275MB):
+#      RECOMMENDED DEFAULT - Best for retrieval tasks
+#   2. text-embedding-qwen3-embedding-8b (8B, 1024-dim, 8GB):
+#      Highest quality, requires more resources
+#   3. nomic-embed-text-v1.5 (137M, 768-dim, 275MB):
+#      Good fallback, reliable
+
+# IMPORTANT: Embedding dimension affects Qdrant collection configuration
+# - Must match dimension when creating collections
+# - Cannot mix models with different dimensions in same collection
+```
+
+### 3. INSTALLATION.txt
+
+Add "Embedding Model Comparison" section:
+
+```markdown
+## Embedding Model Comparison
+
+### Quick Comparison Table
+
+| Provider | Model | Params | Dimension | Size | Cost | Speed | Quality |
+|----------|-------|--------|-----------|------|------|-------|---------|
+| OpenAI | text-embedding-3-large | N/A | 3072 | API | $0.13/1M | Fast | ★★★★★ |
+| OpenAI | text-embedding-3-small | N/A | 1536 | API | $0.02/1M | Fast | ★★★★ |
+| LM Studio | jina-v4-retrieval | 137M | 1024 | 275MB | Free | Medium | ★★★★ |
+| LM Studio | qwen3-embedding-8b | 8B | 1024 | 8GB | Free | Slow | ★★★★★ |
+| LM Studio | nomic-v1.5 | 137M | 768 | 275MB | Free | Medium | ★★★ |
+
+### Dimension Considerations
+
+**Why dimension matters:**
+- Qdrant collections must be configured with correct dimension
+- Cannot change dimension after collection creation
+- Cannot mix models with different dimensions
+- Higher dimension = more information, but slower and more storage
+
+**Choosing dimension:**
+- 3072-dim (OpenAI large): Best quality, highest cost
+- 1536-dim (OpenAI small/ada): Good balance
+- 1024-dim (Jina/Qwen3): Good for local, standard for modern models
+- 768-dim (Nomic): Older standard, still good
+- 384-dim (MiniLM): Fast but lower quality
+
+**Migration between dimensions:**
+Changing embedding dimension requires:
+1. Delete old Qdrant collection
+2. Create new collection with new dimension
+3. Re-embed all documents
+4. Rebuild vector index
+
+### Download Instructions
+
+**LM Studio models:**
+1. Open LM Studio
+2. Go to "Search" tab
+3. Search for model name:
+   - "jina-embeddings-v4"
+   - "qwen3-embedding-8b"
+   - "nomic-embed-text"
+4. Download the model
+5. Go to "Local Server" tab
+6. Load the embedding model
+7. Start server (usually port 1234)
+```
+
+### 4. Task Files Updates
+
+Update task-10 and task-11 to include full specifications:
+
+```python
+# In select_best_embedding_model() function documentation:
+
+"""
+Preferred models with specifications:
+
+1. jina-embeddings-v4-text-retrieval (DEFAULT)
+   - Size: 137M parameters
+   - Dimension: 1024
+   - File: ~275 MB
+   - Quality: Excellent for retrieval
+   - Context: 8192 tokens
+
+2. text-embedding-qwen3-embedding-8b
+   - Size: 8B parameters
+   - Dimension: 1024
+   - File: ~8 GB
+   - Quality: Highest
+   - Context: 32768 tokens
+
+3. nomic-embed-text-v1.5
+   - Size: 137M parameters
+   - Dimension: 768
+   - File: ~275 MB
+   - Quality: Good
+   - Context: 8192 tokens
+"""
+```
+
+### 5. Code Comments
+
+Add dimension information to provider implementations:
+
+```python
+class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
+    """
+    OpenAI cloud embedding provider.
+
+    Supported models:
+    - text-embedding-3-large: 3072 dimensions, highest quality
+    - text-embedding-3-small: 1536 dimensions, cost-effective
+    - text-embedding-ada-002: 1536 dimensions, legacy
+    """
+
+    def get_dimension(self) -> int:
+        """Get embedding dimension for OpenAI model"""
+        dimensions = {
+            "text-embedding-3-large": 3072,   # Latest, highest quality
+            "text-embedding-3-small": 1536,   # Cost-effective
+            "text-embedding-ada-002": 1536,   # Legacy model
+        }
+        return dimensions.get(self.model, 1536)
+
+
+class LMStudioEmbeddingProvider(BaseEmbeddingProvider):
+    """
+    LM Studio local embedding provider.
+
+    Supported models:
+    - jina-embeddings-v4-text-retrieval: 1024 dimensions, 137M params (RECOMMENDED)
+    - text-embedding-qwen3-embedding-8b: 1024 dimensions, 8B params (highest quality)
+    - nomic-embed-text-v1.5: 768 dimensions, 137M params (fallback)
+    """
+
+    def get_dimension(self) -> int:
+        """Get embedding dimension for LM Studio model"""
+        dimensions = {
+            "jina-embeddings-v4-text-retrieval": 1024,  # Default
+            "text-embedding-qwen3-embedding-8b": 1024,  # High quality
+            "nomic-embed-text-v1.5": 768,               # Fallback
+            "nomic-embed-text-v1": 768,                 # Legacy
+            "all-minilm-l6-v2": 384,                    # Small/fast
+        }
+        return dimensions.get(self.model, 768)  # Default to 768
+```
+
+## Implementation Steps
+
+### Phase 1: README.md (30 minutes)
+
+[ ] Add "Embedding Models" section after Quick Setup
+[ ] Create model comparison table
+[ ] Add dimension specifications for all models
+[ ] Add configuration examples with dimensions
+[ ] Include download instructions for LM Studio
+
+### Phase 2: .env.example (30 minutes)
+
+[ ] Update OpenAI section with full specs
+[ ] Update LM Studio section with full specs
+[ ] Add dimension specifications for each model
+[ ] Add notes about dimension importance
+[ ] Add notes about Qdrant compatibility
+
+### Phase 3: INSTALLATION.txt (1 hour)
+
+[ ] Add "Embedding Model Comparison" section
+[ ] Create comprehensive comparison table
+[ ] Add dimension considerations section
+[ ] Document migration between dimensions
+[ ] Add LM Studio download instructions with model specs
+
+### Phase 4: Task Files (30 minutes)
+
+[ ] Update task-10 with full model specs
+[ ] Update task-11 with dimension information
+[ ] Add specifications to code examples
+[ ] Document dimension detection logic
+
+### Phase 5: Code Comments (30 minutes)
+
+[ ] Add dimension specs to OpenAIEmbeddingProvider
+[ ] Add dimension specs to LMStudioEmbeddingProvider
+[ ] Update get_dimension() documentation
+[ ] Add dimension validation logic
+
+### Phase 6: Verification (30 minutes)
+
+[ ] Verify all specifications are accurate
+[ ] Test dimension detection works
+[ ] Verify documentation is consistent
+[ ] Check all files have been updated
+
+## Files to Update
+
+- `README.md` - Add embedding models section
+- `.env.example` - Add full specifications
+- `INSTALLATION.txt` - Add comparison table
+- `tasks/251104-task-10-lmstudio-embedding-support.txt` - Add specs
+- `tasks/251104-task-11-embedding-wrapper-module.txt` - Add dimension info
+- `src/core/c1_embeddings_providers.py` (when created) - Add code comments
+
+## Verification Checklist
+
+[ ] All model dimensions documented
+[ ] All model sizes (parameters) documented
+[ ] All file sizes documented
+[ ] OpenAI models have cost information
+[ ] LM Studio models have download info
+[ ] Dimension importance explained
+[ ] Qdrant compatibility notes added
+[ ] Migration between dimensions documented
+[ ] Code comments include specifications
+[ ] Documentation is consistent across all files
+
+## Acceptance Criteria
+
+1. ✅ Every embedding model has dimension documented
+2. ✅ Every local model has size (parameters) documented
+3. ✅ Every local model has file size documented
+4. ✅ README.md has comparison table
+5. ✅ .env.example has full specifications
+6. ✅ INSTALLATION.txt has detailed comparison
+7. ✅ Task files reference correct dimensions
+8. ✅ Code comments include specifications
+9. ✅ Documentation is consistent everywhere
+
+## Priority
+
+MEDIUM - Important for user understanding and Qdrant configuration
+
+## Estimated Time
+
+3-4 hours
+
+## Dependencies
+
+None - pure documentation task
+
+## Notes
+
+- Dimension mismatches are a common source of runtime errors
+- Users need this info to configure Qdrant collections correctly
+- Can't mix models with different dimensions
+- Model size affects download time and disk usage
+- File size important for deployment planning

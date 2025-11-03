@@ -72,6 +72,15 @@
     - Register pytest custom markers (integration, slow, unit)
     - See: tasks/251104-task-12-fix-deprecation-warnings.txt
 
+[ ] Document embedding model specifications everywhere
+    - Add to README.md: Model name, size, embedding dimensionality
+    - Add to .env.example: Full model specs for each option
+    - Add to INSTALLATION.txt: Model comparison table
+    - Add to task files: Dimension specs for each model
+    - Include: exact model name, model size (parameters), embedding dimension
+    - Example format: "jina-embeddings-v4-text-retrieval (137M params, 1024-dim)"
+    - Document all supported models: Jina v4, Qwen3-8B, Nomic v1.5, OpenAI models
+
 ## Immediate Actions
 
 [DONE] Fix pip install dependency issues
