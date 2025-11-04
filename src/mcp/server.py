@@ -40,6 +40,7 @@ from src.c3_websocket_routes import create_websocket_router
 from src.c3_messaging_routes import create_messaging_router
 from src.c3_task_routes import create_task_router
 from src.c3_memory_routes import create_memory_router
+from src.c3_agent_routes import create_agent_router
 
 logger = logging.getLogger(__name__)
 
@@ -679,6 +680,7 @@ async def startup_event():
     app.include_router(create_messaging_router(server_state))
     app.include_router(create_task_router(server_state, process_queue))
     app.include_router(create_memory_router(server_state))
+    app.include_router(create_agent_router(server_state, process_queue))
 
     # Load phases if folder is specified
     import os
@@ -3356,536 +3358,537 @@ async def get_commit_diff_endpoint(
 #     except Exception as e:
 #         logger.error(f"Failed to fetch workflows: {e}")
 #         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/terminate_agent")
-async def terminate_agent_endpoint(
-    agent_id: str = Body(..., embed=True),
-    reason: str = Body(default="Manual termination", embed=True),
-):
-    """Manually terminate an agent from the UI.
-
-    This endpoint allows users to forcefully terminate running agents.
-    After termination, the queue is processed to start the next queued task if any.
-    """
-    logger.info(f"Manual termination request for agent {agent_id}: {reason}")
-
-    try:
-        session = server_state.db_manager.get_session()
-        try:
-            # Verify agent exists
-            agent = session.query(Agent).filter_by(id=agent_id).first()
-            if not agent:
-                raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-
-            if agent.status == "terminated":
-                raise HTTPException(status_code=400, detail=f"Agent {agent_id} is already terminated")
-
-            # Get the agent's task if any
-            task = None
-            if agent.current_task_id:
-                task = session.query(Task).filter_by(id=agent.current_task_id).first()
-
-            # Terminate the agent and mark task as failed
-            await server_state.agent_manager.terminate_agent(agent_id)
-
-            if task:
-                task.status = "failed"
-                task.failure_reason = f"Manually terminated: {reason}"
-                task.completed_at = datetime.utcnow()
-                session.commit()
-
-        finally:
-            session.close()
-
-        # Process queue after termination
-        await process_queue()
-
-        # Broadcast update
-        await server_state.broadcast_update({
-            "type": "agent_terminated_manually",
-            "agent_id": agent_id,
-            "reason": reason,
-        })
-
-        return {"success": True, "message": f"Agent {agent_id[:8]} terminated successfully"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to terminate agent {agent_id}: {e}")
-#         raise HTTPException(status_code=500, detail=str(e))
+# EXTRACTED TO: src/c3_agent_routes/agent_routes.py
 # 
 # 
-# @app.post("/api/bump_task_priority")
-# async def bump_task_priority_endpoint(
-#     task_id: str = Body(..., embed=True),
+# @app.post("/api/terminate_agent")
+# async def terminate_agent_endpoint(
+#     agent_id: str = Body(..., embed=True),
+#     reason: str = Body(default="Manual termination", embed=True),
 # ):
-#     """Bump a queued task and start it immediately, bypassing the agent limit.
+#     """Manually terminate an agent from the UI.
 # 
-#     This allows urgent tasks to start even when at max capacity (e.g., 2/2 → 3/2).
-#     When agents complete, the system returns to the configured limit.
+#     This endpoint allows users to forcefully terminate running agents.
+#     After termination, the queue is processed to start the next queued task if any.
 #     """
-#     logger.info(f"Priority bump & start request for task {task_id}")
+#     logger.info(f"Manual termination request for agent {agent_id}: {reason}")
 # 
 #     try:
 #         session = server_state.db_manager.get_session()
 #         try:
-#             # Verify task exists and is queued
-#             task = session.query(Task).filter_by(id=task_id).first()
-#             if not task:
-#                 raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+#             # Verify agent exists
+#             agent = session.query(Agent).filter_by(id=agent_id).first()
+#             if not agent:
+#                 raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
 # 
-#             if task.status != "queued":
-#                 raise HTTPException(
-#                     status_code=400,
-#                     detail=f"Task {task_id} is not queued (status: {task.status})"
-#                 )
+#             if agent.status == "terminated":
+#                 raise HTTPException(status_code=400, detail=f"Agent {agent_id} is already terminated")
 # 
-#         finally:
-#             session.close()
+#             # Get the agent's task if any
+#             task = None
+#             if agent.current_task_id:
+#                 task = session.query(Task).filter_by(id=agent.current_task_id).first()
 # 
-#         # Boost the task priority first
-#         success = server_state.queue_service.boost_task_priority(task_id)
-#         if not success:
-#             raise HTTPException(status_code=500, detail="Failed to boost task priority")
+#             # Terminate the agent and mark task as failed
+#             await server_state.agent_manager.terminate_agent(agent_id)
 # 
-#         # Dequeue and start immediately (bypassing limit)
-#         session = server_state.db_manager.get_session()
-#         try:
-#             task = session.query(Task).filter_by(id=task_id).first()
-# 
-#             # Dequeue the task
-#             server_state.queue_service.dequeue_task(task_id)
-# 
-#             # Get project context
-#             project_context = await server_state.agent_manager.get_project_context()
-# 
-#             # Get phase context if applicable
-#             if task.phase_id and server_state.phase_manager:
-#                 phase_context = server_state.phase_manager.get_phase_context(task.phase_id)
-#                 if phase_context:
-#                     project_context = f"{project_context}\n\n{phase_context.to_prompt_context()}"
-# 
-#             # Retrieve relevant memories
-#             context_memories = await server_state.rag_system.retrieve_for_task(
-#                 task_description=task.enriched_description or task.raw_description,
-#                 requesting_agent_id="system",
-#             )
-# 
-#             # Determine working directory
-#             working_directory = None
-#             if task.phase_id:
-#                 from src.core.database import Phase
-#                 phase = session.query(Phase).filter_by(id=task.phase_id).first()
-#                 if phase and phase.working_directory:
-#                     working_directory = phase.working_directory
-#             if not working_directory:
-#                 working_directory = os.getcwd()
-# 
-#         finally:
-#             session.close()
-# 
-#         # Create agent immediately (bypassing agent limit)
-#         agent = await server_state.agent_manager.create_agent_for_task(
-#             task=task,
-#             enriched_data={"enriched_description": task.enriched_description},
-#             memories=context_memories,
-#             project_context=project_context,
-#             working_directory=working_directory,
-#         )
-# 
-#         # Update task status
-#         session = server_state.db_manager.get_session()
-#         try:
-#             task = session.query(Task).filter_by(id=task_id).first()
 #             if task:
-#                 task.assigned_agent_id = agent.id
-#                 task.status = "assigned"
-#                 task.started_at = datetime.utcnow()
+#                 task.status = "failed"
+#                 task.failure_reason = f"Manually terminated: {reason}"
+#                 task.completed_at = datetime.utcnow()
 #                 session.commit()
+# 
 #         finally:
 #             session.close()
 # 
+#         # Process queue after termination
+#         await process_queue()
+# 
 #         # Broadcast update
 #         await server_state.broadcast_update({
-#             "type": "task_priority_bumped",
-#             "task_id": task_id,
-#             "agent_id": agent.id,
+#             "type": "agent_terminated_manually",
+#             "agent_id": agent_id,
+#             "reason": reason,
 #         })
 # 
-#         logger.info(f"Task {task_id} bumped and agent {agent.id} created (bypassing limit)")
-# 
-#         return {
-#             "success": True,
-#             "message": f"Task {task_id[:8]} started immediately (bypassing agent limit)",
-#             "agent_id": agent.id,
-#         }
+#         return {"success": True, "message": f"Agent {agent_id[:8]} terminated successfully"}
 # 
 #     except HTTPException:
 #         raise
 #     except Exception as e:
-#         logger.error(f"Failed to bump and start task: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+#         logger.error(f"Failed to terminate agent {agent_id}: {e}")
+# #         raise HTTPException(status_code=500, detail=str(e))
+# # 
+# # 
+# # @app.post("/api/bump_task_priority")
+# # async def bump_task_priority_endpoint(
+# #     task_id: str = Body(..., embed=True),
+# # ):
+# #     """Bump a queued task and start it immediately, bypassing the agent limit.
+# # 
+# #     This allows urgent tasks to start even when at max capacity (e.g., 2/2 → 3/2).
+# #     When agents complete, the system returns to the configured limit.
+# #     """
+# #     logger.info(f"Priority bump & start request for task {task_id}")
+# # 
+# #     try:
+# #         session = server_state.db_manager.get_session()
+# #         try:
+# #             # Verify task exists and is queued
+# #             task = session.query(Task).filter_by(id=task_id).first()
+# #             if not task:
+# #                 raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+# # 
+# #             if task.status != "queued":
+# #                 raise HTTPException(
+# #                     status_code=400,
+# #                     detail=f"Task {task_id} is not queued (status: {task.status})"
+# #                 )
+# # 
+# #         finally:
+# #             session.close()
+# # 
+# #         # Boost the task priority first
+# #         success = server_state.queue_service.boost_task_priority(task_id)
+# #         if not success:
+# #             raise HTTPException(status_code=500, detail="Failed to boost task priority")
+# # 
+# #         # Dequeue and start immediately (bypassing limit)
+# #         session = server_state.db_manager.get_session()
+# #         try:
+# #             task = session.query(Task).filter_by(id=task_id).first()
+# # 
+# #             # Dequeue the task
+# #             server_state.queue_service.dequeue_task(task_id)
+# # 
+# #             # Get project context
+# #             project_context = await server_state.agent_manager.get_project_context()
+# # 
+# #             # Get phase context if applicable
+# #             if task.phase_id and server_state.phase_manager:
+# #                 phase_context = server_state.phase_manager.get_phase_context(task.phase_id)
+# #                 if phase_context:
+# #                     project_context = f"{project_context}\n\n{phase_context.to_prompt_context()}"
+# # 
+# #             # Retrieve relevant memories
+# #             context_memories = await server_state.rag_system.retrieve_for_task(
+# #                 task_description=task.enriched_description or task.raw_description,
+# #                 requesting_agent_id="system",
+# #             )
+# # 
+# #             # Determine working directory
+# #             working_directory = None
+# #             if task.phase_id:
+# #                 from src.core.database import Phase
+# #                 phase = session.query(Phase).filter_by(id=task.phase_id).first()
+# #                 if phase and phase.working_directory:
+# #                     working_directory = phase.working_directory
+# #             if not working_directory:
+# #                 working_directory = os.getcwd()
+# # 
+# #         finally:
+# #             session.close()
+# # 
+# #         # Create agent immediately (bypassing agent limit)
+# #         agent = await server_state.agent_manager.create_agent_for_task(
+# #             task=task,
+# #             enriched_data={"enriched_description": task.enriched_description},
+# #             memories=context_memories,
+# #             project_context=project_context,
+# #             working_directory=working_directory,
+# #         )
+# # 
+# #         # Update task status
+# #         session = server_state.db_manager.get_session()
+# #         try:
+# #             task = session.query(Task).filter_by(id=task_id).first()
+# #             if task:
+# #                 task.assigned_agent_id = agent.id
+# #                 task.status = "assigned"
+# #                 task.started_at = datetime.utcnow()
+# #                 session.commit()
+# #         finally:
+# #             session.close()
+# # 
+# #         # Broadcast update
+# #         await server_state.broadcast_update({
+# #             "type": "task_priority_bumped",
+# #             "task_id": task_id,
+# #             "agent_id": agent.id,
+# #         })
+# # 
+# #         logger.info(f"Task {task_id} bumped and agent {agent.id} created (bypassing limit)")
+# # 
+# #         return {
+# #             "success": True,
+# #             "message": f"Task {task_id[:8]} started immediately (bypassing agent limit)",
+# #             "agent_id": agent.id,
+# #         }
+# # 
+# #     except HTTPException:
+# #         raise
+# #     except Exception as e:
+# #         logger.error(f"Failed to bump and start task: {e}")
+#         import traceback
+#         logger.error(traceback.format_exc())
+# #         raise HTTPException(status_code=500, detail=str(e))
+# # 
+# # 
+# # @app.post("/api/cancel_queued_task")
+# # async def cancel_queued_task_endpoint(
+# #     task_id: str = Body(..., embed=True),
+# # ):
+# #     """Cancel a queued task and remove it from the queue.
+# # 
+# #     The task will be marked as failed and removed from the queue.
+# #     """
+# #     logger.info(f"Cancel request for queued task {task_id}")
+# # 
+# #     try:
+# #         session = server_state.db_manager.get_session()
+# #         try:
+# #             # Verify task exists and is queued
+# #             task = session.query(Task).filter_by(id=task_id).first()
+# #             if not task:
+# #                 raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+# # 
+# #             if task.status != "queued":
+# #                 raise HTTPException(
+# #                     status_code=400,
+# #                     detail=f"Task {task_id} is not queued (status: {task.status})"
+# #                 )
+# # 
+# #             # Mark task as failed
+# #             task.status = "failed"
+# #             task.failure_reason = "Cancelled by user from queue"
+# #             task.completed_at = datetime.utcnow()
+# #             session.commit()
+# # 
+# #         finally:
+# #             session.close()
+# # 
+# #         # Remove from queue
+# #         server_state.queue_service.dequeue_task(task_id)
+# # 
+# #         # Broadcast update
+# #         await server_state.broadcast_update({
+# #             "type": "task_cancelled",
+# #             "task_id": task_id,
+# #         })
+# # 
+# #         logger.info(f"Task {task_id} cancelled and removed from queue")
+# # 
+# #         return {
+# #             "success": True,
+# #             "message": f"Task {task_id[:8]} cancelled and removed from queue",
+# #         }
+# # 
+# #     except HTTPException:
+# #         raise
+# #     except Exception as e:
+# #         logger.error(f"Failed to cancel queued task: {e}")
+#         import traceback
+#         logger.error(traceback.format_exc())
+# #         raise HTTPException(status_code=500, detail=str(e))
+# # 
+# # 
+# # @app.post("/api/restart_task")
+# # async def restart_task_endpoint(
+# #     task_id: str = Body(..., embed=True),
+# # ):
+# #     """Restart a completed or failed task.
+# # 
+# #     This will:
+# #     - Clear completion data (failure_reason, completion_notes, completed_at)
+# #     - Clear trajectory data (guardian analyses, steering interventions)
+# #     - Reset task to pending/queued status
+# #     - Create new agent or queue based on capacity
+# #     """
+# #     logger.info(f"Restart request for task {task_id}")
+# # 
+# #     try:
+# #         session = server_state.db_manager.get_session()
+# #         try:
+# #             # Verify task exists and is done/failed
+# #             task = session.query(Task).filter_by(id=task_id).first()
+# #             if not task:
+# #                 raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+# # 
+# #             if task.status not in ["done", "failed"]:
+# #                 raise HTTPException(
+# #                     status_code=400,
+# #                     detail=f"Can only restart completed or failed tasks (current status: {task.status})"
+# #                 )
+# # 
+# #             # Get agent ID before clearing (to delete trajectory data)
+# #             old_agent_id = task.assigned_agent_id
+# # 
+# #             # Clear completion data
+# #             task.status = "pending"
+# #             task.assigned_agent_id = None
+# #             task.started_at = None
+# #             task.completed_at = None
+# #             task.completion_notes = None
+# #             task.failure_reason = None
+# #             session.commit()
+# # 
+# #         finally:
+# #             session.close()
+# # 
+# #         # Clear trajectory data for old agent
+# #         if old_agent_id:
+# #             session = server_state.db_manager.get_session()
+# #             try:
+# #                 from src.core.database import GuardianAnalysis, SteeringIntervention
+# # 
+# #                 # Delete guardian analyses
+# #                 session.query(GuardianAnalysis).filter_by(agent_id=old_agent_id).delete()
+# # 
+# #                 # Delete steering interventions
+# #                 session.query(SteeringIntervention).filter_by(agent_id=old_agent_id).delete()
+# # 
+# #                 session.commit()
+# #                 logger.info(f"Cleared trajectory data for agent {old_agent_id}")
+# # 
+# #             finally:
+# #                 session.close()
+# # 
+# #         # Check if we should queue or create agent immediately
+# #         should_queue = server_state.queue_service.should_queue_task()
+# # 
+# #         if should_queue:
+# #             # Queue the task
+# #             server_state.queue_service.enqueue_task(task_id)
+# #             logger.info(f"Task {task_id} restarted and queued")
+# # 
+# #             # Broadcast update
+# #             await server_state.broadcast_update({
+# #                 "type": "task_restarted",
+# #                 "task_id": task_id,
+# #                 "status": "queued",
+# #             })
+# # 
+# #             return {
+# #                 "success": True,
+# #                 "message": f"Task {task_id[:8]} restarted and added to queue",
+# #                 "status": "queued",
+# #             }
+# #         else:
+# #             # Create agent immediately
+# #             session = server_state.db_manager.get_session()
+# #             try:
+# #                 task = session.query(Task).filter_by(id=task_id).first()
+# # 
+# #                 # Get project context
+# #                 project_context = await server_state.agent_manager.get_project_context()
+# # 
+# #                 # Get phase context if applicable
+# #                 if task.phase_id and server_state.phase_manager:
+# #                     phase_context = server_state.phase_manager.get_phase_context(task.phase_id)
+# #                     if phase_context:
+# #                         project_context = f"{project_context}\n\n{phase_context.to_prompt_context()}"
+# # 
+# #                 # Retrieve relevant memories
+# #                 context_memories = await server_state.rag_system.retrieve_for_task(
+# #                     task_description=task.enriched_description or task.raw_description,
+# #                     requesting_agent_id="system",
+# #                 )
+# # 
+# #                 # Determine working directory
+# #                 working_directory = None
+# #                 if task.phase_id:
+# #                     from src.core.database import Phase
+# #                     phase = session.query(Phase).filter_by(id=task.phase_id).first()
+# #                     if phase and phase.working_directory:
+# #                         working_directory = phase.working_directory
+# #                 if not working_directory:
+# #                     working_directory = os.getcwd()
+# # 
+# #             finally:
+# #                 session.close()
+# # 
+# #             # Create agent for the task
+# #             agent = await server_state.agent_manager.create_agent_for_task(
+# #                 task=task,
+# #                 enriched_data={"enriched_description": task.enriched_description},
+# #                 memories=context_memories,
+# #                 project_context=project_context,
+# #                 working_directory=working_directory,
+# #             )
+# # 
+# #             # Update task status
+# #             session = server_state.db_manager.get_session()
+# #             try:
+# #                 task = session.query(Task).filter_by(id=task_id).first()
+# #                 if task:
+# #                     task.assigned_agent_id = agent.id
+# #                     task.status = "assigned"
+# #                     task.started_at = datetime.utcnow()
+# #                     session.commit()
+# #             finally:
+# #                 session.close()
+# # 
+# #             logger.info(f"Task {task_id} restarted with new agent {agent.id}")
+# # 
+# #             # Broadcast update
+# #             await server_state.broadcast_update({
+# #                 "type": "task_restarted",
+# #                 "task_id": task_id,
+# #                 "agent_id": agent.id,
+# #                 "status": "assigned",
+# #             })
+# # 
+# #             return {
+# #                 "success": True,
+# #                 "message": f"Task {task_id[:8]} restarted with new agent",
+# #                 "agent_id": agent.id,
+# #                 "status": "assigned",
+# #             }
+# # 
+# #     except HTTPException:
+# #         raise
+# #     except Exception as e:
+# #         logger.error(f"Failed to restart task: {e}")
+#         import traceback
+#         logger.error(traceback.format_exc())
 #         raise HTTPException(status_code=500, detail=str(e))
 # 
 # 
-# @app.post("/api/cancel_queued_task")
-# async def cancel_queued_task_endpoint(
-#     task_id: str = Body(..., embed=True),
+# # EXTRACTED TO: src/c3_queue_routes/queue_routes.py
+# # @app.get("/api/queue_status")
+# # async def get_queue_status_endpoint():
+# #     """Get current queue status information.
+# #
+# #     Returns information about active agents, queued tasks, and available slots.
+# #     """
+# #     try:
+# #         status = server_state.queue_service.get_queue_status()
+# #         return status
+# #     except Exception as e:
+# #         logger.error(f"Failed to get queue status: {e}")
+# #         raise HTTPException(status_code=500, detail=str(e))
+# 
+# 
+# @app.get("/agent_status")
+# async def get_agent_status(
+#     agent_id: Optional[str] = None,
+#     requesting_agent_id: str = Header(None, alias="X-Agent-ID"),
 # ):
-#     """Cancel a queued task and remove it from the queue.
-# 
-#     The task will be marked as failed and removed from the queue.
-#     """
-#     logger.info(f"Cancel request for queued task {task_id}")
-# 
+#     """Get status of specific agent or all agents."""
 #     try:
 #         session = server_state.db_manager.get_session()
-#         try:
-#             # Verify task exists and is queued
-#             task = session.query(Task).filter_by(id=task_id).first()
-#             if not task:
-#                 raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 # 
-#             if task.status != "queued":
-#                 raise HTTPException(
-#                     status_code=400,
-#                     detail=f"Task {task_id} is not queued (status: {task.status})"
-#                 )
+#         if agent_id:
+#             agent = session.query(Agent).filter_by(id=agent_id).first()
+#             if not agent:
+#                 raise HTTPException(status_code=404, detail="Agent not found")
 # 
-#             # Mark task as failed
-#             task.status = "failed"
-#             task.failure_reason = "Cancelled by user from queue"
-#             task.completed_at = datetime.utcnow()
-#             session.commit()
-# 
-#         finally:
-#             session.close()
-# 
-#         # Remove from queue
-#         server_state.queue_service.dequeue_task(task_id)
-# 
-#         # Broadcast update
-#         await server_state.broadcast_update({
-#             "type": "task_cancelled",
-#             "task_id": task_id,
-#         })
-# 
-#         logger.info(f"Task {task_id} cancelled and removed from queue")
-# 
-#         return {
-#             "success": True,
-#             "message": f"Task {task_id[:8]} cancelled and removed from queue",
-#         }
-# 
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         logger.error(f"Failed to cancel queued task: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-#         raise HTTPException(status_code=500, detail=str(e))
-# 
-# 
-# @app.post("/api/restart_task")
-# async def restart_task_endpoint(
-#     task_id: str = Body(..., embed=True),
-# ):
-#     """Restart a completed or failed task.
-# 
-#     This will:
-#     - Clear completion data (failure_reason, completion_notes, completed_at)
-#     - Clear trajectory data (guardian analyses, steering interventions)
-#     - Reset task to pending/queued status
-#     - Create new agent or queue based on capacity
-#     """
-#     logger.info(f"Restart request for task {task_id}")
-# 
-#     try:
-#         session = server_state.db_manager.get_session()
-#         try:
-#             # Verify task exists and is done/failed
-#             task = session.query(Task).filter_by(id=task_id).first()
-#             if not task:
-#                 raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-# 
-#             if task.status not in ["done", "failed"]:
-#                 raise HTTPException(
-#                     status_code=400,
-#                     detail=f"Can only restart completed or failed tasks (current status: {task.status})"
-#                 )
-# 
-#             # Get agent ID before clearing (to delete trajectory data)
-#             old_agent_id = task.assigned_agent_id
-# 
-#             # Clear completion data
-#             task.status = "pending"
-#             task.assigned_agent_id = None
-#             task.started_at = None
-#             task.completed_at = None
-#             task.completion_notes = None
-#             task.failure_reason = None
-#             session.commit()
-# 
-#         finally:
-#             session.close()
-# 
-#         # Clear trajectory data for old agent
-#         if old_agent_id:
-#             session = server_state.db_manager.get_session()
-#             try:
-#                 from src.core.database import GuardianAnalysis, SteeringIntervention
-# 
-#                 # Delete guardian analyses
-#                 session.query(GuardianAnalysis).filter_by(agent_id=old_agent_id).delete()
-# 
-#                 # Delete steering interventions
-#                 session.query(SteeringIntervention).filter_by(agent_id=old_agent_id).delete()
-# 
-#                 session.commit()
-#                 logger.info(f"Cleared trajectory data for agent {old_agent_id}")
-# 
-#             finally:
-#                 session.close()
-# 
-#         # Check if we should queue or create agent immediately
-#         should_queue = server_state.queue_service.should_queue_task()
-# 
-#         if should_queue:
-#             # Queue the task
-#             server_state.queue_service.enqueue_task(task_id)
-#             logger.info(f"Task {task_id} restarted and queued")
-# 
-#             # Broadcast update
-#             await server_state.broadcast_update({
-#                 "type": "task_restarted",
-#                 "task_id": task_id,
-#                 "status": "queued",
-#             })
-# 
-#             return {
-#                 "success": True,
-#                 "message": f"Task {task_id[:8]} restarted and added to queue",
-#                 "status": "queued",
+#             result = {
+#                 "id": agent.id,
+#                 "status": agent.status,
+#                 "current_task_id": agent.current_task_id,
+#                 "last_activity": agent.last_activity.isoformat() if agent.last_activity else None,
+#                 "health_check_failures": agent.health_check_failures,
 #             }
 #         else:
-#             # Create agent immediately
-#             session = server_state.db_manager.get_session()
-#             try:
-#                 task = session.query(Task).filter_by(id=task_id).first()
+#             # Get all active agents
+#             agents = session.query(Agent).filter(
+#                 Agent.status != "terminated"
+#             ).all()
 # 
-#                 # Get project context
-#                 project_context = await server_state.agent_manager.get_project_context()
+#             result = [
+#                 {
+#                     "id": agent.id,
+#                     "status": agent.status,
+#                     "current_task_id": agent.current_task_id,
+#                     "last_activity": agent.last_activity.isoformat() if agent.last_activity else None,
+#                 }
+#                 for agent in agents
+#             ]
 # 
-#                 # Get phase context if applicable
-#                 if task.phase_id and server_state.phase_manager:
-#                     phase_context = server_state.phase_manager.get_phase_context(task.phase_id)
-#                     if phase_context:
-#                         project_context = f"{project_context}\n\n{phase_context.to_prompt_context()}"
-# 
-#                 # Retrieve relevant memories
-#                 context_memories = await server_state.rag_system.retrieve_for_task(
-#                     task_description=task.enriched_description or task.raw_description,
-#                     requesting_agent_id="system",
-#                 )
-# 
-#                 # Determine working directory
-#                 working_directory = None
-#                 if task.phase_id:
-#                     from src.core.database import Phase
-#                     phase = session.query(Phase).filter_by(id=task.phase_id).first()
-#                     if phase and phase.working_directory:
-#                         working_directory = phase.working_directory
-#                 if not working_directory:
-#                     working_directory = os.getcwd()
-# 
-#             finally:
-#                 session.close()
-# 
-#             # Create agent for the task
-#             agent = await server_state.agent_manager.create_agent_for_task(
-#                 task=task,
-#                 enriched_data={"enriched_description": task.enriched_description},
-#                 memories=context_memories,
-#                 project_context=project_context,
-#                 working_directory=working_directory,
-#             )
-# 
-#             # Update task status
-#             session = server_state.db_manager.get_session()
-#             try:
-#                 task = session.query(Task).filter_by(id=task_id).first()
-#                 if task:
-#                     task.assigned_agent_id = agent.id
-#                     task.status = "assigned"
-#                     task.started_at = datetime.utcnow()
-#                     session.commit()
-#             finally:
-#                 session.close()
-# 
-#             logger.info(f"Task {task_id} restarted with new agent {agent.id}")
-# 
-#             # Broadcast update
-#             await server_state.broadcast_update({
-#                 "type": "task_restarted",
-#                 "task_id": task_id,
-#                 "agent_id": agent.id,
-#                 "status": "assigned",
-#             })
-# 
-#             return {
-#                 "success": True,
-#                 "message": f"Task {task_id[:8]} restarted with new agent",
-#                 "agent_id": agent.id,
-#                 "status": "assigned",
-#             }
+#         session.close()
+#         return result
 # 
 #     except HTTPException:
 #         raise
 #     except Exception as e:
-#         logger.error(f"Failed to restart task: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# EXTRACTED TO: src/c3_queue_routes/queue_routes.py
-# @app.get("/api/queue_status")
-# async def get_queue_status_endpoint():
-#     """Get current queue status information.
-#
-#     Returns information about active agents, queued tasks, and available slots.
-#     """
-#     try:
-#         status = server_state.queue_service.get_queue_status()
-#         return status
-#     except Exception as e:
-#         logger.error(f"Failed to get queue status: {e}")
+#         logger.error(f"Failed to get agent status: {e}")
 #         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/agent_status")
-async def get_agent_status(
-    agent_id: Optional[str] = None,
-    requesting_agent_id: str = Header(None, alias="X-Agent-ID"),
-):
-    """Get status of specific agent or all agents."""
-    try:
-        session = server_state.db_manager.get_session()
-
-        if agent_id:
-            agent = session.query(Agent).filter_by(id=agent_id).first()
-            if not agent:
-                raise HTTPException(status_code=404, detail="Agent not found")
-
-            result = {
-                "id": agent.id,
-                "status": agent.status,
-                "current_task_id": agent.current_task_id,
-                "last_activity": agent.last_activity.isoformat() if agent.last_activity else None,
-                "health_check_failures": agent.health_check_failures,
-            }
-        else:
-            # Get all active agents
-            agents = session.query(Agent).filter(
-                Agent.status != "terminated"
-            ).all()
-
-            result = [
-                {
-                    "id": agent.id,
-                    "status": agent.status,
-                    "current_task_id": agent.current_task_id,
-                    "last_activity": agent.last_activity.isoformat() if agent.last_activity else None,
-                }
-                for agent in agents
-            ]
-
-        session.close()
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get agent status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/task_progress")
-async def get_task_progress(
-    task_id: Optional[str] = None,
-    requesting_agent_id: str = Header(None, alias="X-Agent-ID"),
-):
-    """Get progress of specific task or all active tasks."""
-    try:
-        session = server_state.db_manager.get_session()
-
-        if task_id:
-            task = session.query(Task).filter_by(id=task_id).first()
-            if not task:
-                raise HTTPException(status_code=404, detail="Task not found")
-
-            result = {
-                "id": task.id,
-                "status": task.status,
-                "description": task.enriched_description or task.raw_description,
-                "assigned_agent_id": task.assigned_agent_id,
-                "started_at": task.started_at.isoformat() if task.started_at else None,
-                "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-                "phase_id": task.phase_id,
-                "workflow_id": task.workflow_id,
-            }
-
-            # Add phase information if available
-            if task.phase_id:
-                phase = session.query(Phase).filter_by(id=task.phase_id).first()
-                if phase:
-                    result["phase_name"] = phase.name
-                    result["phase_order"] = phase.order
-        else:
-            # Get all active tasks
-            tasks = session.query(Task).filter(
-                Task.status.in_(["pending", "assigned", "in_progress"])
-            ).all()
-
-            result = []
-            for task in tasks:
-                task_data = {
-                    "id": task.id,
-                    "status": task.status,
-                    "description": (task.enriched_description or task.raw_description)[:200],
-                    "assigned_agent_id": task.assigned_agent_id,
-                    "phase_id": task.phase_id,
-                    "workflow_id": task.workflow_id,
-                }
-
-                # Add phase information if available
-                if task.phase_id:
-                    phase = session.query(Phase).filter_by(id=task.phase_id).first()
-                    if phase:
-                        task_data["phase_name"] = phase.name
-                        task_data["phase_order"] = phase.order
-
-                result.append(task_data)
-
-        session.close()
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get task progress: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# EXTRACTED TO: src/c3_websocket_routes/websocket_routes.py
-# # WebSocket endpoint for real-time updates
-# @app.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     """WebSocket endpoint for real-time updates."""
-#     await websocket.accept()
+# 
+# 
+# @app.get("/task_progress")
+# async def get_task_progress(
+#     task_id: Optional[str] = None,
+#     requesting_agent_id: str = Header(None, alias="X-Agent-ID"),
+# ):
+#     """Get progress of specific task or all active tasks."""
+#     try:
+#         session = server_state.db_manager.get_session()
+# 
+#         if task_id:
+#             task = session.query(Task).filter_by(id=task_id).first()
+#             if not task:
+#                 raise HTTPException(status_code=404, detail="Task not found")
+# 
+#             result = {
+#                 "id": task.id,
+#                 "status": task.status,
+#                 "description": task.enriched_description or task.raw_description,
+#                 "assigned_agent_id": task.assigned_agent_id,
+#                 "started_at": task.started_at.isoformat() if task.started_at else None,
+#                 "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+#                 "phase_id": task.phase_id,
+#                 "workflow_id": task.workflow_id,
+#             }
+# 
+#             # Add phase information if available
+#             if task.phase_id:
+#                 phase = session.query(Phase).filter_by(id=task.phase_id).first()
+#                 if phase:
+#                     result["phase_name"] = phase.name
+#                     result["phase_order"] = phase.order
+#         else:
+#             # Get all active tasks
+#             tasks = session.query(Task).filter(
+#                 Task.status.in_(["pending", "assigned", "in_progress"])
+#             ).all()
+# 
+#             result = []
+#             for task in tasks:
+#                 task_data = {
+#                     "id": task.id,
+#                     "status": task.status,
+#                     "description": (task.enriched_description or task.raw_description)[:200],
+#                     "assigned_agent_id": task.assigned_agent_id,
+#                     "phase_id": task.phase_id,
+#                     "workflow_id": task.workflow_id,
+#                 }
+# 
+#                 # Add phase information if available
+#                 if task.phase_id:
+#                     phase = session.query(Phase).filter_by(id=task.phase_id).first()
+#                     if phase:
+#                         task_data["phase_name"] = phase.name
+#                         task_data["phase_order"] = phase.order
+# 
+#                 result.append(task_data)
+# 
+#         session.close()
+#         return result
+# 
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Failed to get task progress: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
+# 
+# 
+# # EXTRACTED TO: src/c3_websocket_routes/websocket_routes.py
+# # # WebSocket endpoint for real-time updates
+# # @app.websocket("/ws")
+# # async def websocket_endpoint(websocket: WebSocket):
+# #     """WebSocket endpoint for real-time updates."""
+# #     await websocket.accept()
 #     server_state.active_websockets.append(websocket)
 #
 #     try:
