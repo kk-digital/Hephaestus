@@ -15,74 +15,6 @@
 
 ---
 
-## ⚡ Quick Setup (First Time)
-
-**IMPORTANT:** After cloning the repository, you must configure your API keys before running Hephaestus.
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/kk-digital/Hephaestus.git
-cd Hephaestus
-
-# 2. Copy the environment template
-cp .env.example .env
-
-# 3. Edit .env with your actual API keys
-# Add your OpenAI, Anthropic, or other provider keys
-nano .env  # or use your preferred editor
-```
-
-**Why this step is required:**
-- `.env` contains your secret API keys and is **never committed to git** (it's in `.gitignore`)
-- `.env.example` is a template showing what configuration is needed
-- This is standard practice for projects with secrets - keeps your keys safe
-
-See [INSTALLATION.txt](INSTALLATION.txt) for complete setup instructions and troubleshooting.
-
----
-
-## 📊 Embedding Models
-
-Hephaestus supports multiple embedding providers for semantic search and vector operations.
-
-### OpenAI Embeddings (Cloud)
-
-| Model | Dimension | Cost | Quality | Use Case |
-|-------|-----------|------|---------|----------|
-| text-embedding-3-large | 3072 | $0.13/1M tokens | Highest | Production |
-| text-embedding-3-small | 1536 | $0.02/1M tokens | High | Cost-sensitive |
-| text-embedding-ada-002 | 1536 | $0.10/1M tokens | Good | Legacy |
-
-### LM Studio Embeddings (Local, Free) - VERIFIED WORKING
-
-| Model | Size | Dimension | Quality | Use Case |
-|-------|------|-----------|---------|----------|
-| text-embedding-qwen3-embedding-8b ⭐ | 8B | 4096 | ★★★★★ | **Best quality** |
-| text-embedding-qwen3-embedding-4b | 4B | 2560 | ★★★★ | High quality |
-| text-embedding-qwen3-embedding-0.6b | 600M | 1024 | ★★★★ | Good & fast |
-| text-embedding-nomic-embed-text-v1.5 | 137M | 768 | ★★★ | Reliable fallback |
-| text-embedding-granite-embedding-125m-english | 125M | 768 | ★★★ | Alternative |
-| text-embedding-embeddinggemma-300m-with-dense-modules | 300M | 768 | ★★★ | Alternative |
-
-⭐ **Recommended default for LM Studio** - Best quality with 4096 dimensions
-
-**Note:** `jina-embeddings-v4-text-retrieval` does NOT work in LM Studio (returns "Model is not embedding" error).
-
-**Configuration:**
-```bash
-# OpenAI
-EMBEDDING_PROVIDER=openai
-OPENAI_EMBEDDING_MODEL=text-embedding-3-large  # 3072-dim
-
-# LM Studio
-EMBEDDING_PROVIDER=lmstudio
-LMSTUDIO_EMBEDDING_MODEL=text-embedding-qwen3-embedding-8b  # 4096-dim (best quality)
-```
-
-All models have been verified working in LM Studio through actual testing.
-
----
-
 ## 🎥 See Hephaestus in Action
 
 <div align="center">
@@ -260,8 +192,26 @@ And **flexibility where you need it**:
 - **Git** - Your project must be a git repository
 - **Docker** - For running Qdrant vector store
 - **Node.js & npm** - For the frontend UI
-- **Claude Code** - AI coding assistant that agents run inside
+- **Claude Code**, **OpenCode**, **Droid**, or **Codex** - CLI AI tool that agents run inside
 - **API Keys**: OpenAI, OpenRouter, or Anthropic
+
+### Validate Your Setup (macOS)
+
+Before starting, validate that everything is installed and configured correctly:
+
+```bash
+python check_setup_macos.py
+```
+
+This script checks:
+- ✅ All required CLI tools (tmux, git, docker, node, npm, Claude Code)
+- ✅ API keys in `.env` file
+- ✅ MCP servers configured
+- ✅ Configuration files and working directory
+- ✅ Running services (Docker, Qdrant)
+- ✅ Python and frontend dependencies
+
+The script provides a color-coded report showing what's set up and what needs attention.
 
 ### Get Started in 10 Minutes
 
