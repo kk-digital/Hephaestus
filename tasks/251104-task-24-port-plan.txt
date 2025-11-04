@@ -1,0 +1,182 @@
+TASK-24 FUNCTIONAL CHANGES PORT PLAN
+====================================
+
+Date: 2025-11-04
+Total Modified Files: 30
+Strategy: Port functional changes from upstream into our layered structure
+
+## File Categorization
+
+### Category A: Already Ported (No Action - Shims Exist)
+These files we've already extracted to c1 layer - upstream changes go to c1 modules:
+
+1. src/core/database.py → c1_database_session/
+   - We extracted DatabaseManager, Base, get_db()
+   - Need to port any NEW functionality from upstream
+
+2. src/core/user_models.py → c1_user_models/
+   - We extracted 12 user models
+   - Need to port any NEW models or field changes from upstream
+
+3. src/core/worktree_manager.py → Used c1_worktree_enums/
+   - We extracted MergeStatus, CommitType enums
+   - File still in old location, need to check for functional changes beyond enum extraction
+
+4. src/monitoring/monitor.py → Uses c1_monitoring_enums/
+   - We extracted AgentState, MonitoringDecision enums
+   - File still in old location, need to check for functional changes
+
+5. src/monitoring/conductor.py → Uses c1_conductor_enums/
+   - We extracted ConductorState enum
+   - File still in old location, need to check for functional changes
+
+6. src/monitoring/guardian.py → Uses c1_guardian_enums/
+   - We extracted GuardianAction enum
+   - File still in old location, need to check for functional changes
+
+### Category B: Not Yet Refactored (Apply Directly)
+These files we haven't touched yet - apply upstream changes directly:
+
+7. src/agents/manager.py (not refactored)
+8. src/core/simple_config.py (not refactored)
+9. src/__init__.py (not refactored)
+10. src/interfaces/__init__.py (not refactored)
+11. src/interfaces/cli_interface.py (not refactored)
+12. src/interfaces/langchain_llm_client.py (not refactored)
+13. src/interfaces/llm_interface.py (not refactored)
+14. src/interfaces/multi_provider_llm.py (not refactored)
+15. src/mcp/api.py (not refactored)
+16. src/mcp/server.py (not refactored)
+17. src/sdk/process_manager.py (not refactored)
+18. src/services/ticket_service.py (not refactored)
+19. src/validation/__init__.py (not refactored)
+20. src/validation/check_executors.py (not refactored)
+
+### Category C: Non-Code Files (Accept Upstream)
+These are docs, config, scripts - take upstream version:
+
+21. pyproject.toml (EXCEPT: keep our pytest markers)
+22. README.md (accept upstream improvements)
+23. claude_mcp_client.py (accept upstream version)
+24. run_prd_workflow.py (accept upstream version)
+25. example_workflows/prd_to_software/phase_1_requirements_analysis.py (accept upstream)
+26. frontend/vite.config.ts (accept upstream)
+27. website/docs/getting-started/quick-start.md (accept upstream)
+28. website/docs/sdk/examples.md (accept upstream)
+29. website/docs/sdk/overview.md (accept upstream)
+30. website/sidebars.ts (accept upstream)
+
+## Port Execution Plan
+
+### Phase 1: Category A - Port to c1 Modules (6 files)
+
+**File 1: src/core/database.py**
+[ ] Check diff: git diff refactor/three-layer-architecture..upstream/main -- src/core/database.py
+[ ] Identify new functionality (beyond what we extracted)
+[ ] Port to c1_database_session/database_manager.py or base.py
+[ ] Update src/core/database.py shim if needed
+[ ] Test import compatibility
+[ ] Commit: "Port upstream database.py changes to c1_database_session"
+
+**File 2: src/core/user_models.py**
+[ ] Check diff for NEW models or field changes
+[ ] Port to c1_user_models/user.py
+[ ] Update shim if needed
+[ ] Test
+[ ] Commit: "Port upstream user_models.py changes to c1_user_models"
+
+**File 3: src/core/worktree_manager.py**
+[ ] Check diff for functional changes (beyond enum extraction)
+[ ] If significant, consider extracting to c2 layer
+[ ] If minor, apply to existing file
+[ ] Test
+[ ] Commit: "Port upstream worktree_manager.py functional changes"
+
+**File 4-6: Monitoring files (monitor.py, conductor.py, guardian.py)**
+[ ] Check diffs for functional changes (beyond enum extraction)
+[ ] Decide if logic should move to c2 layer
+[ ] For now, apply directly to existing files
+[ ] Test
+[ ] Commit: "Port upstream monitoring changes"
+
+### Phase 2: Category B - Apply Directly (14 files)
+
+**Batch 1: LLM/Interface Layer (8 files)**
+[ ] git checkout upstream/main -- src/interfaces/
+[ ] git checkout upstream/main -- src/agents/manager.py
+[ ] Test that multi-provider system works
+[ ] Commit: "Port upstream LLM interface improvements"
+
+**Batch 2: MCP Server (2 files)**
+[ ] git checkout upstream/main -- src/mcp/api.py src/mcp/server.py
+[ ] Test MCP server
+[ ] Commit: "Port upstream MCP server improvements"
+
+**Batch 3: Services and SDK (3 files)**
+[ ] git checkout upstream/main -- src/services/ticket_service.py
+[ ] git checkout upstream/main -- src/sdk/process_manager.py
+[ ] Test services
+[ ] Commit: "Port upstream service improvements"
+
+**Batch 4: Validation and Init (3 files)**
+[ ] git checkout upstream/main -- src/validation/
+[ ] git checkout upstream/main -- src/__init__.py src/core/simple_config.py
+[ ] Test
+[ ] Commit: "Port upstream validation and config improvements"
+
+### Phase 3: Category C - Non-Code Files (10 files)
+
+**Batch 1: Documentation (5 files)**
+[ ] git checkout upstream/main -- README.md
+[ ] git checkout upstream/main -- website/docs/
+[ ] git checkout upstream/main -- website/sidebars.ts
+[ ] Commit: "Port upstream documentation improvements"
+
+**Batch 2: Scripts and Examples (4 files)**
+[ ] git checkout upstream/main -- claude_mcp_client.py
+[ ] git checkout upstream/main -- run_prd_workflow.py
+[ ] git checkout upstream/main -- example_workflows/
+[ ] git checkout upstream/main -- frontend/vite.config.ts
+[ ] Test scripts work
+[ ] Commit: "Port upstream script and example improvements"
+
+**Batch 3: pyproject.toml (1 file - SPECIAL)**
+[ ] git checkout upstream/main -- pyproject.toml
+[ ] RESTORE our pytest markers:
+    markers = [
+        "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+        "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+        "unit: marks tests as unit tests",
+    ]
+[ ] Commit: "Port upstream pyproject.toml changes, keep our pytest markers"
+
+## Testing Strategy
+
+After each phase:
+1. Run pytest tests/ --ignore=tests/manual_validation_test.py
+2. Verify imports work (both old and new locations)
+3. Check no import errors
+4. Spot check key functionality
+
+## Risk Assessment
+
+**Low Risk (Phase 3)**: Documentation, examples, scripts
+**Medium Risk (Phase 2)**: Direct file replacements in unchanged modules
+**High Risk (Phase 1)**: Porting to c1 modules (requires analysis and careful merging)
+
+## Estimated Time
+
+- Phase 1 (6 files, high complexity): 2-3 hours
+- Phase 2 (14 files, medium complexity): 1-2 hours
+- Phase 3 (10 files, low complexity): 30 minutes
+- Testing throughout: 1 hour
+
+Total: 4.5-6.5 hours
+
+## Notes
+
+- Commit after each logical unit (file or batch)
+- Test after each commit
+- If tests fail, investigate before proceeding
+- Keep backward compatibility shims working
+- Document any deviations from upstream in commit messages
