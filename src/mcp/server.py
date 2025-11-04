@@ -35,6 +35,7 @@ from src.services.ticket_search_service import TicketSearchService
 # C3 Routes (Application Layer)
 from src.c3_health_routes import router as health_router
 from src.c3_queue_routes import create_queue_router
+from src.c3_workflow_routes import create_workflow_router
 
 logger = logging.getLogger(__name__)
 
@@ -669,6 +670,7 @@ async def startup_event():
     # Add c3 layer routes (extracted application layer)
     app.include_router(health_router)
     app.include_router(create_queue_router(server_state))
+    app.include_router(create_workflow_router(server_state))
 
     # Load phases if folder is specified
     import os
@@ -2345,18 +2347,19 @@ async def submit_result_validation(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/workflows/{workflow_id}/results")
-async def get_workflow_results(
-    workflow_id: str,
-    requesting_agent_id: str = Header(None, alias="X-Agent-ID"),
-):
-    """Get all results for a specific workflow."""
-    try:
-        results = WorkflowResultService.get_workflow_results(workflow_id)
-        return results
-    except Exception as e:
-        logger.error(f"Failed to get workflow results: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+# EXTRACTED TO: src/c3_workflow_routes/workflow_routes.py
+# @app.get("/workflows/{workflow_id}/results")
+# async def get_workflow_results(
+#     workflow_id: str,
+#     requesting_agent_id: str = Header(None, alias="X-Agent-ID"),
+# ):
+#     """Get all results for a specific workflow."""
+#     try:
+#         results = WorkflowResultService.get_workflow_results(workflow_id)
+#         return results
+#     except Exception as e:
+#         logger.error(f"Failed to get workflow results: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/broadcast_message", response_model=BroadcastMessageResponse)
@@ -3313,34 +3316,35 @@ async def get_commit_diff_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/workflows")
-async def get_workflows_endpoint(
-    agent_id: str = Header(..., alias="X-Agent-ID"),
-):
-    """Get all workflows."""
-    logger.info(f"Agent {agent_id} fetching workflows")
-
-    try:
-        session = server_state.db_manager.get_session()
-        try:
-            workflows = session.query(Workflow).all()
-
-            return [
-                {
-                    "id": w.id,
-                    "name": w.name,
-                    "status": w.status,
-                    "phases_folder_path": w.phases_folder_path,
-                    "created_at": w.created_at.isoformat() if w.created_at else None,
-                }
-                for w in workflows
-            ]
-        finally:
-            session.close()
-
-    except Exception as e:
-        logger.error(f"Failed to fetch workflows: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+# EXTRACTED TO: src/c3_workflow_routes/workflow_routes.py
+# @app.get("/api/workflows")
+# async def get_workflows_endpoint(
+#     agent_id: str = Header(..., alias="X-Agent-ID"),
+# ):
+#     """Get all workflows."""
+#     logger.info(f"Agent {agent_id} fetching workflows")
+#
+#     try:
+#         session = server_state.db_manager.get_session()
+#         try:
+#             workflows = session.query(Workflow).all()
+#
+#             return [
+#                 {
+#                     "id": w.id,
+#                     "name": w.name,
+#                     "status": w.status,
+#                     "phases_folder_path": w.phases_folder_path,
+#                     "created_at": w.created_at.isoformat() if w.created_at else None,
+#                 }
+#                 for w in workflows
+#             ]
+#         finally:
+#             session.close()
+#
+#     except Exception as e:
+#         logger.error(f"Failed to fetch workflows: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/terminate_agent")
