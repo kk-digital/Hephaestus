@@ -586,3 +586,10 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
 - Continue c3 layer extraction (routes/API)
 - Document three-layer architecture benefits
 
+**Dependency Fix (2025-11-04)**:
+✓ Fixed requirements.txt dependency conflict
+  - Added langchain-core>=1.0.0 to complete langchain dependencies
+  - Ensured requests>=2.32.5 (was causing conflict with langchain-community 0.4.1)
+  - Pip install now succeeds: All 449 tests collected successfully
+  - Commit: 11e972a
+
