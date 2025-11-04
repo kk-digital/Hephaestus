@@ -32,6 +32,9 @@ from src.services.ticket_service import TicketService
 from src.services.ticket_history_service import TicketHistoryService
 from src.services.ticket_search_service import TicketSearchService
 
+# C3 Routes (Application Layer)
+from src.c3_health_routes import router as health_router
+
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
@@ -661,6 +664,9 @@ async def startup_event():
 
     # Add authentication routes
     app.include_router(auth_router)
+
+    # Add c3 layer routes (extracted application layer)
+    app.include_router(health_router)
 
     # Load phases if folder is specified
     import os
@@ -3875,14 +3881,15 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info("WebSocket client disconnected")
 
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0",
-    }
+# EXTRACTED TO: src/c3_health_routes/health_routes.py
+# @app.get("/health")
+# async def health_check():
+#     """Health check endpoint."""
+#     return {
+#         "status": "healthy",
+#         "timestamp": datetime.utcnow().isoformat(),
+#         "version": "1.0.0",
+#     }
 
 
 # OAuth endpoints for MCP compatibility with Dynamic Client Registration
