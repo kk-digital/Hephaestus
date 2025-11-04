@@ -184,6 +184,19 @@
     - See planning docs: tasks/251104-task-{17,18,19,20}-*.txt
     - See report: reports/251104-module-structure-and-naming.txt
 
+[TODO] Task-22: Organize tests to match module structure
+    - Split tests/ directory into module-based structure
+    - Test organization pattern: tests/test-c{N}-{module}/
+    - Examples:
+      - tests/test-c1-agent-models/ (c1_agent_models tests)
+      - tests/test-c2-task-service/ (c2_task_service tests)
+      - tests/test-c3-task-routes/ (c3_task_routes tests)
+    - Integration tests: tests/integration-{module}/
+    - Unit tests: tests/unit-{module}/ or tests/test-c{N}-{module}/unit/
+    - Keep test structure mirroring source structure
+    - Move tests as modules are created during refactoring
+    - See: tasks/251101-task-04-test-organization.txt for original plan
+
 ## Immediate Actions
 
 [DONE] Fix pip install dependency issues
