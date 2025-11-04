@@ -1,16 +1,5 @@
 """API endpoints for the frontend dashboard."""
 
-# REFACTORING NOTE: This file will be split during three-layer architecture refactoring
-# See tasks/251104-task-19-file-mapping.txt for complete split plan
-#
-# DESTINATION MAPPING (api.py - 1,595 lines → 6 files):
-# - Dashboard data aggregation routes → c3_frontend_routes/dashboard_routes.py
-# - Task history/timeline routes → c3_frontend_routes/task_history_routes.py
-# - Agent status/metrics routes → c3_frontend_routes/agent_status_routes.py
-# - Workflow visualization routes → c3_frontend_routes/workflow_viz_routes.py
-# - Static file serving routes → c3_frontend_routes/static_routes.py
-# - Analytics/reporting routes → c3_frontend_routes/analytics_routes.py
-
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query

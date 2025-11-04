@@ -1,15 +1,5 @@
 """Service layer for managing tickets in the ticket tracking system."""
 
-# REFACTORING NOTE: This file will be split during three-layer architecture refactoring
-# See tasks/251104-task-19-file-mapping.txt for complete split plan
-#
-# DESTINATION MAPPING (ticket_service.py - 1,216 lines → 5 files):
-# - TicketService class (CRUD operations) → c2_ticket_service/ticket_service.py
-# - Ticket status transitions → c2_ticket_service/ticket_lifecycle.py
-# - Ticket search/filter logic → c2_ticket_service/ticket_search.py
-# - Ticket comments/history → c2_ticket_service/ticket_history.py
-# - Ticket-commit linking → c2_ticket_service/ticket_git_integration.py
-
 import uuid
 import json
 import logging

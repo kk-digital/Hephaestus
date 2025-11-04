@@ -1,64 +1,5 @@
 """MCP Server implementation for Hephaestus."""
 
-# REFACTORING NOTE: This file will be split during three-layer architecture refactoring
-# See tasks/251104-task-19-file-mapping.txt for complete split plan
-#
-# SPLIT PLAN - 13 FILES (server.py is 4,216 lines):
-#
-# 1. Request/Response Models (lines 40-470) → Split by domain:
-#    - Task models → c3_orchestration_routes/task_schemas.py
-#    - Agent models → c3_orchestration_routes/agent_schemas.py
-#    - Ticket models → c3_ticketing_routes/ticket_schemas.py
-#    - Workflow models → c3_workflow_routes/workflow_schemas.py
-#    - Memory models → c3_memory_routes/memory_schemas.py
-#    - Validation models → c3_workflow_routes/validation_schemas.py
-#
-# 2. ServerState class (lines ~480-600) → c3_mcp_server/server_state.py
-#
-# 3. Lifespan context manager (lines ~610-700) → c3_mcp_server/lifespan.py
-#
-# 4. FastAPI app initialization (lines ~710-750) → c3_mcp_server/app.py
-#
-# 5. Task routes (lines ~760-1400) → c3_orchestration_routes/task_routes.py
-#    - POST /orchestrate_phase, GET /get_workflow_status
-#    - POST /create_task, GET /get_task_status, POST /update_task_status
-#    - GET /list_tasks, POST /set_debug_mode
-#
-# 6. Agent routes (lines ~1410-1900) → c3_orchestration_routes/agent_routes.py
-#    - POST /spawn_agent, POST /terminate_agent
-#    - POST /send_message_to_agent, POST /broadcast_to_agents
-#    - GET /check_agent_health, GET /get_agent_output
-#
-# 7. Memory routes (lines ~1910-2100) → c3_memory_routes/memory_routes.py
-#    - POST /save_memory, GET /search_memories
-#    - GET /get_recent_memories
-#
-# 8. Validation routes (lines ~2110-2400) → c3_workflow_routes/validation_routes.py
-#    - POST /request_validation, POST /give_validation_review
-#    - POST /submit_result_validation, GET /validation_status
-#
-# 9. Result routes (lines ~2410-2600) → c3_workflow_routes/result_routes.py
-#    - POST /report_results, POST /submit_result
-#
-# 10. Ticket routes (lines ~2610-3800) → c3_ticketing_routes/ticket_routes.py
-#     - POST /create_ticket, GET /get_ticket, POST /update_ticket
-#     - POST /change_ticket_status, POST /resolve_ticket
-#     - POST /add_comment, GET /search_tickets
-#     - POST /link_commit, POST /request_clarification
-#     - GET /ticket_stats, GET /get_tickets
-#
-# 11. Workflow routes (lines ~3810-4000) → c3_workflow_routes/workflow_routes.py
-#     - POST /create_workflow, GET /get_workflow
-#     - GET /list_phases
-#
-# 12. WebSocket handlers (lines ~4010-4150) → c3_mcp_server/websocket.py
-#     - WebSocket /ws/agent/{agent_id}
-#     - WebSocket /ws/ticket_updates
-#
-# 13. Health/Debug routes (lines ~4160-4216) → c3_mcp_server/health_routes.py
-#     - GET /health/live, GET /health/status
-#     - POST /health/shutdown
-
 from typing import Dict, Any, Optional, List
 import json
 import uuid
@@ -66,7 +7,6 @@ import logging
 import os
 import time
 from datetime import datetime, timedelta
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Header, WebSocket, WebSocketDisconnect, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
@@ -93,6 +33,24 @@ from src.services.ticket_history_service import TicketHistoryService
 from src.services.ticket_search_service import TicketSearchService
 
 logger = logging.getLogger(__name__)
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="Hephaestus MCP Server",
+    description="Model Context Protocol server for AI agent orchestration",
+    version="1.0.0",
+)
+
+# Add CORS middleware
+config = get_config()
+if config.enable_cors:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 # Request/Response Models
@@ -665,24 +623,43 @@ class ServerState:
 server_state = ServerState()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Manage application lifespan (startup and shutdown)."""
-    # Startup
+def get_single_active_workflow() -> Optional[str]:
+    """
+    Get the ID of the single active workflow in the system.
+
+    Returns:
+        workflow_id if exactly one workflow exists, None otherwise
+    """
+    try:
+        with get_db() as session:
+            workflows = session.query(Workflow).filter(
+                Workflow.status.in_(["active", "paused"])
+            ).all()
+
+            if len(workflows) == 1:
+                return workflows[0].id
+            elif len(workflows) == 0:
+                logger.warning("No active workflows found in the system")
+                return None
+            else:
+                logger.warning(f"Multiple workflows found ({len(workflows)}), cannot auto-select")
+                return None
+    except Exception as e:
+        logger.error(f"Error getting single active workflow: {e}")
+        return None
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize server on startup."""
     logger.info("Starting Hephaestus MCP Server...")
     await server_state.initialize()
 
     # Add frontend API routes
-    from src.mcp.api import create_frontend_routes
-    api_router = create_frontend_routes(
-        server_state.db_manager,
-        server_state.agent_manager,
-        server_state.phase_manager
-    )
+    api_router = create_frontend_routes(server_state.db_manager, server_state.agent_manager, server_state.phase_manager)
     app.include_router(api_router)
 
     # Add authentication routes
-    from src.auth.auth_api import router as auth_router
     app.include_router(auth_router)
 
     # Load phases if folder is specified
@@ -724,7 +701,7 @@ async def lifespan(app: FastAPI):
             workflow_def = PhaseLoader.load_phases_from_folder(phases_folder)
             logger.info(f"Loaded workflow '{workflow_def.name}' with {len(workflow_def.phases)} phases")
 
-            # Load phases configuration
+            # Load phases configuration (for ticket tracking, result handling, etc.)
             logger.info(f"Loading phases_config.yaml from '{phases_folder}'")
             phases_config = PhaseLoader.load_phases_config(phases_folder)
             logger.info(f"Loaded phases config: enable_tickets={phases_config.enable_tickets}, has_result={phases_config.has_result}")
@@ -749,6 +726,7 @@ async def lifespan(app: FastAPI):
             logger.error(f"Failed to load phases: {e}")
             import traceback
             logger.error(f"Full traceback:\n{traceback.format_exc()}")
+            # Don't fail server startup, just run without phases
     else:
         logger.info("No phases folder specified - running in standard mode")
         logger.info("To load phases, set HEPHAESTUS_PHASES_FOLDER environment variable")
@@ -762,9 +740,10 @@ async def lifespan(app: FastAPI):
 
     logger.info("Server started successfully")
 
-    yield
 
-    # Shutdown
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
     logger.info("Shutting down Hephaestus MCP Server...")
 
     # Stop background queue processor
@@ -781,52 +760,6 @@ async def lifespan(app: FastAPI):
     # Close all WebSocket connections
     for ws in server_state.active_websockets:
         await ws.close()
-
-
-# Initialize FastAPI app with lifespan
-app = FastAPI(
-    title="Hephaestus MCP Server",
-    description="Model Context Protocol server for AI agent orchestration",
-    version="1.0.0",
-    lifespan=lifespan,
-)
-
-# Add CORS middleware
-config = get_config()
-if config.enable_cors:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-
-def get_single_active_workflow() -> Optional[str]:
-    """
-    Get the ID of the single active workflow in the system.
-
-    Returns:
-        workflow_id if exactly one workflow exists, None otherwise
-    """
-    try:
-        with get_db() as session:
-            workflows = session.query(Workflow).filter(
-                Workflow.status.in_(["active", "paused"])
-            ).all()
-
-            if len(workflows) == 1:
-                return workflows[0].id
-            elif len(workflows) == 0:
-                logger.warning("No active workflows found in the system")
-                return None
-            else:
-                logger.warning(f"Multiple workflows found ({len(workflows)}), cannot auto-select")
-                return None
-    except Exception as e:
-        logger.error(f"Error getting single active workflow: {e}")
-        return None
 
 
 def verify_agent_id(agent_id: str = Header(None, alias="X-Agent-ID")) -> str:
@@ -1599,6 +1532,36 @@ async def create_task(
     except Exception as e:
         logger.error(f"Failed to create task: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/validate_agent_id/{agent_id}")
+async def validate_agent_id(agent_id: str):
+    """Quick endpoint for agents to validate their ID format.
+    
+    Returns:
+        Success if ID matches UUID format, error otherwise
+    """
+    import re
+    uuid_pattern = re.compile(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+        re.IGNORECASE
+    )
+    
+    if uuid_pattern.match(agent_id):
+        return {
+            "valid": True,
+            "message": f"✅ Agent ID {agent_id} is valid UUID format"
+        }
+    else:
+        return {
+            "valid": False,
+            "message": f"❌ Agent ID '{agent_id}' is NOT valid. Use the UUID from your initial prompt.",
+            "common_mistakes": [
+                "Using 'agent-mcp' instead of actual UUID",
+                "Using 'main-session-agent' when you're not the main session",
+                "Typo in UUID"
+            ]
+        }
 
 
 @app.post("/update_task_status", response_model=UpdateTaskStatusResponse)

@@ -1,11 +1,21 @@
 """Validation check type executors."""
 
+from enum import Enum
 from typing import Dict, Any, List, Optional
 import os
 import subprocess
 from pathlib import Path
 
-from src.c1_result_validation_enums import ValidationCheckType
+
+class ValidationCheckType(Enum):
+    """Types of validation checks."""
+    FILE_EXISTS = "file_exists"
+    FILE_CONTAINS = "file_contains"
+    COMMAND_SUCCESS = "command_success"
+    MANUAL_VERIFICATION = "manual_verification"
+    CODE_REVIEW = "code_review"
+    TEST_PASS = "test_pass"
+    PERFORMANCE_METRIC = "performance_metric"
 
 
 def execute_validation_check(

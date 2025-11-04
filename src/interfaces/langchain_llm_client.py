@@ -2,6 +2,7 @@
 
 import logging
 from typing import Dict, Any, List, Optional, Literal
+from enum import Enum
 import json
 import asyncio
 from abc import ABC, abstractmethod
@@ -14,7 +15,6 @@ from langchain_core.documents import Document
 from pydantic import BaseModel, Field
 from typing import Optional as Opt
 
-from src.c1_llm_enums import ComponentType
 from src.monitoring.models import GuardianTrajectoryAnalysis, ConductorSystemAnalysis
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,15 @@ class LLMConfig(BaseModel):
     embedding_model: str = "text-embedding-3-small"
     providers: Dict[str, ProviderConfig]
     model_assignments: Dict[str, ModelAssignment]
+
+
+class ComponentType(Enum):
+    """Component types for model routing."""
+    TASK_ENRICHMENT = "task_enrichment"
+    AGENT_MONITORING = "agent_monitoring"
+    GUARDIAN_ANALYSIS = "guardian_analysis"
+    CONDUCTOR_ANALYSIS = "conductor_analysis"
+    AGENT_PROMPTS = "agent_prompts"
 
 
 class LangChainLLMClient:
