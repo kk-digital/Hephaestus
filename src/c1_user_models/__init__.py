@@ -1,9 +1,6 @@
-"""User models - DEPRECATED, use src.c1_user_models instead."""
+"""User authentication and management models for Hephaestus."""
 
-# This is a backward compatibility shim
-# All user models have been moved to src.c1_user_models
-
-from src.c1_user_models import (
+from src.c1_user_models.user import (
     User,
     Role,
     UserRole,
