@@ -1,5 +1,15 @@
 """Intelligent monitoring and self-healing system for Hephaestus."""
 
+# REFACTORING NOTE: This file will be split during three-layer architecture refactoring
+# See tasks/251104-task-19-file-mapping.txt for complete split plan
+#
+# DESTINATION MAPPING (monitor.py - 1,602 lines → 5 files):
+# - MonitoringLoop class (main monitoring logic) → c2_monitoring_service/monitoring_loop.py
+# - Diagnostic agent spawning logic → c2_monitoring_service/diagnostic_service.py
+# - Performance analysis logic → c2_monitoring_service/performance_analyzer.py
+# - Health check orchestration → c2_monitoring_service/health_orchestrator.py
+# - Recovery/intervention logic → c2_monitoring_service/recovery_service.py
+
 import asyncio
 import logging
 from typing import Dict, Any, Optional, List

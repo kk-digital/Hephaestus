@@ -1,5 +1,64 @@
 """MCP Server implementation for Hephaestus."""
 
+# REFACTORING NOTE: This file will be split during three-layer architecture refactoring
+# See tasks/251104-task-19-file-mapping.txt for complete split plan
+#
+# SPLIT PLAN - 13 FILES (server.py is 4,216 lines):
+#
+# 1. Request/Response Models (lines 40-470) → Split by domain:
+#    - Task models → c3_orchestration_routes/task_schemas.py
+#    - Agent models → c3_orchestration_routes/agent_schemas.py
+#    - Ticket models → c3_ticketing_routes/ticket_schemas.py
+#    - Workflow models → c3_workflow_routes/workflow_schemas.py
+#    - Memory models → c3_memory_routes/memory_schemas.py
+#    - Validation models → c3_workflow_routes/validation_schemas.py
+#
+# 2. ServerState class (lines ~480-600) → c3_mcp_server/server_state.py
+#
+# 3. Lifespan context manager (lines ~610-700) → c3_mcp_server/lifespan.py
+#
+# 4. FastAPI app initialization (lines ~710-750) → c3_mcp_server/app.py
+#
+# 5. Task routes (lines ~760-1400) → c3_orchestration_routes/task_routes.py
+#    - POST /orchestrate_phase, GET /get_workflow_status
+#    - POST /create_task, GET /get_task_status, POST /update_task_status
+#    - GET /list_tasks, POST /set_debug_mode
+#
+# 6. Agent routes (lines ~1410-1900) → c3_orchestration_routes/agent_routes.py
+#    - POST /spawn_agent, POST /terminate_agent
+#    - POST /send_message_to_agent, POST /broadcast_to_agents
+#    - GET /check_agent_health, GET /get_agent_output
+#
+# 7. Memory routes (lines ~1910-2100) → c3_memory_routes/memory_routes.py
+#    - POST /save_memory, GET /search_memories
+#    - GET /get_recent_memories
+#
+# 8. Validation routes (lines ~2110-2400) → c3_workflow_routes/validation_routes.py
+#    - POST /request_validation, POST /give_validation_review
+#    - POST /submit_result_validation, GET /validation_status
+#
+# 9. Result routes (lines ~2410-2600) → c3_workflow_routes/result_routes.py
+#    - POST /report_results, POST /submit_result
+#
+# 10. Ticket routes (lines ~2610-3800) → c3_ticketing_routes/ticket_routes.py
+#     - POST /create_ticket, GET /get_ticket, POST /update_ticket
+#     - POST /change_ticket_status, POST /resolve_ticket
+#     - POST /add_comment, GET /search_tickets
+#     - POST /link_commit, POST /request_clarification
+#     - GET /ticket_stats, GET /get_tickets
+#
+# 11. Workflow routes (lines ~3810-4000) → c3_workflow_routes/workflow_routes.py
+#     - POST /create_workflow, GET /get_workflow
+#     - GET /list_phases
+#
+# 12. WebSocket handlers (lines ~4010-4150) → c3_mcp_server/websocket.py
+#     - WebSocket /ws/agent/{agent_id}
+#     - WebSocket /ws/ticket_updates
+#
+# 13. Health/Debug routes (lines ~4160-4216) → c3_mcp_server/health_routes.py
+#     - GET /health/live, GET /health/status
+#     - POST /health/shutdown
+
 from typing import Dict, Any, Optional, List
 import json
 import uuid

@@ -1,5 +1,15 @@
 """Agent management system for Hephaestus."""
 
+# REFACTORING NOTE: This file will be split during three-layer architecture refactoring
+# See tasks/251104-task-19-file-mapping.txt for complete split plan
+#
+# DESTINATION MAPPING (manager.py - 1,187 lines → 5 files):
+# - AgentManager class (core management) → c2_agent_service/agent_manager.py
+# - Agent lifecycle (spawn/terminate) → c2_agent_service/agent_lifecycle.py
+# - Agent communication (messaging) → c2_agent_service/agent_communication.py
+# - Agent health monitoring → c2_agent_service/agent_health.py
+# - Agent output capture → c2_agent_service/agent_output.py
+
 import uuid
 import asyncio
 import logging

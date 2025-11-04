@@ -1,5 +1,14 @@
 """Git worktree isolation manager for agents."""
 
+# REFACTORING NOTE: This file will be split during three-layer architecture refactoring
+# See tasks/251104-task-19-file-mapping.txt for complete split plan
+#
+# DESTINATION MAPPING (worktree_manager.py - 1,367 lines → 4 files):
+# - WorktreeManager class (core logic) → c2_worktree_service/worktree_manager.py
+# - Git operations wrapper → c2_worktree_service/git_operations.py
+# - Worktree allocation/cleanup → c2_worktree_service/worktree_lifecycle.py
+# - Conflict resolution logic → c2_worktree_service/conflict_resolver.py
+
 import os
 import shutil
 import uuid
