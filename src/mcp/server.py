@@ -34,6 +34,7 @@ from src.services.ticket_search_service import TicketSearchService
 
 # C3 Routes (Application Layer)
 from src.c3_health_routes import router as health_router
+from src.c3_queue_routes import create_queue_router
 
 logger = logging.getLogger(__name__)
 
@@ -667,6 +668,7 @@ async def startup_event():
 
     # Add c3 layer routes (extracted application layer)
     app.include_router(health_router)
+    app.include_router(create_queue_router(server_state))
 
     # Load phases if folder is specified
     import os
@@ -3734,18 +3736,19 @@ async def restart_task_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/queue_status")
-async def get_queue_status_endpoint():
-    """Get current queue status information.
-
-    Returns information about active agents, queued tasks, and available slots.
-    """
-    try:
-        status = server_state.queue_service.get_queue_status()
-        return status
-    except Exception as e:
-        logger.error(f"Failed to get queue status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+# EXTRACTED TO: src/c3_queue_routes/queue_routes.py
+# @app.get("/api/queue_status")
+# async def get_queue_status_endpoint():
+#     """Get current queue status information.
+#
+#     Returns information about active agents, queued tasks, and available slots.
+#     """
+#     try:
+#         status = server_state.queue_service.get_queue_status()
+#         return status
+#     except Exception as e:
+#         logger.error(f"Failed to get queue status: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/agent_status")
