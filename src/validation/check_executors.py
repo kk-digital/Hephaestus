@@ -5,7 +5,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from src.c1_validation_enums import ValidationCheckType
+from src.c1_result_validation_enums import ValidationCheckType
 
 
 def execute_validation_check(
