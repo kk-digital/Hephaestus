@@ -1,0 +1,248 @@
+TASK-24 UPSTREAM ANALYSIS REPORT
+================================
+
+Date: 2025-11-04
+Analysis of upstream/main changes vs our refactor/three-layer-architecture branch
+
+## Executive Summary
+
+**CRITICAL FINDING**: Upstream does NOT have our three-layer refactoring. They are still using the old monolithic structure in src/core/, src/agents/, src/monitoring/, etc.
+
+**Implication**: We CANNOT merge upstream directly. We must PORT their functional changes into our c1/c2/c3 structure.
+
+## Upstream Status
+
+- **Commits ahead of us**: 23 commits
+- **Branch analyzed**: upstream/main
+- **Files added**: 23 (new features, scripts, docs)
+- **Files deleted**: 91 (these are OUR refactoring files that upstream doesn't have)
+- **Files modified**: 30 (functional changes in old structure that we need to port)
+
+## File Change Breakdown
+
+### Added Files (23 total)
+
+These are NEW files in upstream that we should add:
+
+**Scripts and Tools**:
+- check_setup_macos.py (macOS setup validation)
+- run_example.py (example runner)
+- scripts/bootstrap_project.py (project bootstrap script)
+- scripts/dev/start_all.sh (dev helper)
+- scripts/dev/update_from_upstream.sh (upstream sync script)
+
+**Examples**:
+- examples/gitignore_example
+- examples/.gitignore_template
+- examples/PRD.md
+- examples/sub_agents/*.md (9 sub-agent examples):
+  - api-integration-engineer.md
+  - database-architect.md
+  - debug-troubleshoot-expert.md
+  - devops-engineer.md
+  - senior-code-reviewer.md
+  - senior-fastapi-engineer.md
+  - senior-frontend-engineer.md
+  - technical-documentation-writer.md
+  - test-automation-engineer.md
+
+**Documentation**:
+- website/docs/getting-started/bootstrap-new-project.md
+- website/docs/troubleshooting/agent-issues.md
+
+**Action**: Add these files directly (they don't conflict with our refactoring)
+
+### Deleted Files (91 total)
+
+These are OUR refactoring files that upstream doesn't have:
+
+**Our c1 Layer Modules** (15 modules deleted in upstream):
+- src/c1_agent_models/
+- src/c1_conductor_enums/
+- src/c1_database_session/
+- src/c1_guardian_enums/
+- src/c1_llm_enums/
+- src/c1_memory_models/
+- src/c1_monitoring_enums/
+- src/c1_monitoring_models/
+- src/c1_result_validation_enums/
+- src/c1_task_models/
+- src/c1_ticket_models/
+- src/c1_user_models/
+- src/c1_workflow_models/
+- src/c1_worktree_enums/
+
+**Our Task Files** (21 task files deleted in upstream):
+- tasks/251101-task-01.txt through tasks/251104-task-24.txt
+- tasks/TASK-FILE-FORMAT.txt
+
+**Our Documentation** (11 docs deleted in upstream):
+- todo.txt
+- STAGE-1.1-VALIDATION.md
+- SESSION-SUMMARY-*.txt/.md (3 files)
+- REFACTOR-*.txt/.md (3 files)
+- reports/251104-module-structure-and-naming.txt
+
+**Old Files Cleaned Up** (44 files - good deletions):
+- .claude/CLAUDE.md (old version)
+- *.backup files
+- Mock database paths
+- Old requirements files
+- Validation scripts we replaced
+
+**Action**: KEEP our c1 modules, KEEP our task files, KEEP our docs. These are our unique work.
+
+### Modified Files (30 total) - **CRITICAL FOR PORTING**
+
+These files have functional changes in upstream that we need to port:
+
+**Core System** (6 files):
+- src/core/database.py (database changes - port to c1_database_session)
+- src/core/simple_config.py (config changes - check if affects our structure)
+- src/core/user_models.py (user model changes - port to c1_user_models)
+- src/core/worktree_manager.py (worktree changes - check enum usage)
+- src/__init__.py (init changes)
+- src/agents/manager.py (agent manager changes)
+
+**LLM/Interface Layer** (5 files):
+- src/interfaces/__init__.py
+- src/interfaces/cli_interface.py
+- src/interfaces/langchain_llm_client.py
+- src/interfaces/llm_interface.py
+- src/interfaces/multi_provider_llm.py
+
+**MCP Server** (2 files):
+- src/mcp/api.py
+- src/mcp/server.py
+
+**Monitoring** (3 files):
+- src/monitoring/conductor.py
+- src/monitoring/guardian.py
+- src/monitoring/monitor.py
+
+**Validation** (2 files):
+- src/validation/__init__.py
+- src/validation/check_executors.py
+
+**Other Services** (2 files):
+- src/sdk/process_manager.py
+- src/services/ticket_service.py
+
+**Config and Entry Points** (4 files):
+- hephaestus_config.yaml (config schema changes)
+- pyproject.toml (dependencies)
+- requirements.txt (dependencies)
+- .env.example (env vars)
+
+**Client Scripts** (2 files):
+- claude_mcp_client.py
+- run_prd_workflow.py
+
+**Example Workflows** (1 file):
+- example_workflows/prd_to_software/phase_1_requirements_analysis.py
+
+**Frontend** (1 file):
+- frontend/vite.config.ts
+
+**Website Docs** (4 files):
+- website/docs/getting-started/quick-start.md
+- website/docs/sdk/examples.md
+- website/docs/sdk/overview.md
+- website/sidebars.ts
+
+## Porting Strategy
+
+### Phase 1: Add New Files (Low Risk)
+Add all 23 new files directly - they don't conflict with our structure:
+- Copy scripts/*, examples/*, website/docs/* from upstream
+- Test that new scripts work with our structure
+
+### Phase 2: Update Dependencies (Medium Risk)
+Update configuration files to match upstream:
+- requirements.txt (merge dependencies)
+- pyproject.toml (merge dependencies)
+- .env.example (add new env vars)
+- hephaestus_config.yaml (merge config schema)
+
+### Phase 3: Port Functional Changes (High Risk - CORE WORK)
+
+For each modified file in src/:
+
+1. **Identify what changed**:
+   ```bash
+   git diff refactor/three-layer-architecture..upstream/main -- src/core/database.py
+   ```
+
+2. **Determine target location in our structure**:
+   - src/core/database.py changes → c1_database_session/
+   - src/core/user_models.py changes → c1_user_models/
+   - src/monitoring/*.py changes → Check if affects c1_monitoring_models/enums
+   - etc.
+
+3. **Apply changes to new location**
+
+4. **Test that change works**
+
+5. **Commit with**: `Port upstream: {original commit message}`
+
+### Phase 4: Verify Backward Compatibility
+- Ensure old import locations still work (shims)
+- Test that all examples work
+- Run full test suite
+
+## Key Commits to Review
+
+Major functional changes in upstream:
+
+1. **72d6154**: fix(monitoring): resolve langchain import breaking multi-provider system
+   - Files: src/interfaces/langchain_llm_client.py, src/interfaces/multi_provider_llm.py
+   - Impact: LLM provider system
+   - Port to: c2 layer (if we have LLM service there)
+
+2. **310b80d**: feat(bootstrap): add project bootstrap script with simplified single-database approach
+   - Files: scripts/bootstrap_project.py, src/core/database.py
+   - Impact: Database initialization
+   - Port to: c1_database_session/
+
+3. **c4e5e50**: feat(config): add to_env_dict() method to Config class
+   - Files: src/core/simple_config.py
+   - Impact: Config interface
+   - Port to: Check if affects our config usage
+
+4. **9971dac**: fix(monitor): add grace period for orphaned session detection
+   - Files: src/monitoring/monitor.py
+   - Impact: Monitoring logic
+   - Port to: c1_monitoring_models/ or c2 if service logic
+
+5. **797d3f5**: feat: Add OpenCode support as alternative CLI agent
+   - Files: src/interfaces/cli_interface.py, src/interfaces/__init__.py
+   - Impact: CLI interface expansion
+   - Port to: Determine layer (probably c2 or c3)
+
+## Next Steps
+
+1. ✅ Phase 2 Analysis complete (this report)
+2. [ ] Create port plan for each modified file (30 files)
+3. [ ] Start with low-risk additions (scripts, examples, docs)
+4. [ ] Port dependency updates (requirements, config)
+5. [ ] Port core functional changes one file at a time
+6. [ ] Test after each port
+7. [ ] Document porting decisions
+
+## Risk Assessment
+
+**Low Risk**: Adding new files (scripts, examples, docs) - no conflicts
+**Medium Risk**: Dependency updates - may need conflict resolution
+**High Risk**: Porting functional changes - requires careful analysis and testing
+
+**Estimated Time**: 8-12 hours (30 modified files to analyze and port)
+
+## Decision: Keep Our Structure, Port Their Features
+
+We are NOT merging upstream. We are EXTRACTING their functional improvements and porting them into our layered architecture.
+
+Rationale:
+- Our three-layer architecture is a significant improvement
+- Upstream is still using old monolithic structure
+- Merging would destroy our refactoring work
+- Selective porting preserves our architecture while gaining upstream improvements
