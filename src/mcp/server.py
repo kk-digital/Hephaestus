@@ -36,6 +36,8 @@ from src.services.ticket_search_service import TicketSearchService
 from src.c3_health_routes import router as health_router
 from src.c3_queue_routes import create_queue_router
 from src.c3_workflow_routes import create_workflow_router
+from src.c3_websocket_routes import create_websocket_router
+from src.c3_messaging_routes import create_messaging_router
 
 logger = logging.getLogger(__name__)
 
@@ -671,6 +673,8 @@ async def startup_event():
     app.include_router(health_router)
     app.include_router(create_queue_router(server_state))
     app.include_router(create_workflow_router(server_state))
+    app.include_router(create_websocket_router(server_state))
+    app.include_router(create_messaging_router(server_state))
 
     # Load phases if folder is specified
     import os
@@ -2362,85 +2366,86 @@ async def submit_result_validation(
 #         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/broadcast_message", response_model=BroadcastMessageResponse)
-async def broadcast_message(
-    request: BroadcastMessageRequest,
-    agent_id: str = Header(..., alias="X-Agent-ID"),
-):
-    """Broadcast a message to all active agents except the sender.
+# EXTRACTED TO: src/c3_messaging_routes/messaging_routes.py
+# @app.post("/api/broadcast_message", response_model=BroadcastMessageResponse)
+# async def broadcast_message(
+#     request: BroadcastMessageRequest,
+#     agent_id: str = Header(..., alias="X-Agent-ID"),
+# ):
+#     """Broadcast a message to all active agents except the sender.
+# 
+#     This allows agents to communicate with each other by sending messages
+#     that will be delivered to all other active agents in the system.
+#     """
+#     logger.info(f"Agent {agent_id[:8]} broadcasting message: {request.message[:100]}...")
+# 
+#     try:
+#         # Use agent manager to broadcast the message
+#         recipient_count = await server_state.agent_manager.broadcast_message_to_all_agents(
+#             sender_agent_id=agent_id,
+#             message=request.message
+#         )
+# 
+#         # Broadcast update via WebSocket
+#         await server_state.broadcast_update({
+#             "type": "agent_broadcast",
+#             "sender_agent_id": agent_id,
+#             "recipient_count": recipient_count,
+#             "message_preview": request.message[:100],
+#         })
+# 
+#         return BroadcastMessageResponse(
+#             success=True,
+#             recipient_count=recipient_count,
+#             message=f"Message broadcast to {recipient_count} agent(s)"
+#         )
+# 
+#     except Exception as e:
+#         logger.error(f"Failed to broadcast message: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
 
-    This allows agents to communicate with each other by sending messages
-    that will be delivered to all other active agents in the system.
-    """
-    logger.info(f"Agent {agent_id[:8]} broadcasting message: {request.message[:100]}...")
 
-    try:
-        # Use agent manager to broadcast the message
-        recipient_count = await server_state.agent_manager.broadcast_message_to_all_agents(
-            sender_agent_id=agent_id,
-            message=request.message
-        )
-
-        # Broadcast update via WebSocket
-        await server_state.broadcast_update({
-            "type": "agent_broadcast",
-            "sender_agent_id": agent_id,
-            "recipient_count": recipient_count,
-            "message_preview": request.message[:100],
-        })
-
-        return BroadcastMessageResponse(
-            success=True,
-            recipient_count=recipient_count,
-            message=f"Message broadcast to {recipient_count} agent(s)"
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to broadcast message: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/send_message", response_model=SendMessageResponse)
-async def send_message(
-    request: SendMessageRequest,
-    agent_id: str = Header(..., alias="X-Agent-ID"),
-):
-    """Send a direct message to a specific agent.
-
-    This allows agents to communicate directly with each other by sending
-    targeted messages to specific agents.
-    """
-    logger.info(f"Agent {agent_id[:8]} sending message to {request.recipient_agent_id[:8]}: {request.message[:100]}...")
-
-    try:
-        # Use agent manager to send the direct message
-        success = await server_state.agent_manager.send_direct_message(
-            sender_agent_id=agent_id,
-            recipient_agent_id=request.recipient_agent_id,
-            message=request.message
-        )
-
-        if not success:
-            return SendMessageResponse(
-                success=False,
-                message=f"Failed to send message - recipient agent {request.recipient_agent_id[:8]} may not exist or is terminated"
-            )
-
-        # Broadcast update via WebSocket
-        await server_state.broadcast_update({
-            "type": "agent_direct_message",
-            "sender_agent_id": agent_id,
-            "recipient_agent_id": request.recipient_agent_id,
-            "message_preview": request.message[:100],
-        })
-
-        return SendMessageResponse(
-            success=True,
-            message=f"Message sent to agent {request.recipient_agent_id[:8]}"
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to send direct message: {e}")
+# @app.post("/api/send_message", response_model=SendMessageResponse)
+# async def send_message(
+#     request: SendMessageRequest,
+#     agent_id: str = Header(..., alias="X-Agent-ID"),
+# ):
+#     """Send a direct message to a specific agent.
+# 
+#     This allows agents to communicate directly with each other by sending
+#     targeted messages to specific agents.
+#     """
+#     logger.info(f"Agent {agent_id[:8]} sending message to {request.recipient_agent_id[:8]}: {request.message[:100]}...")
+# 
+#     try:
+#         # Use agent manager to send the direct message
+#         success = await server_state.agent_manager.send_direct_message(
+#             sender_agent_id=agent_id,
+#             recipient_agent_id=request.recipient_agent_id,
+#             message=request.message
+#         )
+# 
+#         if not success:
+#             return SendMessageResponse(
+#                 success=False,
+#                 message=f"Failed to send message - recipient agent {request.recipient_agent_id[:8]} may not exist or is terminated"
+#             )
+# 
+#         # Broadcast update via WebSocket
+#         await server_state.broadcast_update({
+#             "type": "agent_direct_message",
+#             "sender_agent_id": agent_id,
+#             "recipient_agent_id": request.recipient_agent_id,
+#             "message_preview": request.message[:100],
+#         })
+# 
+#         return SendMessageResponse(
+#             success=True,
+#             message=f"Message sent to agent {request.recipient_agent_id[:8]}"
+#         )
+# 
+#     except Exception as e:
+#         logger.error(f"Failed to send direct message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -3869,23 +3874,24 @@ async def get_task_progress(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# WebSocket endpoint for real-time updates
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time updates."""
-    await websocket.accept()
-    server_state.active_websockets.append(websocket)
-
-    try:
-        while True:
-            # Keep connection alive and handle any incoming messages
-            data = await websocket.receive_text()
-            # Echo back or handle commands
-            await websocket.send_json({"type": "echo", "data": data})
-
-    except WebSocketDisconnect:
-        server_state.active_websockets.remove(websocket)
-        logger.info("WebSocket client disconnected")
+# EXTRACTED TO: src/c3_websocket_routes/websocket_routes.py
+# # WebSocket endpoint for real-time updates
+# @app.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket):
+#     """WebSocket endpoint for real-time updates."""
+#     await websocket.accept()
+#     server_state.active_websockets.append(websocket)
+#
+#     try:
+#         while True:
+#             # Keep connection alive and handle any incoming messages
+#             data = await websocket.receive_text()
+#             # Echo back or handle commands
+#             await websocket.send_json({"type": "echo", "data": data})
+#
+#     except WebSocketDisconnect:
+#         server_state.active_websockets.remove(websocket)
+#         logger.info("WebSocket client disconnected")
 
 
 # EXTRACTED TO: src/c3_health_routes/health_routes.py
