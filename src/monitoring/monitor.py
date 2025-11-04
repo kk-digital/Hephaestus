@@ -1,22 +1,12 @@
 """Intelligent monitoring and self-healing system for Hephaestus."""
 
-# REFACTORING NOTE: This file will be split during three-layer architecture refactoring
-# See tasks/251104-task-19-file-mapping.txt for complete split plan
-#
-# DESTINATION MAPPING (monitor.py - 1,602 lines → 5 files):
-# - MonitoringLoop class (main monitoring logic) → c2_monitoring_service/monitoring_loop.py
-# - Diagnostic agent spawning logic → c2_monitoring_service/diagnostic_service.py
-# - Performance analysis logic → c2_monitoring_service/performance_analyzer.py
-# - Health check orchestration → c2_monitoring_service/health_orchestrator.py
-# - Recovery/intervention logic → c2_monitoring_service/recovery_service.py
-
 import asyncio
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
+from enum import Enum
 import json
 
-from src.c1_monitoring_enums import AgentState, MonitoringDecision
 from src.core.simple_config import get_config
 from src.core.database import DatabaseManager, Agent, Task, AgentLog, GuardianAnalysis, ConductorAnalysis, DetectedDuplicate, SteeringIntervention
 from src.agents.manager import AgentManager
@@ -28,6 +18,24 @@ from src.monitoring.conductor import Conductor, SystemDecision
 from src.monitoring.trajectory_context import TrajectoryContext
 
 logger = logging.getLogger(__name__)
+
+
+class AgentState(Enum):
+    """Agent state enumeration."""
+    HEALTHY = "healthy"
+    STUCK_WAITING = "stuck_waiting"
+    STUCK_ERROR = "stuck_error"
+    STUCK_CONFUSED = "stuck_confused"
+    UNRECOVERABLE = "unrecoverable"
+
+
+class MonitoringDecision(Enum):
+    """Monitoring decision enumeration."""
+    CONTINUE = "continue"
+    NUDGE = "nudge"
+    ANSWER = "answer"
+    RESTART = "restart"
+    RECREATE = "recreate"
 
 
 class IntelligentMonitor:
@@ -1064,16 +1072,41 @@ class MonitoringLoop:
                 session.close()
 
             # Find orphaned sessions (exist in tmux but not in database)
+            # Use grace period based on last check time to avoid killing newly-created sessions
+            GRACE_PERIOD_SECONDS = 120
+            current_time = datetime.now()
+            
+            # Track when we last checked - agents created since last check get grace period
+            if not hasattr(self, '_last_orphan_check_time'):
+                self._last_orphan_check_time = current_time
+                logger.debug("First orphan check - skipping all sessions for grace period")
+                return
+            
+            time_since_last_check = (current_time - self._last_orphan_check_time).total_seconds()
+            
             orphaned_sessions = []
-            for session_name in agent_sessions:
-                if session_name not in active_session_names:
-                    orphaned_sessions.append(session_name)
+            for tmux_sess in self.agent_manager.tmux_server.sessions:
+                if tmux_sess.name not in agent_sessions:
+                    continue
+                if tmux_sess.name in active_session_names:
+                    continue
+                
+                # Apply grace period: if we just started monitoring or haven't checked in a while,
+                # skip orphan detection to let new agents get registered in DB
+                if time_since_last_check < GRACE_PERIOD_SECONDS:
+                    logger.debug(f"Skipping session {tmux_sess.name} - within grace period ({time_since_last_check:.0f}s < {GRACE_PERIOD_SECONDS}s)")
+                    continue
+                    
+                orphaned_sessions.append(tmux_sess.name)
+            
+            # Update last check time
+            self._last_orphan_check_time = current_time
 
             if not orphaned_sessions:
                 logger.debug("No orphaned tmux sessions found")
                 return
 
-            logger.info(f"Found {len(orphaned_sessions)} orphaned tmux sessions: {orphaned_sessions}")
+            logger.info(f"Found {len(orphaned_sessions)} orphaned tmux sessions (after grace period): {orphaned_sessions}")
 
             # Kill orphaned sessions
             killed_count = 0

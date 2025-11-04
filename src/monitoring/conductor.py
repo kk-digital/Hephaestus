@@ -5,12 +5,21 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from collections import defaultdict
+from enum import Enum
 
-from src.c1_conductor_enums import SystemDecision
 from src.core.database import DatabaseManager, Agent, Task, AgentLog
 from src.agents.manager import AgentManager
 
 logger = logging.getLogger(__name__)
+
+
+class SystemDecision(Enum):
+    """System-level decisions the conductor can make."""
+    CONTINUE = "continue"
+    TERMINATE_DUPLICATE = "terminate_duplicate"
+    COORDINATE_RESOURCES = "coordinate_resources"
+    CREATE_MISSING_TASK = "create_missing_task"
+    ESCALATE = "escalate"
 
 
 class Conductor:
