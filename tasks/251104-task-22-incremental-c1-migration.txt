@@ -1,0 +1,226 @@
+TASK-22: Incremental C1 Layer Migration
+========================================
+
+Date: 2025-11-04
+Status: Active
+Strategy: Split → Coarse Move → Fine Move → Review
+
+## Overview
+
+Complete the c1 foundation layer extraction using incremental passes:
+1. SPLIT: Already done (database.py split in Stage 1.1)
+2. COARSE PASS: Move obvious c1 candidates (exceptions, config, utils)
+3. FINE PASS: Review, organize, and polish c1 modules
+4. VALIDATION: Test c1 layer completeness and dependencies
+
+## Current State (After Stage 1.1 + Enum Extraction)
+
+Existing c1 Modules (14 created):
+- c1_agent_models/ (5 agent models)
+- c1_task_models/ (Task model)
+- c1_memory_models/ (Memory model)
+- c1_workflow_models/ (7 workflow models)
+- c1_monitoring_models/ (5 monitoring models)
+- c1_ticket_models/ (6 ticket models)
+- c1_database_session/ (Base, DatabaseManager)
+- c1_worktree_enums/ (MergeStatus, CommitType)
+- c1_monitoring_enums/ (AgentState, MonitoringDecision)
+- c1_conductor_enums/ (SystemDecision)
+- c1_guardian_enums/ (SteeringType, TrajectoryPhase)
+- c1_validation_enums/ (ValidationCheckType)
+- c1_llm_enums/ (ComponentType)
+- c1_validation_models/ (validation models - if exists)
+
+## COARSE PASS: Obvious C1 Candidates
+
+### 1. Exceptions (HIGH PRIORITY - Foundation)
+
+Source: src/sdk/exceptions.py
+Destination: c1_exceptions/
+Files to create:
+  - c1_exceptions/sdk_exceptions.py (SDK-specific exceptions)
+  - c1_exceptions/__init__.py
+
+Action: Move entire sdk/exceptions.py → c1_exceptions/sdk_exceptions.py
+Notes: Foundation layer, no dependencies on higher layers
+
+### 2. Configuration Loaders (HIGH PRIORITY - Foundation)
+
+Source files:
+  - src/core/config.py (7156 bytes - main config loader)
+  - src/core/llm_config.py (9659 bytes - LLM config)
+  - src/core/simple_config.py (14852 bytes - simple config)
+  - src/sdk/config.py (SDK config)
+  - src/auth/auth_config.py (auth config)
+
+Destinations:
+  - c1_config_loaders/config.py
+  - c1_config_loaders/llm_config.py
+  - c1_config_loaders/simple_config.py
+  - c1_config_loaders/sdk_config.py
+  - c1_config_loaders/auth_config.py
+  - c1_config_loaders/__init__.py
+
+Action: Move all config loaders to c1_config_loaders/
+Notes: Pure configuration loading logic, foundation layer
+
+### 3. Utilities (MEDIUM PRIORITY - Foundation Helpers)
+
+Source files:
+  - src/auth/auth_utils.py (auth utilities)
+  - src/services/validation_helpers.py (validation helpers)
+  - src/services/result_validation_helpers.py (result validation)
+  - src/sdk/tui/widgets/animation_utils.py (animation utils - keep in SDK)
+
+Destinations:
+  - c1_auth_utils/auth_utils.py
+  - c1_validation_utils/validation_helpers.py
+  - c1_validation_utils/result_validation_helpers.py
+  - c1_auth_utils/__init__.py
+  - c1_validation_utils/__init__.py
+
+Action: Move utility modules to appropriate c1_*_utils/ packages
+Notes: Small helper functions, no business logic
+
+### 4. User Models (HIGH PRIORITY - Foundation Data)
+
+Source: src/core/user_models.py (11898 bytes)
+Destination: c1_user_models/user.py
+
+Action: Move user models to c1 layer
+Notes: Similar to other model extractions done in Stage 1.1
+
+### 5. LLM Provider Base Classes (MEDIUM PRIORITY)
+
+Source: src/interfaces/llm_interface.py (base interface)
+Destination: c1_llm_providers/llm_interface.py
+
+Action: Extract LLM provider interface to c1 layer
+Notes: Base abstraction, no implementation
+
+## FINE PASS: Organization and Polish
+
+After coarse pass completes, review and organize:
+
+1. Consolidate related modules
+   - Review if c1_validation_utils should merge with c1_validation_enums
+   - Review if c1_auth_utils should merge with auth models (if exist)
+
+2. Add comprehensive __init__.py files
+   - Export all public APIs from each c1 module
+   - Clean import paths
+
+3. Add module docstrings
+   - Document purpose of each c1 module
+   - Document dependencies and usage
+
+4. Verify naming consistency
+   - All modules follow c1_{noun}_{type} pattern
+   - Plural for collections (models, enums)
+   - Singular for single-purpose (config, session)
+
+## Migration Checklist Template
+
+For each module being moved:
+
+[ ] Identify source file(s)
+[ ] Create c1 destination directory
+[ ] Create __init__.py with exports
+[ ] Copy/move source to destination
+[ ] Update imports in source file to use c1 location
+[ ] Search codebase for imports of old location
+[ ] Update all import statements
+[ ] Run pytest to verify no breakage
+[ ] Commit with clear message: Extract {module} to c1_{name}
+[ ] Mark complete in this task file
+
+## Progress Tracking
+
+### Exceptions
+[ ] Create c1_exceptions/ directory
+[ ] Move sdk/exceptions.py → c1_exceptions/sdk_exceptions.py
+[ ] Create __init__.py
+[ ] Update imports across codebase
+[ ] Test
+[ ] Commit
+
+### Config Loaders
+[ ] Create c1_config_loaders/ directory
+[ ] Move core/config.py → c1_config_loaders/config.py
+[ ] Move core/llm_config.py → c1_config_loaders/llm_config.py
+[ ] Move core/simple_config.py → c1_config_loaders/simple_config.py
+[ ] Move sdk/config.py → c1_config_loaders/sdk_config.py
+[ ] Move auth/auth_config.py → c1_config_loaders/auth_config.py
+[ ] Create __init__.py
+[ ] Update imports across codebase
+[ ] Test
+[ ] Commit
+
+### Auth Utils
+[ ] Create c1_auth_utils/ directory
+[ ] Move auth/auth_utils.py → c1_auth_utils/auth_utils.py
+[ ] Create __init__.py
+[ ] Update imports across codebase
+[ ] Test
+[ ] Commit
+
+### Validation Utils
+[ ] Create c1_validation_utils/ directory
+[ ] Move services/validation_helpers.py → c1_validation_utils/validation_helpers.py
+[ ] Move services/result_validation_helpers.py → c1_validation_utils/result_validation_helpers.py
+[ ] Create __init__.py
+[ ] Update imports across codebase
+[ ] Test
+[ ] Commit
+
+### User Models
+[ ] Create c1_user_models/ directory
+[ ] Move core/user_models.py → c1_user_models/user.py
+[ ] Create __init__.py
+[ ] Update imports across codebase
+[ ] Test
+[ ] Commit
+
+### LLM Provider Interface
+[ ] Create c1_llm_providers/ directory
+[ ] Move interfaces/llm_interface.py → c1_llm_providers/llm_interface.py
+[ ] Create __init__.py
+[ ] Update imports across codebase
+[ ] Test
+[ ] Commit
+
+## Validation After Coarse Pass
+
+[ ] Run full test suite: pytest tests/ --ignore=tests/manual_validation_test.py
+[ ] Verify no regressions (compare to Stage 1.1 baseline: 255 passing)
+[ ] Check all c1 modules have __init__.py
+[ ] Check all c1 modules have docstrings
+[ ] Verify no c1 module imports from c2 or c3
+[ ] Run architecture validator script
+
+## Notes
+
+- Use strangler fig pattern (import from new location, keep backward compat shim)
+- Commit after each module extraction
+- Test after each module extraction
+- Keep old locations as import shims initially
+- Remove shims in fine pass after everything works
+
+## Time Estimates
+
+Coarse Pass:
+- Exceptions: 15 minutes
+- Config Loaders: 30 minutes (5 files)
+- Auth Utils: 15 minutes
+- Validation Utils: 20 minutes
+- User Models: 20 minutes
+- LLM Provider Interface: 15 minutes
+Total Coarse Pass: ~2 hours
+
+Fine Pass:
+- Review and consolidation: 30 minutes
+- Cleanup and documentation: 30 minutes
+- Testing and validation: 30 minutes
+Total Fine Pass: ~1.5 hours
+
+Total Task-22 Estimate: 3-4 hours

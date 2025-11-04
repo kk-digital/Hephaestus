@@ -4,10 +4,10 @@ from typing import Dict, Any, List, Optional
 import logging
 import asyncio
 
+from src.c1_llm_enums import ComponentType
 from src.interfaces.llm_interface import LLMProviderInterface
 from src.interfaces.langchain_llm_client import (
     LangChainLLMClient,
-    ComponentType,
     LLMConfig as LangChainConfig,
     ModelAssignment,
     ProviderConfig
