@@ -1,0 +1,290 @@
+HOST PATH: /Users/sp/claude/claude-docker.hephaestus/Hephaestus/Hephaestus/reports/251104-module-structure-and-naming.txt
+
+MODULE STRUCTURE AND NAMING CONVENTIONS REPORT
+==============================================
+
+Date: 2025-11-04
+Project: Hephaestus
+Branch: refactor/three-layer-architecture
+Status: Planning Complete, Preparation Stage Complete
+
+## User Instructions Summary
+
+### 1. Naming Convention
+
+**Standard Format**: `c{N}_{noun}_{function}`
+
+Where:
+- `c{N}` = Layer number (c1, c2, or c3)
+- `{noun}` = Object/entity type (agent, task, database, ticket, workflow, memory, etc.)
+- `{function}` = Purpose/module type (models, service, routes, session, manager, etc.)
+
+**Examples**:
+- c1_agent_models - Layer 1: Agent data models
+- c1_task_enums - Layer 1: Task enumeration types
+- c2_task_service - Layer 2: Task service logic
+- c3_task_routes - Layer 3: Task HTTP endpoints
+
+**CRITICAL RULE**: All packages at src/ level - NO subfolders/nesting
+
+### 2. Three-Layer Architecture (NOT 5 layers)
+
+**User explicitly corrected from 5 layers to 3 layers**
+
+**Layer c1: Foundation**
+- Data models (Pydantic, SQLAlchemy ORM)
+- Enumerations and constants
+- Exception classes
+- Database session management
+- External service clients (LLM, embedding, vector store)
+- Configuration loading
+
+**Layer c2: Services**
+- Business logic and algorithms
+- Service orchestration
+- Background processing
+- Authentication and authorization
+
+**Layer c3: Applications**
+- HTTP API endpoints
+- MCP protocol implementation
+- WebSocket handlers
+- CLI, SDK, TUI interfaces
+
+**Layer Dependency Rules**:
+- c1 imports: stdlib + external packages ONLY
+- c2 imports: c1 + stdlib + external packages
+- c3 imports: c1 + c2 + stdlib + external packages
+- NO circular dependencies allowed
+
+### 3. Flat Structure (NO nesting)
+
+**User explicitly corrected nested structure to flat**
+
+**CORRECT**:
+```
+src/
+├── c1_agent_models/
+├── c1_task_models/
+├── c1_database_session/
+├── c2_task_service/
+├── c2_agent_service/
+├── c3_orchestration_routes/
+├── c3_workflow_routes/
+└── c3_mcp_server/
+```
+
+**INCORRECT** (nested structure):
+```
+src/
+├── c1_layer/
+│   ├── models/
+│   └── database/
+├── c2_layer/
+│   └── services/
+└── c3_layer/
+    └── routes/
+```
+
+### 4. Modular Monolith Organization
+
+**Concept**: Independent server modules registered to central orchestrator
+
+**6 Modular Monoliths** (grouped from 17 original API endpoint groups):
+
+1. **Orchestration Module** - Core workflow and agent coordination
+   - Routes: /orchestrate_phase, /get_workflow_status, /check_agent_health, /set_debug_mode
+   - Package: c3_orchestration_routes
+
+2. **Task Management Module** - Task CRUD and lifecycle
+   - Routes: /create_task, /get_task_status, /update_task_status, /list_tasks
+   - Packages: c1_task_models, c2_task_service, c3_task_routes
+
+3. **Agent Management Module** - Agent lifecycle and communication
+   - Routes: /spawn_agent, /terminate_agent, /send_message_to_agent, /broadcast_to_agents
+   - Packages: c1_agent_models, c2_agent_service, c3_agent_routes
+
+4. **Validation Module** - Validation and review workflows
+   - Routes: /request_validation, /submit_validation_result, /validation_status
+   - Packages: c1_validation_models, c2_validation_service, c3_validation_routes
+
+5. **Memory Module** - Memory storage and retrieval
+   - Routes: /save_memory, /search_memories, /get_recent_memories
+   - Packages: c1_memory_models, c2_memory_service, c3_memory_routes
+
+6. **Ticket Tracking Module** - Issue/ticket management
+   - Routes: /tickets/*, /ticket_comments/*, /boards/*
+   - Packages: c1_ticket_models, c2_ticket_service, c3_ticket_routes
+
+**Module Registry Pattern**:
+- Each module implements BaseModule interface
+- ModuleRegistry tracks available modules
+- Central server routes requests to appropriate module
+- Modules can be developed, tested, and deployed independently
+
+### 5. Package Organization Examples
+
+**Agent Module** (across 3 layers):
+```
+c1_agent_models/
+├── __init__.py
+├── agent_models.py       # Agent, AgentLog, AgentResult (SQLAlchemy ORM)
+└── agent_config.py       # AgentConfig (Pydantic)
+
+c2_agent_service/
+├── __init__.py
+├── agent_manager.py      # AgentManager class (business logic)
+├── agent_lifecycle.py    # spawn, terminate, health checks
+└── agent_communication.py # messaging between agents
+
+c3_agent_routes/
+├── __init__.py
+├── agent_routes.py       # FastAPI routes for agent endpoints
+└── agent_schemas.py      # Request/response schemas
+```
+
+**Task Module** (across 3 layers):
+```
+c1_task_models/
+├── __init__.py
+├── task_models.py        # Task (SQLAlchemy ORM)
+├── task_enums.py         # TaskStatus, TaskPriority enums
+└── task_schemas.py       # TaskRequest, TaskResponse (Pydantic)
+
+c2_task_service/
+├── __init__.py
+├── task_service.py       # TaskService class (CRUD operations)
+├── task_enrichment.py    # Task description enrichment
+├── task_deduplication.py # Duplicate task detection
+└── task_relationships.py # Parent-child task relationships
+
+c3_task_routes/
+├── __init__.py
+└── task_routes.py        # FastAPI routes for task endpoints
+```
+
+**Database Session Module** (c1 only):
+```
+c1_database_session/
+├── __init__.py
+├── base.py              # declarative_base, Base class
+├── database_manager.py  # DatabaseManager class
+└── session.py           # SessionLocal, get_db() dependency
+```
+
+## Current State (Before Refactoring)
+
+**Total Files**: 93 Python files
+**Total Lines**: 29,308 lines of code
+**Current Structure**: Mixed hierarchy under src/ (no layer separation)
+
+**Largest Files Requiring Splitting**:
+1. src/mcp/server.py - 4,216 lines
+2. src/monitoring/monitor.py - 1,602 lines
+3. src/mcp/api.py - 1,595 lines
+4. src/core/worktree_manager.py - 1,367 lines
+5. src/services/ticket_service.py - 1,216 lines
+6. src/agents/manager.py - 1,187 lines
+7. src/core/database.py - 987 lines
+
+## Planned Final State (After Refactoring)
+
+**Structure**: Flat packages at src/ level following c{N}_{noun}_{function} pattern
+**Estimated Package Count**: 30-40 packages across 3 layers
+**Estimated File Count**: 180+ Python files (smaller, focused files)
+
+**Layer Distribution** (estimated):
+- c1 packages: 12-15 packages (models, configs, sessions, clients)
+- c2 packages: 10-12 packages (services, business logic)
+- c3 packages: 8-10 packages (routes, interfaces, servers)
+
+## Refactoring Strategy
+
+**6 Stages** (24-34 hours estimated):
+
+**Stage 0: Preparation** [COMPLETE]
+- Create refactoring branch: refactor/three-layer-architecture
+- Document test baseline: 449 tests collected
+- Create validation scripts
+- Commit: d5ce392
+
+**Stage 1: Split Large Files** (6-8 hours)
+- Split 7 large files into logical components
+- Add destination comments to ALL files
+- Test after each split
+- Commit after each file
+
+**Stage 2: Migrate c1 Layer** (4-6 hours)
+- Create c1_* packages
+- Move models, configs, sessions
+- Update imports
+- Test and commit
+
+**Stage 3: Migrate c2 Layer** (6-8 hours)
+- Create c2_* packages
+- Move service logic
+- Update imports
+- Test and commit
+
+**Stage 4: Migrate c3 Layer** (4-6 hours)
+- Create c3_* packages
+- Move routes and interfaces
+- Update imports
+- Test and commit
+
+**Stage 5: Cleanup** (2-3 hours)
+- Remove old src/ directories
+- Final import cleanup
+- Run validation scripts
+- Full test suite
+
+**Stage 6: Merge** (1 hour)
+- Merge refactor branch to dev-haltingstate-00
+- Deploy if needed
+
+## Validation and Testing
+
+**Architecture Validator**: scripts/validate_architecture.py
+- Validates layer dependency rules
+- Detects circular dependencies
+- Ensures c1 doesn't import c2/c3, c2 doesn't import c3
+
+**Test Strategy**:
+- Unit tests after each file split
+- Integration tests after each substage
+- Full test suite after each stage
+- Regression tests after every commit
+
+**Success Criteria**:
+- All 449 tests still collect
+- All passing tests still pass
+- No new import errors
+- Layer dependencies validated
+- All files in flat structure
+
+## Documentation References
+
+- **Architecture Spec**: tasks/251104-task-17-three-layer-architecture.txt
+- **Refactoring Plan**: tasks/251104-task-18-refactor-plan.txt
+- **File Mapping**: tasks/251104-task-19-file-mapping.txt
+- **Validation Scripts**: tasks/251104-task-20-validation-scripts.txt
+- **Baseline**: REFACTORING-BASELINE.txt
+
+## Key User Corrections During Planning
+
+1. **5 layers → 3 layers**: User corrected initial c0-c4 design to c1-c3
+2. **Nested → Flat**: User corrected nested folder structure to flat packages
+3. **Naming pattern**: User specified c{N}_{noun}_{function} format
+4. **Modular monolith**: User requested module-based organization with registry
+
+## Next Immediate Steps
+
+1. Add destination comments to remaining large files (server.py, monitor.py, api.py)
+2. Begin splitting database.py into 8-9 focused files
+3. Test imports after each split
+4. Commit incrementally with clear messages
+5. Continue through Stage 1 substages
+
+---
+
+End of Report

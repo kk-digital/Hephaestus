@@ -1,5 +1,37 @@
 """Database models and schema for Hephaestus."""
 
+# REFACTORING NOTE: This file will be split during three-layer architecture refactoring
+# See tasks/251104-task-19-file-mapping.txt for complete split plan
+#
+# DESTINATION MAPPING:
+# - Lines 1-25 (Base, imports) → c1_database_session/base.py
+# - Lines 27-65 (Agent model) → c1_agent_models/agent_models.py
+# - Lines 67-143 (Task model) → c1_task_models/task_models.py
+# - Lines 145-170 (Memory model) → c1_memory_models/memory_models.py
+# - Lines 172-194 (AgentLog model) → c1_agent_models/agent_models.py
+# - Lines 196-206 (ProjectContext model) → c1_workflow_models/workflow_models.py
+# - Lines 208-233 (Workflow model) → c1_workflow_models/workflow_models.py
+# - Lines 235-258 (Phase model) → c1_workflow_models/workflow_models.py
+# - Lines 260-280 (PhaseExecution model) → c1_workflow_models/workflow_models.py
+# - Lines 282-319 (AgentWorktree model) → c1_agent_models/agent_models.py
+# - Lines 321-351 (WorktreeCommit model) → c1_agent_models/agent_models.py
+# - Lines 353-371 (ValidationReview model) → c1_validation_models/validation_models.py
+# - Lines 373-401 (MergeConflictResolution model) → c1_workflow_models/workflow_models.py
+# - Lines 403-435 (AgentResult model) → c1_agent_models/agent_models.py
+# - Lines 437-463 (WorkflowResult model) → c1_workflow_models/workflow_models.py
+# - Lines 465-495 (GuardianAnalysis model) → c1_monitoring_models/monitoring_models.py
+# - Lines 497-519 (ConductorAnalysis model) → c1_monitoring_models/monitoring_models.py
+# - Lines 521-538 (DetectedDuplicate model) → c1_monitoring_models/monitoring_models.py
+# - Lines 540-556 (SteeringIntervention model) → c1_monitoring_models/monitoring_models.py
+# - Lines 558-596 (DiagnosticRun model) → c1_monitoring_models/monitoring_models.py
+# - Lines 598-657 (Ticket model) → c1_ticket_models/ticket_models.py
+# - Lines 659-686 (TicketComment model) → c1_ticket_models/ticket_models.py
+# - Lines 688-715 (TicketHistory model) → c1_ticket_models/ticket_models.py
+# - Lines 717-744 (TicketCommit model) → c1_ticket_models/ticket_models.py
+# - Lines 746-775 (BoardConfig model) → c1_ticket_models/ticket_models.py
+# - Lines 777-965 (DatabaseManager class) → c1_database_session/database_manager.py
+# - Lines 967-987 (get_db function) → c1_database_session/session.py
+
 import os
 import logging
 from datetime import datetime
