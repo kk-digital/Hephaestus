@@ -593,3 +593,24 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
   - Pip install now succeeds: All 449 tests collected successfully
   - Commit: 11e972a
 
+
+## Task-25: C2 Services Extraction Progress (2025-11-05)
+
+**Phase 1 COMPLETE** (4 services - Quick wins):
+✓ c2_embedding_service (198 lines) - commit de5c6b1
+✓ c2_queue_service (408 lines) - commit a7caa22
+✓ c2_task_similarity_service (372 lines) - commit fef25f1
+✓ c2_workflow_result_service (258 lines) - commit 1598310
+
+**Phase 2 COMPLETE** (3 services - Moderate):
+✓ c2_validation_service (639 lines, 3 files) - commit f59f064
+✓ c2_result_service (204 lines) - commit 06dd1d8
+✓ c2_task_blocking_service (299 lines) - commit 4a537b5
+
+**Phase 3 IN PROGRESS** (4 services - Complex):
+[ ] c2_ticket_service (large, multiple files)
+[ ] c2_agent_service (large, tmux dependencies)
+[ ] c2_monitoring_guardian (multiple files)
+[ ] c2_worktree_service (git operations)
+
+**Stats**: 7 of 11 services extracted, 2,378 lines migrated to c2 layer
