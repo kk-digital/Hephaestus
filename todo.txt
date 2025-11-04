@@ -197,6 +197,15 @@
     - Move tests as modules are created during refactoring
     - See: tasks/251101-task-04-test-organization.txt for original plan
 
+[DEFERRED] Task-23: Rename ambiguous "Memory" model to "AgentMemory"
+    - Current name "Memory" is ambiguous (agent memory? board memory? task history?)
+    - Analysis: Model stores agent discoveries and learnings (error_fix, discovery, decision, learning, warning, codebase_knowledge)
+    - Proposed rename: Memory → AgentMemory (most specific and accurate)
+    - Module rename: c1_memory_models → c1_agent_memory
+    - Keep database table name "memories" unchanged
+    - Deferred until AFTER three-layer refactoring completes
+    - See: tasks/251104-task-23-rename-ambiguous-memory.txt for complete plan
+
 ## Immediate Actions
 
 [DONE] Fix pip install dependency issues
