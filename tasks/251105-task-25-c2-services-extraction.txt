@@ -1,0 +1,172 @@
+TASK-25: C2 Services Layer Extraction
+=======================================
+
+Date: 2025-11-05
+Status: IN PROGRESS
+Priority: HIGH
+Estimated: 6-8 hours
+Depends on: Task-24 (upstream integration complete)
+
+## Overview
+
+Extract all service modules from src/services/, src/agents/, src/monitoring/,
+and src/core/ to c2_*_service/ packages following the three-layer architecture.
+
+## Strategy
+
+Use strangler fig pattern (same as Task-21 database extraction):
+1. Extract service to new c2_*_service/ package
+2. Create backward compatibility shim at old location
+3. Test imports work from both locations
+4. Commit after each service extraction
+5. Run tests after each extraction
+
+## Services to Extract
+
+### High Priority (Small, Independent)
+
+1. **c2_embedding_service** (from src/services/embedding_service.py)
+   - Size: ~100-200 lines
+   - Dependencies: c1_embedding_provider, c1_vector_store
+   - Creates: src/c2_embedding_service/embedding_service.py
+   - Shim: src/services/embedding_service.py
+
+2. **c2_queue_service** (from src/services/queue_service.py)
+   - Size: ~100-200 lines
+   - Dependencies: c1_task_models
+   - Creates: src/c2_queue_service/queue_service.py
+   - Shim: src/services/queue_service.py
+
+3. **c2_validation_service** (from src/services/result_validator_service.py)
+   - Size: ~200-300 lines
+   - Dependencies: c1_result_validation_enums, c1_monitoring_models
+   - Includes: result_validator_service.py, validation_helpers.py, result_validation_helpers.py
+   - Creates: src/c2_validation_service/
+   - Shim: src/services/result_validator_service.py
+
+4. **c2_task_similarity_service** (from src/services/task_similarity_service.py)
+   - Size: ~150-250 lines
+   - Dependencies: c1_task_models, c1_embedding_provider
+   - Creates: src/c2_task_similarity_service/similarity_service.py
+   - Shim: src/services/task_similarity_service.py
+
+5. **c2_workflow_result_service** (from src/services/workflow_result_service.py)
+   - Size: ~150-250 lines
+   - Dependencies: c1_workflow_models
+   - Creates: src/c2_workflow_result_service/result_service.py
+   - Shim: src/services/workflow_result_service.py
+
+### Medium Priority (Moderate Dependencies)
+
+6. **c2_ticket_service** (from src/services/ticket_service.py)
+   - Size: ~1,216 lines (LARGE - may need split)
+   - Dependencies: c1_ticket_models, c1_database_session
+   - Includes: ticket_service.py, ticket_history_service.py, ticket_search_service.py
+   - Creates: src/c2_ticket_service/
+   - Shim: src/services/ticket_service.py
+
+7. **c2_result_service** (from src/services/result_service.py)
+   - Size: ~200-300 lines
+   - Dependencies: c1_monitoring_models, c1_task_models
+   - Creates: src/c2_result_service/result_service.py
+   - Shim: src/services/result_service.py
+
+8. **c2_task_blocking_service** (from src/services/task_blocking_service.py)
+   - Size: ~150-250 lines
+   - Dependencies: c1_task_models
+   - Creates: src/c2_task_blocking_service/blocking_service.py
+   - Shim: src/services/task_blocking_service.py
+
+### High Priority (Complex, Dependencies)
+
+9. **c2_agent_service** (from src/agents/manager.py)
+   - Size: ~1,187 lines (LARGE - may need split)
+   - Dependencies: c1_agent_models, c1_database_session, tmux
+   - Creates: src/c2_agent_service/agent_manager.py
+   - Shim: src/agents/manager.py
+
+10. **c2_monitoring_guardian** (from src/monitoring/)
+    - Size: ~1,500 lines total (guardian.py, conductor.py, monitor.py)
+    - Dependencies: c1_monitoring_models, c1_monitoring_enums, c1_guardian_enums, c1_conductor_enums
+    - Creates: src/c2_monitoring_guardian/
+    - Shim: src/monitoring/
+
+11. **c2_worktree_service** (from src/core/worktree_manager.py)
+    - Size: Large (needs analysis)
+    - Dependencies: c1_worktree_enums, GitPython
+    - Creates: src/c2_worktree_service/worktree_manager.py
+    - Shim: src/core/worktree_manager.py
+
+## Execution Order
+
+Phase 1 (Quick Wins - 2 hours):
+1. c2_embedding_service
+2. c2_queue_service
+3. c2_task_similarity_service
+4. c2_workflow_result_service
+
+Phase 2 (Moderate - 2 hours):
+5. c2_validation_service (3 files)
+6. c2_result_service
+7. c2_task_blocking_service
+
+Phase 3 (Complex - 4 hours):
+8. c2_ticket_service (3 files, large)
+9. c2_agent_service (large, tmux dependencies)
+10. c2_monitoring_guardian (multiple files)
+11. c2_worktree_service (git operations)
+
+## Testing Strategy
+
+After each service extraction:
+1. Test import from new location: `python -c "from src.c2_*_service import *"`
+2. Test import from old location (shim): `python -c "from src.services.* import *"`
+3. Run pytest: `pytest tests/ -k service_name`
+4. Commit if tests pass
+
+After all extractions:
+1. Run full test suite: `pytest tests/ -v`
+2. Verify 449 tests still collected
+3. Verify no new test failures
+
+## Commit Strategy
+
+One commit per service extraction:
+- "Extract c2_embedding_service from src/services/"
+- "Extract c2_queue_service from src/services/"
+- etc.
+
+## Dependencies
+
+All c2 services depend on:
+- c1 layer (models, enums, exceptions)
+- c1_database_session (for database access)
+- May depend on external services (Qdrant, LLM providers, Git)
+
+c2 services MUST NOT depend on:
+- c3 layer (routes, API)
+- Other c2 services (initially - will refactor later)
+
+## Success Criteria
+
+✓ All services extracted to c2_*_service/ packages
+✓ All old imports still work via shims
+✓ All 449 tests still collected
+✓ No new test failures introduced
+✓ Clean layer separation (c1 ← c2, no c3 dependencies)
+
+## Notes
+
+- Follow strangler fig pattern used in Task-21 (database extraction)
+- Start with small, independent services
+- Save large, complex services for last
+- Test after EVERY extraction
+- Commit frequently
+
+## Progress Tracking
+
+[ ] Phase 1: Quick wins (4 services)
+[ ] Phase 2: Moderate (3 services)
+[ ] Phase 3: Complex (4 services)
+[ ] Final testing and validation
+[ ] Documentation update
