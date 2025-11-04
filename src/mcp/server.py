@@ -39,6 +39,7 @@ from src.c3_workflow_routes import create_workflow_router
 from src.c3_websocket_routes import create_websocket_router
 from src.c3_messaging_routes import create_messaging_router
 from src.c3_task_routes import create_task_router
+from src.c3_memory_routes import create_memory_router
 
 logger = logging.getLogger(__name__)
 
@@ -677,6 +678,7 @@ async def startup_event():
     app.include_router(create_websocket_router(server_state))
     app.include_router(create_messaging_router(server_state))
     app.include_router(create_task_router(server_state, process_queue))
+    app.include_router(create_memory_router(server_state))
 
     # Load phases if folder is specified
     import os
@@ -1817,547 +1819,548 @@ async def background_queue_processor():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/save_memory", response_model=SaveMemoryResponse)
-async def save_memory(
-    request: SaveMemoryRequest,
-    agent_id: str = Header(..., alias="X-Agent-ID"),
-):
-    """Store important discoveries and learnings."""
-    logger.info(f"Saving memory from agent {agent_id}: {request.memory_content[:100]}...")
-
-    try:
-        # Generate memory ID immediately
-        memory_id = str(uuid.uuid4())
-
-        # Create initial memory record in database
-        session = server_state.db_manager.get_session()
-        memory = Memory(
-            id=memory_id,
-            agent_id=agent_id,
-            content=request.memory_content,
-            memory_type=request.memory_type,
-            embedding_id=None,  # Will be updated after processing
-            tags=request.tags,
-            related_files=request.related_files,
-        )
-        session.add(memory)
-        session.commit()
-        session.close()
-
-        # Process the embedding and deduplication asynchronously
-        async def process_memory_async():
-            try:
-                # 1. Generate embedding
-                embedding = await server_state.llm_provider.generate_embedding(request.memory_content)
-
-                # 2. Check for similar memories
-                similar = await server_state.vector_store.search(
-                    collection="agent_memories",
-                    query_vector=embedding,
-                    limit=5,
-                    score_threshold=0.95,  # High threshold for deduplication
-                )
-
-                # 3. If not duplicate, store in vector database
-                if not similar or similar[0]["score"] < 0.95:
-                    # Store in vector database
-                    success = await server_state.vector_store.store_memory(
-                        collection="agent_memories",
-                        memory_id=memory_id,
-                        embedding=embedding,
-                        content=request.memory_content,
-                        metadata={
-                            "agent_id": agent_id,
-                            "memory_type": request.memory_type,
-                            "related_files": request.related_files,
-                            "tags": request.tags,
-                        },
-                    )
-
-                    # Update memory with embedding ID
-                    session = server_state.db_manager.get_session()
-                    memory = session.query(Memory).filter_by(id=memory_id).first()
-                    if memory:
-                        memory.embedding_id = memory_id if success else None
-                        session.commit()
-                    session.close()
-
-                    logger.info(f"Memory {memory_id} indexed successfully in background")
-                else:
-                    # Memory is too similar to existing one - mark as duplicate
-                    session = server_state.db_manager.get_session()
-                    memory = session.query(Memory).filter_by(id=memory_id).first()
-                    if memory:
-                        # Mark as duplicate by adding a reference to the original
-                        memory.tags = (memory.tags or []) + [f"duplicate_of:{similar[0]['id']}"]
-                        session.commit()
-                    session.close()
-                    logger.info(f"Memory {memory_id} marked as duplicate of {similar[0]['id']}")
-
-            except Exception as e:
-                logger.error(f"Failed to process memory {memory_id} in background: {e}")
-                # Update memory with error status
-                session = server_state.db_manager.get_session()
-                memory = session.query(Memory).filter_by(id=memory_id).first()
-                if memory:
-                    memory.tags = (memory.tags or []) + [f"indexing_error:{str(e)[:50]}"]
-                    session.commit()
-                session.close()
-
-        # Start background processing
-        asyncio.create_task(process_memory_async())
-
-        # Return immediately with memory ID
-        return SaveMemoryResponse(
-            memory_id=memory_id,
-            indexed=True,  # Optimistically return true (indexing happens async)
-            similar_memories=None,  # Can't provide this synchronously anymore
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to save memory: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/report_results", response_model=ReportResultsResponse)
-async def report_results(
-    request: ReportResultsRequest,
-    agent_id: str = Header(..., alias="X-Agent-ID"),
-):
-    """Submit formal results for a completed task."""
-    logger.info(f"Agent {agent_id} reporting results for task {request.task_id}")
-
-    try:
-        # Import the result service
-        from src.services.result_service import ResultService
-
-        # Create the result
-        result = ResultService.create_result(
-            agent_id=agent_id,
-            task_id=request.task_id,
-            markdown_file_path=request.markdown_file_path,
-            result_type=request.result_type,
-            summary=request.summary,
-        )
-
-        # Broadcast update
-        await server_state.broadcast_update({
-            "type": "results_reported",
-            "task_id": request.task_id,
-            "agent_id": agent_id,
-            "result_id": result["result_id"],
-            "summary": request.summary[:200],
-        })
-
-        return ReportResultsResponse(
-            status=result["status"],
-            result_id=result["result_id"],
-            task_id=result["task_id"],
-            agent_id=result["agent_id"],
-            verification_status=result["verification_status"],
-            created_at=result["created_at"],
-        )
-
-    except FileNotFoundError as e:
-        logger.error(f"File not found: {e}")
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        logger.error(f"Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to report results: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/give_validation_review", response_model=GiveValidationReviewResponse)
-async def give_validation_review(
-    request: GiveValidationReviewRequest,
-    agent_id: str = Header(..., alias="X-Agent-ID"),
-):
-    """Submit validation review for a task."""
-    logger.info(f"Validation review from {agent_id}: task={request.task_id}, passed={request.validation_passed}")
-
-    try:
-        session = server_state.db_manager.get_session()
-
-        # 1. Verify caller is a validator agent
-        agent = session.query(Agent).filter_by(id=agent_id).first()
-        if not agent or agent.agent_type != "validator":
-            raise HTTPException(status_code=403, detail="Only validator agents can submit reviews")
-
-        # 2. Get task
-        task = session.query(Task).filter_by(id=request.task_id).first()
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-
-        original_agent_id = task.assigned_agent_id
-
-        # 3. Create validation review record
-        review = ValidationReview(
-            id=str(uuid.uuid4()),
-            task_id=request.task_id,
-            validator_agent_id=agent_id,
-            iteration_number=task.validation_iteration,
-            validation_passed=request.validation_passed,
-            feedback=request.feedback,
-            evidence=request.evidence,
-            recommendations=request.recommendations
-        )
-        session.add(review)
-
-        if request.validation_passed:
-            # 4a. Validation successful
-            task.status = "done"
-            task.review_done = True
-            task.completed_at = datetime.utcnow()
-
-            # Update verification status of results if they exist
-            if task.has_results:
-                from src.services.result_service import ResultService
-                results = ResultService.get_results_for_task(request.task_id)
-                for result_info in results:
-                    try:
-                        ResultService.verify_result(
-                            result_id=result_info["result_id"],
-                            validation_review_id=review.id,
-                            verified=True
-                        )
-                    except Exception as e:
-                        logger.warning(f"Failed to verify result {result_info['result_id']}: {e}")
-
-            # Create recommended follow-up tasks
-            if request.recommendations:
-                for rec in request.recommendations:
-                    follow_up_task = Task(
-                        id=str(uuid.uuid4()),
-                        raw_description=rec,
-                        done_definition="Complete as described",
-                        parent_task_id=request.task_id,
-                        created_by_agent_id=agent_id,
-                        priority="medium",
-                        status="pending"
-                    )
-                    session.add(follow_up_task)
-
-            session.commit()
-
-            # Merge agent's work to parent (if using worktrees)
-            if hasattr(server_state, 'worktree_manager') and original_agent_id:
-                try:
-                    merge_result = server_state.worktree_manager.merge_to_parent(original_agent_id)
-                    logger.info(f"Merged validated work: {merge_result}")
-                except Exception as e:
-                    logger.warning(f"Failed to merge validated work: {e}")
-
-            # Terminate both original and validator agents, then process queue
-            async def terminate_both_and_process_queue():
-                await server_state.agent_manager.terminate_agent(original_agent_id)
-                await server_state.agent_manager.terminate_agent(agent_id)
-                await process_queue()
-
-            asyncio.create_task(terminate_both_and_process_queue())
-
-            # Broadcast success
-            await server_state.broadcast_update({
-                "type": "validation_passed",
-                "task_id": request.task_id,
-                "agent_id": original_agent_id,
-                "validator_id": agent_id,
-                "iteration": task.validation_iteration
-            })
-
-            return GiveValidationReviewResponse(
-                status="completed",
-                message="Validation passed, task completed",
-                iteration=task.validation_iteration
-            )
-
-        else:
-            # 4b. Validation failed - send feedback to original agent
-            task.status = "needs_work"
-            task.last_validation_feedback = request.feedback
-            session.commit()
-
-            # Send feedback to the still-running agent
-            from src.validation.validator_agent import send_feedback_to_agent
-            feedback_sent = send_feedback_to_agent(
-                agent_id=original_agent_id,
-                feedback=request.feedback,
-                iteration=task.validation_iteration
-            )
-
-            if not feedback_sent:
-                logger.error(f"Failed to send feedback to agent {original_agent_id}")
-
-            # Terminate validator (its job is done) and process queue
-            async def terminate_validator_and_process_queue():
-                await server_state.agent_manager.terminate_agent(agent_id)
-                await process_queue()
-
-            asyncio.create_task(terminate_validator_and_process_queue())
-
-            # Broadcast validation failure
-            await server_state.broadcast_update({
-                "type": "validation_failed",
-                "task_id": request.task_id,
-                "agent_id": original_agent_id,
-                "validator_id": agent_id,
-                "iteration": task.validation_iteration
-            })
-
-            return GiveValidationReviewResponse(
-                status="needs_work",
-                message="Validation failed, feedback sent to agent",
-                iteration=task.validation_iteration
-            )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to process validation review: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        session.close()
-
-
-@app.post("/submit_result", response_model=SubmitResultResponse)
-async def submit_result(
-    request: SubmitResultRequest,
-    agent_id: str = Header(..., alias="X-Agent-ID"),
-):
-    """Submit a workflow result for validation."""
-    try:
-        logger.info(f"Agent {agent_id} submitting result: {request.explanation}")
-
-        # Get agent's task to determine workflow_id
-        session = server_state.db_manager.get_session()
-        try:
-            agent = session.query(Agent).filter_by(id=agent_id).first()
-            if not agent:
-                raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
-
-            # Find the agent's assigned task
-            task = session.query(Task).filter_by(assigned_agent_id=agent_id).first()
-            if not task:
-                raise HTTPException(status_code=404, detail=f"No task found for agent: {agent_id}")
-
-            workflow_id = task.workflow_id
-            if not workflow_id:
-                raise HTTPException(status_code=400, detail=f"Task {task.id} has no workflow_id")
-
-            logger.info(f"Derived workflow_id {workflow_id} from agent {agent_id}'s task {task.id}")
-
-        finally:
-            session.close()
-
-        # Submit the result
-        result = WorkflowResultService.submit_result(
-            agent_id=agent_id,
-            workflow_id=workflow_id,
-            markdown_file_path=request.markdown_file_path,
-            explanation=request.explanation,
-            evidence=request.evidence,
-        )
-
-        # Create AgentResult entry for tracking
-        session = server_state.db_manager.get_session()
-        try:
-            # Get the task to link AgentResult
-            task = session.query(Task).filter_by(assigned_agent_id=agent_id).first()
-            if task:
-                with open(request.markdown_file_path, 'r') as f:
-                    markdown_content = f.read()
-
-                agent_result = AgentResult(
-                    id=f"agent-result-{uuid.uuid4()}",
-                    agent_id=agent_id,
-                    task_id=task.id,
-                    markdown_content=markdown_content,
-                    markdown_file_path=request.markdown_file_path,
-                    result_type="implementation",  # Default to implementation for workflow results
-                    summary=request.explanation or "Workflow result submitted",
-                    created_at=datetime.utcnow()
-                )
-                session.add(agent_result)
-                session.commit()
-                logger.info(f"Created AgentResult {agent_result.id} for workflow result {result['result_id']}")
-        except Exception as e:
-            logger.warning(f"Failed to create AgentResult entry: {e}")
-            session.rollback()
-        finally:
-            session.close()
-
-        # Create commit for result submission
-        commit_sha = None
-        if hasattr(server_state, 'worktree_manager'):
-            try:
-                commit_result = server_state.worktree_manager.commit_for_validation(
-                    agent_id=agent_id,
-                    iteration=1,  # Results are always first iteration
-                    message="Result submitted for workflow validation"
-                )
-                commit_sha = commit_result.get("commit_sha")
-                logger.info(f"Created commit {commit_sha} for result submission by agent {agent_id}")
-            except Exception as e:
-                logger.warning(f"Failed to create result submission commit: {e}")
-
-        # Check if validation should be triggered
-        should_validate, criteria = server_state.result_validator_service.should_spawn_validator(
-            workflow_id
-        )
-
-        validation_triggered = False
-        if should_validate and criteria:
-            # Spawn validator asynchronously using unified validator system
-            async def spawn_validator_async():
-                try:
-                    from src.validation.validator_agent import spawn_validator_agent
-                    validator_id = await spawn_validator_agent(
-                        validation_type="result",
-                        target_id=result["result_id"],
-                        workflow_id=workflow_id,
-                        commit_sha=commit_sha or "HEAD",
-                        db_manager=server_state.db_manager,
-                        worktree_manager=getattr(server_state, 'worktree_manager', None),
-                        agent_manager=server_state.agent_manager,
-                        criteria=criteria,
-                        original_agent_id=agent_id
-                    )
-                    logger.info(f"Spawned result validator {validator_id} for result {result['result_id']}")
-                except Exception as e:
-                    logger.error(f"Failed to spawn result validator: {e}")
-
-            asyncio.create_task(spawn_validator_async())
-            validation_triggered = True
-
-        # Broadcast result submission
-        await server_state.broadcast_update({
-            "type": "result_submitted",
-            "result_id": result["result_id"],
-            "workflow_id": workflow_id,
-            "agent_id": agent_id,
-            "validation_triggered": validation_triggered,
-        })
-
-        return SubmitResultResponse(
-            status=result["status"],
-            result_id=result["result_id"],
-            workflow_id=workflow_id,
-            agent_id=agent_id,
-            validation_triggered=validation_triggered,
-            message="Result submitted successfully" + (" and validation triggered" if validation_triggered else ""),
-            created_at=result["created_at"],
-        )
-
-    except FileNotFoundError as e:
-        logger.error(f"File not found: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except ValueError as e:
-        logger.error(f"Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to submit result: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/submit_result_validation", response_model=SubmitResultValidationResponse)
-async def submit_result_validation(
-    request: SubmitResultValidationRequest,
-):
-    """Submit validation review for a workflow result (validator agents only)."""
-    try:
-        logger.info(f"Processing validation for result {request.result_id}")
-
-        # Get the workflow result to find the validator agent
-        session = server_state.db_manager.get_session()
-        try:
-            result = session.query(WorkflowResult).filter_by(id=request.result_id).first()
-            if not result:
-                raise HTTPException(status_code=404, detail=f"Result {request.result_id} not found")
-
-            # The validator agent should be the one that currently has this result assigned
-            # We can find it by looking for the most recent result_validator agent for this workflow
-            validator_agent = session.query(Agent).filter(
-                Agent.agent_type == "result_validator"
-            ).order_by(Agent.created_at.desc()).first()
-
-            if not validator_agent:
-                raise HTTPException(status_code=500, detail="No validator agent found for this validation")
-
-            agent_id = validator_agent.id
-            logger.info(f"Using validator agent {agent_id} for result {request.result_id}")
-        finally:
-            session.close()
-
-        # Process validation outcome
-        outcome = server_state.result_validator_service.process_validation_outcome(
-            result_id=request.result_id,
-            passed=request.validation_passed,
-            feedback=request.feedback,
-            evidence=request.evidence,
-            validator_agent_id=agent_id
-        )
-
-        # Handle workflow actions
-        workflow_action_taken = None
-        if "terminate_workflow" in outcome["next_actions"]:
-            # Import termination handler when needed
-            from src.workflow.termination_handler import WorkflowTerminationHandler
-            termination_handler = WorkflowTerminationHandler(
-                db_manager=server_state.db_manager,
-                agent_manager=server_state.agent_manager
-            )
-
-            await termination_handler.terminate_workflow(outcome["workflow_id"])
-            workflow_action_taken = "workflow_terminated"
-            logger.info(f"Terminated workflow {outcome['workflow_id']} due to validated result")
-
-        elif "continue_workflow" in outcome["next_actions"]:
-            workflow_action_taken = "workflow_continues"
-            logger.info(f"Workflow {outcome['workflow_id']} continues after validated result")
-
-        # Terminate validator agent and process queue
-        async def terminate_result_validator_and_process_queue():
-            await server_state.agent_manager.terminate_agent(agent_id)
-            await process_queue()
-
-        asyncio.create_task(terminate_result_validator_and_process_queue())
-
-        # Broadcast validation result
-        await server_state.broadcast_update({
-            "type": "result_validation_completed",
-            "result_id": request.result_id,
-            "workflow_id": outcome["workflow_id"],
-            "validation_passed": request.validation_passed,
-            "validator_agent_id": agent_id,
-            "workflow_action": workflow_action_taken,
-        })
-
-        status = "workflow_terminated" if workflow_action_taken == "workflow_terminated" else "completed"
-        message = f"Validation {'passed' if request.validation_passed else 'failed'}"
-        if workflow_action_taken == "workflow_terminated":
-            message += " - workflow terminated"
-        elif workflow_action_taken == "workflow_continues":
-            message += " - workflow continues"
-
-        return SubmitResultValidationResponse(
-            status=status,
-            message=message,
-            workflow_action_taken=workflow_action_taken,
-            result_id=request.result_id,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to process result validation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# EXTRACTED TO: src/c3_workflow_routes/workflow_routes.py
-# @app.get("/workflows/{workflow_id}/results")
-# async def get_workflow_results(
-#     workflow_id: str,
+# EXTRACTED TO: src/c3_memory_routes/memory_routes.py
+# @app.post("/save_memory", response_model=SaveMemoryResponse)
+# async def save_memory(
+#     request: SaveMemoryRequest,
+#     agent_id: str = Header(..., alias="X-Agent-ID"),
+# ):
+#     """Store important discoveries and learnings."""
+#     logger.info(f"Saving memory from agent {agent_id}: {request.memory_content[:100]}...")
+# 
+#     try:
+#         # Generate memory ID immediately
+#         memory_id = str(uuid.uuid4())
+# 
+#         # Create initial memory record in database
+#         session = server_state.db_manager.get_session()
+#         memory = Memory(
+#             id=memory_id,
+#             agent_id=agent_id,
+#             content=request.memory_content,
+#             memory_type=request.memory_type,
+#             embedding_id=None,  # Will be updated after processing
+#             tags=request.tags,
+#             related_files=request.related_files,
+#         )
+#         session.add(memory)
+#         session.commit()
+#         session.close()
+# 
+#         # Process the embedding and deduplication asynchronously
+#         async def process_memory_async():
+#             try:
+#                 # 1. Generate embedding
+#                 embedding = await server_state.llm_provider.generate_embedding(request.memory_content)
+# 
+#                 # 2. Check for similar memories
+#                 similar = await server_state.vector_store.search(
+#                     collection="agent_memories",
+#                     query_vector=embedding,
+#                     limit=5,
+#                     score_threshold=0.95,  # High threshold for deduplication
+#                 )
+# 
+#                 # 3. If not duplicate, store in vector database
+#                 if not similar or similar[0]["score"] < 0.95:
+#                     # Store in vector database
+#                     success = await server_state.vector_store.store_memory(
+#                         collection="agent_memories",
+#                         memory_id=memory_id,
+#                         embedding=embedding,
+#                         content=request.memory_content,
+#                         metadata={
+#                             "agent_id": agent_id,
+#                             "memory_type": request.memory_type,
+#                             "related_files": request.related_files,
+#                             "tags": request.tags,
+#                         },
+#                     )
+# 
+#                     # Update memory with embedding ID
+#                     session = server_state.db_manager.get_session()
+#                     memory = session.query(Memory).filter_by(id=memory_id).first()
+#                     if memory:
+#                         memory.embedding_id = memory_id if success else None
+#                         session.commit()
+#                     session.close()
+# 
+#                     logger.info(f"Memory {memory_id} indexed successfully in background")
+#                 else:
+#                     # Memory is too similar to existing one - mark as duplicate
+#                     session = server_state.db_manager.get_session()
+#                     memory = session.query(Memory).filter_by(id=memory_id).first()
+#                     if memory:
+#                         # Mark as duplicate by adding a reference to the original
+#                         memory.tags = (memory.tags or []) + [f"duplicate_of:{similar[0]['id']}"]
+#                         session.commit()
+#                     session.close()
+#                     logger.info(f"Memory {memory_id} marked as duplicate of {similar[0]['id']}")
+# 
+#             except Exception as e:
+#                 logger.error(f"Failed to process memory {memory_id} in background: {e}")
+#                 # Update memory with error status
+#                 session = server_state.db_manager.get_session()
+#                 memory = session.query(Memory).filter_by(id=memory_id).first()
+#                 if memory:
+#                     memory.tags = (memory.tags or []) + [f"indexing_error:{str(e)[:50]}"]
+#                     session.commit()
+#                 session.close()
+# 
+#         # Start background processing
+#         asyncio.create_task(process_memory_async())
+# 
+#         # Return immediately with memory ID
+#         return SaveMemoryResponse(
+#             memory_id=memory_id,
+#             indexed=True,  # Optimistically return true (indexing happens async)
+#             similar_memories=None,  # Can't provide this synchronously anymore
+#         )
+# 
+#     except Exception as e:
+#         logger.error(f"Failed to save memory: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
+# 
+# 
+# @app.post("/report_results", response_model=ReportResultsResponse)
+# async def report_results(
+#     request: ReportResultsRequest,
+#     agent_id: str = Header(..., alias="X-Agent-ID"),
+# ):
+#     """Submit formal results for a completed task."""
+#     logger.info(f"Agent {agent_id} reporting results for task {request.task_id}")
+# 
+#     try:
+#         # Import the result service
+#         from src.services.result_service import ResultService
+# 
+#         # Create the result
+#         result = ResultService.create_result(
+#             agent_id=agent_id,
+#             task_id=request.task_id,
+#             markdown_file_path=request.markdown_file_path,
+#             result_type=request.result_type,
+#             summary=request.summary,
+#         )
+# 
+#         # Broadcast update
+#         await server_state.broadcast_update({
+#             "type": "results_reported",
+#             "task_id": request.task_id,
+#             "agent_id": agent_id,
+#             "result_id": result["result_id"],
+#             "summary": request.summary[:200],
+#         })
+# 
+#         return ReportResultsResponse(
+#             status=result["status"],
+#             result_id=result["result_id"],
+#             task_id=result["task_id"],
+#             agent_id=result["agent_id"],
+#             verification_status=result["verification_status"],
+#             created_at=result["created_at"],
+#         )
+# 
+#     except FileNotFoundError as e:
+#         logger.error(f"File not found: {e}")
+#         raise HTTPException(status_code=404, detail=str(e))
+#     except ValueError as e:
+#         logger.error(f"Validation error: {e}")
+#         raise HTTPException(status_code=400, detail=str(e))
+#     except Exception as e:
+#         logger.error(f"Failed to report results: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
+# 
+# 
+# @app.post("/give_validation_review", response_model=GiveValidationReviewResponse)
+# async def give_validation_review(
+#     request: GiveValidationReviewRequest,
+#     agent_id: str = Header(..., alias="X-Agent-ID"),
+# ):
+#     """Submit validation review for a task."""
+#     logger.info(f"Validation review from {agent_id}: task={request.task_id}, passed={request.validation_passed}")
+# 
+#     try:
+#         session = server_state.db_manager.get_session()
+# 
+#         # 1. Verify caller is a validator agent
+#         agent = session.query(Agent).filter_by(id=agent_id).first()
+#         if not agent or agent.agent_type != "validator":
+#             raise HTTPException(status_code=403, detail="Only validator agents can submit reviews")
+# 
+#         # 2. Get task
+#         task = session.query(Task).filter_by(id=request.task_id).first()
+#         if not task:
+#             raise HTTPException(status_code=404, detail="Task not found")
+# 
+#         original_agent_id = task.assigned_agent_id
+# 
+#         # 3. Create validation review record
+#         review = ValidationReview(
+#             id=str(uuid.uuid4()),
+#             task_id=request.task_id,
+#             validator_agent_id=agent_id,
+#             iteration_number=task.validation_iteration,
+#             validation_passed=request.validation_passed,
+#             feedback=request.feedback,
+#             evidence=request.evidence,
+#             recommendations=request.recommendations
+#         )
+#         session.add(review)
+# 
+#         if request.validation_passed:
+#             # 4a. Validation successful
+#             task.status = "done"
+#             task.review_done = True
+#             task.completed_at = datetime.utcnow()
+# 
+#             # Update verification status of results if they exist
+#             if task.has_results:
+#                 from src.services.result_service import ResultService
+#                 results = ResultService.get_results_for_task(request.task_id)
+#                 for result_info in results:
+#                     try:
+#                         ResultService.verify_result(
+#                             result_id=result_info["result_id"],
+#                             validation_review_id=review.id,
+#                             verified=True
+#                         )
+#                     except Exception as e:
+#                         logger.warning(f"Failed to verify result {result_info['result_id']}: {e}")
+# 
+#             # Create recommended follow-up tasks
+#             if request.recommendations:
+#                 for rec in request.recommendations:
+#                     follow_up_task = Task(
+#                         id=str(uuid.uuid4()),
+#                         raw_description=rec,
+#                         done_definition="Complete as described",
+#                         parent_task_id=request.task_id,
+#                         created_by_agent_id=agent_id,
+#                         priority="medium",
+#                         status="pending"
+#                     )
+#                     session.add(follow_up_task)
+# 
+#             session.commit()
+# 
+#             # Merge agent's work to parent (if using worktrees)
+#             if hasattr(server_state, 'worktree_manager') and original_agent_id:
+#                 try:
+#                     merge_result = server_state.worktree_manager.merge_to_parent(original_agent_id)
+#                     logger.info(f"Merged validated work: {merge_result}")
+#                 except Exception as e:
+#                     logger.warning(f"Failed to merge validated work: {e}")
+# 
+#             # Terminate both original and validator agents, then process queue
+#             async def terminate_both_and_process_queue():
+#                 await server_state.agent_manager.terminate_agent(original_agent_id)
+#                 await server_state.agent_manager.terminate_agent(agent_id)
+#                 await process_queue()
+# 
+#             asyncio.create_task(terminate_both_and_process_queue())
+# 
+#             # Broadcast success
+#             await server_state.broadcast_update({
+#                 "type": "validation_passed",
+#                 "task_id": request.task_id,
+#                 "agent_id": original_agent_id,
+#                 "validator_id": agent_id,
+#                 "iteration": task.validation_iteration
+#             })
+# 
+#             return GiveValidationReviewResponse(
+#                 status="completed",
+#                 message="Validation passed, task completed",
+#                 iteration=task.validation_iteration
+#             )
+# 
+#         else:
+#             # 4b. Validation failed - send feedback to original agent
+#             task.status = "needs_work"
+#             task.last_validation_feedback = request.feedback
+#             session.commit()
+# 
+#             # Send feedback to the still-running agent
+#             from src.validation.validator_agent import send_feedback_to_agent
+#             feedback_sent = send_feedback_to_agent(
+#                 agent_id=original_agent_id,
+#                 feedback=request.feedback,
+#                 iteration=task.validation_iteration
+#             )
+# 
+#             if not feedback_sent:
+#                 logger.error(f"Failed to send feedback to agent {original_agent_id}")
+# 
+#             # Terminate validator (its job is done) and process queue
+#             async def terminate_validator_and_process_queue():
+#                 await server_state.agent_manager.terminate_agent(agent_id)
+#                 await process_queue()
+# 
+#             asyncio.create_task(terminate_validator_and_process_queue())
+# 
+#             # Broadcast validation failure
+#             await server_state.broadcast_update({
+#                 "type": "validation_failed",
+#                 "task_id": request.task_id,
+#                 "agent_id": original_agent_id,
+#                 "validator_id": agent_id,
+#                 "iteration": task.validation_iteration
+#             })
+# 
+#             return GiveValidationReviewResponse(
+#                 status="needs_work",
+#                 message="Validation failed, feedback sent to agent",
+#                 iteration=task.validation_iteration
+#             )
+# 
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Failed to process validation review: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
+#     finally:
+#         session.close()
+# 
+# 
+# @app.post("/submit_result", response_model=SubmitResultResponse)
+# async def submit_result(
+#     request: SubmitResultRequest,
+#     agent_id: str = Header(..., alias="X-Agent-ID"),
+# ):
+#     """Submit a workflow result for validation."""
+#     try:
+#         logger.info(f"Agent {agent_id} submitting result: {request.explanation}")
+# 
+#         # Get agent's task to determine workflow_id
+#         session = server_state.db_manager.get_session()
+#         try:
+#             agent = session.query(Agent).filter_by(id=agent_id).first()
+#             if not agent:
+#                 raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
+# 
+#             # Find the agent's assigned task
+#             task = session.query(Task).filter_by(assigned_agent_id=agent_id).first()
+#             if not task:
+#                 raise HTTPException(status_code=404, detail=f"No task found for agent: {agent_id}")
+# 
+#             workflow_id = task.workflow_id
+#             if not workflow_id:
+#                 raise HTTPException(status_code=400, detail=f"Task {task.id} has no workflow_id")
+# 
+#             logger.info(f"Derived workflow_id {workflow_id} from agent {agent_id}'s task {task.id}")
+# 
+#         finally:
+#             session.close()
+# 
+#         # Submit the result
+#         result = WorkflowResultService.submit_result(
+#             agent_id=agent_id,
+#             workflow_id=workflow_id,
+#             markdown_file_path=request.markdown_file_path,
+#             explanation=request.explanation,
+#             evidence=request.evidence,
+#         )
+# 
+#         # Create AgentResult entry for tracking
+#         session = server_state.db_manager.get_session()
+#         try:
+#             # Get the task to link AgentResult
+#             task = session.query(Task).filter_by(assigned_agent_id=agent_id).first()
+#             if task:
+#                 with open(request.markdown_file_path, 'r') as f:
+#                     markdown_content = f.read()
+# 
+#                 agent_result = AgentResult(
+#                     id=f"agent-result-{uuid.uuid4()}",
+#                     agent_id=agent_id,
+#                     task_id=task.id,
+#                     markdown_content=markdown_content,
+#                     markdown_file_path=request.markdown_file_path,
+#                     result_type="implementation",  # Default to implementation for workflow results
+#                     summary=request.explanation or "Workflow result submitted",
+#                     created_at=datetime.utcnow()
+#                 )
+#                 session.add(agent_result)
+#                 session.commit()
+#                 logger.info(f"Created AgentResult {agent_result.id} for workflow result {result['result_id']}")
+#         except Exception as e:
+#             logger.warning(f"Failed to create AgentResult entry: {e}")
+#             session.rollback()
+#         finally:
+#             session.close()
+# 
+#         # Create commit for result submission
+#         commit_sha = None
+#         if hasattr(server_state, 'worktree_manager'):
+#             try:
+#                 commit_result = server_state.worktree_manager.commit_for_validation(
+#                     agent_id=agent_id,
+#                     iteration=1,  # Results are always first iteration
+#                     message="Result submitted for workflow validation"
+#                 )
+#                 commit_sha = commit_result.get("commit_sha")
+#                 logger.info(f"Created commit {commit_sha} for result submission by agent {agent_id}")
+#             except Exception as e:
+#                 logger.warning(f"Failed to create result submission commit: {e}")
+# 
+#         # Check if validation should be triggered
+#         should_validate, criteria = server_state.result_validator_service.should_spawn_validator(
+#             workflow_id
+#         )
+# 
+#         validation_triggered = False
+#         if should_validate and criteria:
+#             # Spawn validator asynchronously using unified validator system
+#             async def spawn_validator_async():
+#                 try:
+#                     from src.validation.validator_agent import spawn_validator_agent
+#                     validator_id = await spawn_validator_agent(
+#                         validation_type="result",
+#                         target_id=result["result_id"],
+#                         workflow_id=workflow_id,
+#                         commit_sha=commit_sha or "HEAD",
+#                         db_manager=server_state.db_manager,
+#                         worktree_manager=getattr(server_state, 'worktree_manager', None),
+#                         agent_manager=server_state.agent_manager,
+#                         criteria=criteria,
+#                         original_agent_id=agent_id
+#                     )
+#                     logger.info(f"Spawned result validator {validator_id} for result {result['result_id']}")
+#                 except Exception as e:
+#                     logger.error(f"Failed to spawn result validator: {e}")
+# 
+#             asyncio.create_task(spawn_validator_async())
+#             validation_triggered = True
+# 
+#         # Broadcast result submission
+#         await server_state.broadcast_update({
+#             "type": "result_submitted",
+#             "result_id": result["result_id"],
+#             "workflow_id": workflow_id,
+#             "agent_id": agent_id,
+#             "validation_triggered": validation_triggered,
+#         })
+# 
+#         return SubmitResultResponse(
+#             status=result["status"],
+#             result_id=result["result_id"],
+#             workflow_id=workflow_id,
+#             agent_id=agent_id,
+#             validation_triggered=validation_triggered,
+#             message="Result submitted successfully" + (" and validation triggered" if validation_triggered else ""),
+#             created_at=result["created_at"],
+#         )
+# 
+#     except FileNotFoundError as e:
+#         logger.error(f"File not found: {e}")
+#         raise HTTPException(status_code=400, detail=str(e))
+#     except ValueError as e:
+#         logger.error(f"Validation error: {e}")
+#         raise HTTPException(status_code=400, detail=str(e))
+#     except Exception as e:
+#         logger.error(f"Failed to submit result: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
+# 
+# 
+# @app.post("/submit_result_validation", response_model=SubmitResultValidationResponse)
+# async def submit_result_validation(
+#     request: SubmitResultValidationRequest,
+# ):
+#     """Submit validation review for a workflow result (validator agents only)."""
+#     try:
+#         logger.info(f"Processing validation for result {request.result_id}")
+# 
+#         # Get the workflow result to find the validator agent
+#         session = server_state.db_manager.get_session()
+#         try:
+#             result = session.query(WorkflowResult).filter_by(id=request.result_id).first()
+#             if not result:
+#                 raise HTTPException(status_code=404, detail=f"Result {request.result_id} not found")
+# 
+#             # The validator agent should be the one that currently has this result assigned
+#             # We can find it by looking for the most recent result_validator agent for this workflow
+#             validator_agent = session.query(Agent).filter(
+#                 Agent.agent_type == "result_validator"
+#             ).order_by(Agent.created_at.desc()).first()
+# 
+#             if not validator_agent:
+#                 raise HTTPException(status_code=500, detail="No validator agent found for this validation")
+# 
+#             agent_id = validator_agent.id
+#             logger.info(f"Using validator agent {agent_id} for result {request.result_id}")
+#         finally:
+#             session.close()
+# 
+#         # Process validation outcome
+#         outcome = server_state.result_validator_service.process_validation_outcome(
+#             result_id=request.result_id,
+#             passed=request.validation_passed,
+#             feedback=request.feedback,
+#             evidence=request.evidence,
+#             validator_agent_id=agent_id
+#         )
+# 
+#         # Handle workflow actions
+#         workflow_action_taken = None
+#         if "terminate_workflow" in outcome["next_actions"]:
+#             # Import termination handler when needed
+#             from src.workflow.termination_handler import WorkflowTerminationHandler
+#             termination_handler = WorkflowTerminationHandler(
+#                 db_manager=server_state.db_manager,
+#                 agent_manager=server_state.agent_manager
+#             )
+# 
+#             await termination_handler.terminate_workflow(outcome["workflow_id"])
+#             workflow_action_taken = "workflow_terminated"
+#             logger.info(f"Terminated workflow {outcome['workflow_id']} due to validated result")
+# 
+#         elif "continue_workflow" in outcome["next_actions"]:
+#             workflow_action_taken = "workflow_continues"
+#             logger.info(f"Workflow {outcome['workflow_id']} continues after validated result")
+# 
+#         # Terminate validator agent and process queue
+#         async def terminate_result_validator_and_process_queue():
+#             await server_state.agent_manager.terminate_agent(agent_id)
+#             await process_queue()
+# 
+#         asyncio.create_task(terminate_result_validator_and_process_queue())
+# 
+#         # Broadcast validation result
+#         await server_state.broadcast_update({
+#             "type": "result_validation_completed",
+#             "result_id": request.result_id,
+#             "workflow_id": outcome["workflow_id"],
+#             "validation_passed": request.validation_passed,
+#             "validator_agent_id": agent_id,
+#             "workflow_action": workflow_action_taken,
+#         })
+# 
+#         status = "workflow_terminated" if workflow_action_taken == "workflow_terminated" else "completed"
+#         message = f"Validation {'passed' if request.validation_passed else 'failed'}"
+#         if workflow_action_taken == "workflow_terminated":
+#             message += " - workflow terminated"
+#         elif workflow_action_taken == "workflow_continues":
+#             message += " - workflow continues"
+# 
+#         return SubmitResultValidationResponse(
+#             status=status,
+#             message=message,
+#             workflow_action_taken=workflow_action_taken,
+#             result_id=request.result_id,
+#         )
+# 
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Failed to process result validation: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
+# 
+# 
+# # EXTRACTED TO: src/c3_workflow_routes/workflow_routes.py
+# # @app.get("/workflows/{workflow_id}/results")
+# # async def get_workflow_results(
+# #     workflow_id: str,
 #     requesting_agent_id: str = Header(None, alias="X-Agent-ID"),
 # ):
 #     """Get all results for a specific workflow."""
