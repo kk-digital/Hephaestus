@@ -490,3 +490,32 @@ Total c1 modules created: 15
 [ ] Commit Task-24 file
 [ ] Continue with remaining c1 extraction or start Task-24
 [ ] Decide priority: finish c1 layer vs integrate upstream changes
+
+## Task-24 Upstream Integration - CRITICAL FINDINGS (2025-11-04)
+
+### Key Discovery
+
+Upstream does NOT have our three-layer refactoring:
+- They still have monolithic database.py (988 lines, all models inline)
+- We have extracted models to 15 c1 modules (agent, task, memory, workflow, monitoring, ticket, user, database_session)
+- Our structure is SUPERIOR and should be KEPT
+
+### Integration Strategy
+
+**Category A (Already Refactored)**:
+- database.py: KEEP our c1 modules, NO porting needed (upstream is old monolithic structure)
+- user_models.py: Check for NEW fields/models, port to c1_user_models if any
+- Monitoring files: Apply functional changes (we only extracted enums)
+- worktree_manager.py: Apply functional changes (we only extracted enums)
+
+**Category B (Not Refactored)**: Applied directly (14 files) - DONE ✓
+**Category C (Non-Code)**: Applied directly (9 files) - DONE ✓
+
+### Files Remaining
+
+- [ ] Check user_models.py for new fields
+- [ ] Port monitoring functional changes (monitor.py, conductor.py, guardian.py)
+- [ ] Port worktree_manager.py functional changes
+- [ ] Test all imports and backward compatibility
+- [ ] Run full test suite
+
