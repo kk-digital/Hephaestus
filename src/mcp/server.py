@@ -42,6 +42,7 @@ from src.c3_task_routes import create_task_router
 from src.c3_memory_routes import create_memory_router
 from src.c3_agent_routes import create_agent_router
 from src.c3_ticket_routes import create_ticket_router
+from src.c3_mcp_routes import create_mcp_router
 
 logger = logging.getLogger(__name__)
 
@@ -683,6 +684,7 @@ async def startup_event():
     app.include_router(create_memory_router(server_state))
     app.include_router(create_agent_router(server_state, process_queue))
     app.include_router(create_ticket_router(server_state))
+    app.include_router(create_mcp_router(server_state))
 
     # Load phases if folder is specified
     import os
@@ -4101,170 +4103,170 @@ async def root():
     }
 
 
-# MCP Protocol endpoints
-@app.get("/tools")
-async def list_tools():
-    """List available MCP tools."""
-    return {
-        "tools": [
-            {
-                "name": "create_task",
-                "description": "Create a new task for an autonomous agent",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "task_description": {"type": "string"},
-                        "done_definition": {"type": "string"},
-                        "priority": {"type": "string", "enum": ["low", "medium", "high"]}
-                    },
-                    "required": ["task_description", "done_definition"]
-                }
-            },
-            {
-                "name": "save_memory",
-                "description": "Save a memory to the knowledge base",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "content": {"type": "string"},
-                        "memory_type": {"type": "string"},
-                        "tags": {"type": "array", "items": {"type": "string"}}
-                    },
-                    "required": ["content", "memory_type"]
-                }
-            },
-            {
-                "name": "get_task_status",
-                "description": "Get status of all tasks",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {}
-                }
-            }
-        ]
-    }
-
-
-@app.post("/tools/execute")
-async def execute_tool(request: Dict[str, Any]):
-    """Execute an MCP tool."""
-    tool_name = request.get("tool")
-    arguments = request.get("arguments", {})
-
-    if tool_name == "create_task":
-        # Forward to create_task endpoint
-        return await create_task(
-            CreateTaskRequest(
-                task_description=arguments.get("task_description"),
-                done_definition=arguments.get("done_definition"),
-                ai_agent_id="mcp-claude",
-                priority=arguments.get("priority", "medium")
-            ),
-            agent_id="mcp-claude"
-        )
-    elif tool_name == "save_memory":
-        # Forward to save_memory endpoint
-        return await save_memory(
-            SaveMemoryRequest(
-                content=arguments.get("content"),
-                memory_type=arguments.get("memory_type", "discovery"),
-                tags=arguments.get("tags", []),
-                related_files=arguments.get("related_files", [])
-            ),
-            agent_id="mcp-claude"
-        )
-    elif tool_name == "get_task_status":
-        return await task_progress()
-    else:
-        raise HTTPException(status_code=400, detail=f"Unknown tool: {tool_name}")
-
-
-@app.get("/resources")
-async def list_resources():
-    """List available MCP resources."""
-    session = server_state.db_manager.get_session()
-    try:
-        tasks = session.query(Task).filter(Task.status != "done").all()
-        return {
-            "resources": [
-                {
-                    "uri": f"task://{task.id}",
-                    "name": f"Task: {task.id[:8]}",
-                    "description": (task.enriched_description or task.raw_description)[:100],
-                    "mimeType": "application/json"
-                }
-                for task in tasks
-            ]
-        }
-    finally:
-        session.close()
-
-
-@app.get("/resources/{resource_uri:path}")
-async def get_resource(resource_uri: str):
-    """Get a specific MCP resource."""
-    if resource_uri.startswith("task://"):
-        task_id = resource_uri.replace("task://", "")
-        session = server_state.db_manager.get_session()
-        try:
-            task = session.query(Task).filter_by(id=task_id).first()
-            if task:
-                return {
-                    "uri": resource_uri,
-                    "content": {
-                        "id": task.id,
-                        "description": task.enriched_description or task.raw_description,
-                        "status": task.status,
-                        "assigned_agent": task.assigned_agent_id,
-                        "created_at": task.created_at.isoformat() if task.created_at else None
-                    }
-                }
-            else:
-                raise HTTPException(status_code=404, detail="Task not found")
-        finally:
-            session.close()
-    else:
-        raise HTTPException(status_code=404, detail="Resource not found")
-
-
-@app.get("/sse")
-async def sse_endpoint():
-    """Server-Sent Events endpoint for Claude MCP integration."""
-    async def event_generator():
-        """Generate SSE events."""
-        # Send initial connection event
-        yield f"data: {json.dumps({'type': 'connected', 'message': 'Connected to Hephaestus MCP Server', 'timestamp': datetime.utcnow().isoformat()})}\n\n"
-
-        # Create a queue for this SSE connection
-        event_queue = asyncio.Queue(maxsize=100)
-        server_state.sse_queues.append(event_queue)
-
-        try:
-            while True:
-                # Wait for events to send
-                try:
-                    # Check for events with timeout to send keepalive
-                    event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
-                    yield f"data: {json.dumps(event)}\n\n"
-                except asyncio.TimeoutError:
-                    # Send keepalive event every 30 seconds
-                    yield f"data: {json.dumps({'type': 'keepalive', 'timestamp': datetime.utcnow().isoformat()})}\n\n"
-        except asyncio.CancelledError:
-            # Clean up when connection is closed
-            if event_queue in server_state.sse_queues:
-                server_state.sse_queues.remove(event_queue)
-            raise
-        finally:
-            # Ensure cleanup
-            if event_queue in server_state.sse_queues:
-                server_state.sse_queues.remove(event_queue)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
+# # MCP Protocol endpoints
+# @app.get("/tools")
+# async def list_tools():
+#     """List available MCP tools."""
+#     return {
+#         "tools": [
+#             {
+#                 "name": "create_task",
+#                 "description": "Create a new task for an autonomous agent",
+#                 "input_schema": {
+#                     "type": "object",
+#                     "properties": {
+#                         "task_description": {"type": "string"},
+#                         "done_definition": {"type": "string"},
+#                         "priority": {"type": "string", "enum": ["low", "medium", "high"]}
+#                     },
+#                     "required": ["task_description", "done_definition"]
+#                 }
+#             },
+#             {
+#                 "name": "save_memory",
+#                 "description": "Save a memory to the knowledge base",
+#                 "input_schema": {
+#                     "type": "object",
+#                     "properties": {
+#                         "content": {"type": "string"},
+#                         "memory_type": {"type": "string"},
+#                         "tags": {"type": "array", "items": {"type": "string"}}
+#                     },
+#                     "required": ["content", "memory_type"]
+#                 }
+#             },
+#             {
+#                 "name": "get_task_status",
+#                 "description": "Get status of all tasks",
+#                 "input_schema": {
+#                     "type": "object",
+#                     "properties": {}
+#                 }
+#             }
+#         ]
+#     }
+# 
+# 
+# @app.post("/tools/execute")
+# async def execute_tool(request: Dict[str, Any]):
+#     """Execute an MCP tool."""
+#     tool_name = request.get("tool")
+#     arguments = request.get("arguments", {})
+# 
+#     if tool_name == "create_task":
+#         # Forward to create_task endpoint
+#         return await create_task(
+#             CreateTaskRequest(
+#                 task_description=arguments.get("task_description"),
+#                 done_definition=arguments.get("done_definition"),
+#                 ai_agent_id="mcp-claude",
+#                 priority=arguments.get("priority", "medium")
+#             ),
+#             agent_id="mcp-claude"
+#         )
+#     elif tool_name == "save_memory":
+#         # Forward to save_memory endpoint
+#         return await save_memory(
+#             SaveMemoryRequest(
+#                 content=arguments.get("content"),
+#                 memory_type=arguments.get("memory_type", "discovery"),
+#                 tags=arguments.get("tags", []),
+#                 related_files=arguments.get("related_files", [])
+#             ),
+#             agent_id="mcp-claude"
+#         )
+#     elif tool_name == "get_task_status":
+#         return await task_progress()
+#     else:
+#         raise HTTPException(status_code=400, detail=f"Unknown tool: {tool_name}")
+# 
+# 
+# @app.get("/resources")
+# async def list_resources():
+#     """List available MCP resources."""
+#     session = server_state.db_manager.get_session()
+#     try:
+#         tasks = session.query(Task).filter(Task.status != "done").all()
+#         return {
+#             "resources": [
+#                 {
+#                     "uri": f"task://{task.id}",
+#                     "name": f"Task: {task.id[:8]}",
+#                     "description": (task.enriched_description or task.raw_description)[:100],
+#                     "mimeType": "application/json"
+#                 }
+#                 for task in tasks
+#             ]
+#         }
+#     finally:
+#         session.close()
+# 
+# 
+# @app.get("/resources/{resource_uri:path}")
+# async def get_resource(resource_uri: str):
+#     """Get a specific MCP resource."""
+#     if resource_uri.startswith("task://"):
+#         task_id = resource_uri.replace("task://", "")
+#         session = server_state.db_manager.get_session()
+#         try:
+#             task = session.query(Task).filter_by(id=task_id).first()
+#             if task:
+#                 return {
+#                     "uri": resource_uri,
+#                     "content": {
+#                         "id": task.id,
+#                         "description": task.enriched_description or task.raw_description,
+#                         "status": task.status,
+#                         "assigned_agent": task.assigned_agent_id,
+#                         "created_at": task.created_at.isoformat() if task.created_at else None
+#                     }
+#                 }
+#             else:
+#                 raise HTTPException(status_code=404, detail="Task not found")
+#         finally:
+#             session.close()
+#     else:
+#         raise HTTPException(status_code=404, detail="Resource not found")
+# 
+# 
+# @app.get("/sse")
+# async def sse_endpoint():
+#     """Server-Sent Events endpoint for Claude MCP integration."""
+#     async def event_generator():
+#         """Generate SSE events."""
+#         # Send initial connection event
+#         yield f"data: {json.dumps({'type': 'connected', 'message': 'Connected to Hephaestus MCP Server', 'timestamp': datetime.utcnow().isoformat()})}\n\n"
+# 
+#         # Create a queue for this SSE connection
+#         event_queue = asyncio.Queue(maxsize=100)
+#         server_state.sse_queues.append(event_queue)
+# 
+#         try:
+#             while True:
+#                 # Wait for events to send
+#                 try:
+#                     # Check for events with timeout to send keepalive
+#                     event = await asyncio.wait_for(event_queue.get(), timeout=30.0)
+#                     yield f"data: {json.dumps(event)}\n\n"
+#                 except asyncio.TimeoutError:
+#                     # Send keepalive event every 30 seconds
+#                     yield f"data: {json.dumps({'type': 'keepalive', 'timestamp': datetime.utcnow().isoformat()})}\n\n"
+#         except asyncio.CancelledError:
+#             # Clean up when connection is closed
+#             if event_queue in server_state.sse_queues:
+#                 server_state.sse_queues.remove(event_queue)
+#             raise
+#         finally:
+#             # Ensure cleanup
+#             if event_queue in server_state.sse_queues:
+#                 server_state.sse_queues.remove(event_queue)
+# 
+#     return StreamingResponse(
+#         event_generator(),
+#         media_type="text/event-stream",
+#         headers={
+#             "Cache-Control": "no-cache",
+#             "Connection": "keep-alive",
+#             "X-Accel-Buffering": "no",
         },
     )
