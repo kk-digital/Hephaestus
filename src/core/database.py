@@ -55,8 +55,8 @@ from sqlalchemy.pool import StaticPool
 # Import Base from new c1 layer (shared base for all models)
 from src.c1_database_session.base import Base, logger
 
-# Import Agent from new c1 layer module (strangler fig pattern)
-from src.c1_agent_models.agent import Agent  # noqa: E402
+# Import Agent models from new c1 layer (strangler fig pattern)
+from src.c1_agent_models.agent import Agent, AgentLog  # noqa: E402
 
 
 class Task(Base):
@@ -162,30 +162,6 @@ class Memory(Base):
     # Relationships
     agent = relationship("Agent", back_populates="memories")
     task = relationship("Task", back_populates="memories")
-
-
-class AgentLog(Base):
-    """Log entries for agent activities and interventions."""
-
-    __tablename__ = "agent_logs"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
-    created_at = Column(
-        DateTime, default=datetime.utcnow, nullable=False
-    )  # Added for compatibility
-    agent_id = Column(
-        String, ForeignKey("agents.id"), nullable=True
-    )  # Made nullable for conductor logs
-    log_type = Column(
-        String,
-        nullable=False,
-    )  # Removed constraint to allow more types
-    message = Column(Text)
-    details = Column(JSON)  # Additional structured data
-
-    # Relationships
-    agent = relationship("Agent", back_populates="logs")
 
 
 class ProjectContext(Base):
