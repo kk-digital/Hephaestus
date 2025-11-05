@@ -118,10 +118,82 @@ SESSION 2 SUMMARY: Test Fixes Progress (2025-11-05)
    - Apply MockDatabaseManager pattern from auth tests
    - Create reusable fixtures in conftest.py
 
+### Key Patterns Established (Reusable Solutions)
+
+#### 1. MockDatabaseManager Pattern
+**Problem**: Tests using database need shared test DB session with auth routes
+**Solution**: Create MockDatabaseManager class with get_session() context manager
+**Example** (tests/test_authentication.py:205-218):
+```python
+class MockDatabaseManager:
+    def get_session(self):
+        class ContextManager:
+            def __enter__(self_cm):
+                return test_db  # Return shared test DB session
+            def __exit__(self_cm, *args):
+                pass
+        return ContextManager()
+
+monkeypatch.setattr(src.auth.auth_api, "get_db_manager", lambda: MockDatabaseManager())
+```
+**When to use**: Any test that needs to mock DatabaseManager and share DB state
+**Files modified**: tests/test_authentication.py
+
+#### 2. AsyncMock Pattern
+**Problem**: Mock methods raise "object Mock can't be used in 'await' expression"
+**Solution**: Use AsyncMock() instead of Mock() for methods that are awaited
+**Example** (tests/test_guardian.py:26):
+```python
+# BEFORE (fails):
+mock.send_message_to_agent = Mock()
+
+# AFTER (works):
+mock.send_message_to_agent = AsyncMock()
+```
+**When to use**: Any mock method that is called with `await` in the code under test
+**Files modified**: tests/test_guardian.py, tests/test_conductor.py
+
+#### 3. Import Compatibility Shim Pattern
+**Problem**: Tests patch old module paths (src.services.X) after refactoring to c1/c2/c3
+**Solution**: Update compatibility shims to export what tests need to patch
+**Example** (src/agents/manager.py):
+```python
+# BEFORE (test patching fails):
+from src.c2_agent_service.agent_manager import AgentManager
+__all__ = ["AgentManager"]
+
+# AFTER (test patching works):
+from src.c2_agent_service.agent_manager import AgentManager
+import libtmux  # Export for test patching
+__all__ = ["AgentManager", "libtmux"]
+```
+**When to use**: Tests fail with "module has no attribute X" when patching old paths
+**What to do**:
+1. Find where attribute actually lives (grep for import in src/)
+2. Add import to compatibility shim file
+3. Add to __all__ export list
+**Files modified**: src/agents/manager.py, tests/test_mcp_results_endpoint.py
+
+#### 4. User Model Registration Pattern
+**Problem**: Base.metadata.create_all() doesn't create User tables (not registered)
+**Solution**: Import User models in src/core/database.py so they register with Base
+**Example** (src/core/database.py:37-42):
+```python
+# Import User models from new c1 layer
+from src.c1_user_models.user import (
+    User, Role, UserRole, Permission, RolePermission,
+    Team, TeamMember, AuthToken, UserSession, AuditLog,
+    UserPreferences, LoginAttempt
+)
+```
+**When to use**: Tests create database with Base.metadata.create_all() but tables missing
+**What happens**: SQLAlchemy only knows about models that have been imported
+**Files modified**: src/core/database.py
+
 ### Systematic Approach Working:
-- Each fix addresses a category of failures
-- Import path fixes prevent future issues
-- Async mock pattern established for reuse
-- Database fixture pattern proven effective
+- Each fix addresses a category of failures (not individual tests)
+- Import path fixes prevent future test failures after refactoring
+- Async mock pattern documented for reuse in other test files
+- Database fixture pattern proven effective for auth tests
 
 **Session was productive! Maintained 70% pass rate while reducing errors and fixing architectural issues.**
