@@ -35,7 +35,8 @@ class TestAgentOutputCapture:
     @pytest.fixture
     def agent_manager(self, mock_db_manager, mock_llm_provider, mock_tmux_server):
         """Create an agent manager with mocked dependencies."""
-        with patch('src.agents.manager.libtmux.Server', return_value=mock_tmux_server):
+        # Patch the actual module location after refactoring
+        with patch('src.c2_agent_service.agent_manager.libtmux.Server', return_value=mock_tmux_server):
             manager = AgentManager(mock_db_manager, mock_llm_provider)
             manager.tmux_server = mock_tmux_server
             return manager
