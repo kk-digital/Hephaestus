@@ -1,0 +1,275 @@
+ROOT CAUSE ANALYSIS: All Test Failures and Errors (2025-11-05)
+
+## EXECUTIVE SUMMARY
+
+**Current Status:**
+- Total tests: 466
+- Passing: 288 (62%)
+- Failing: 132 (28%)
+- Errors: 33 (7%)
+- Skipped: 13 (3%)
+
+**Remaining to fix: 165 tests (132 failures + 33 errors)**
+
+## CATEGORIZATION BY ROOT CAUSE
+
+### CATEGORY 1: Test Import Path Issues (EASY FIX - ~20 tests)
+
+**Root Cause:** Tests patch old module paths (src.services.*) instead of new c2 layer paths
+
+**Affected Files (6 files):**
+1. tests/test_result_service.py (7 failures)
+2. tests/test_workflow_result_service.py (7 failures)
+3. tests/test_result_service_coverage.py (5 failures)
+4. tests/test_mcp_results_endpoint.py (9 failures - may include other issues)
+5. tests/test_validation_helpers_coverage.py (unknown count)
+6. tests/test_mcp_results_endpoint_async.py (unknown count)
+
+**Pattern:** Same as previously fixed tests (embedding_service, task_similarity_service, agent_output_capture)
+
+**Solution:** Update patch paths:
+- src.services.result_service → src.c2_result_service.*
+- src.services.workflow_result_service → src.c2_workflow_result_service.*
+- src.services.validation_service → src.c2_validation_service.*
+
+**Estimated Impact:** +15-25 tests
+**Effort:** 30-45 minutes
+**Priority:** HIGH (easy wins)
+
+### CATEGORY 2: Database Fixture Issues (MEDIUM FIX - ~13 tests)
+
+**Root Cause:** Tests expect pre-created database files (e2e_test.db)
+
+**Affected Files:**
+1. tests/test_mcp_server_tickets.py (13 errors) - ALL tests in this file
+
+**Error Message:**
+```
+FileNotFoundError: e2e_test.db not found. Please run 'python tests/e2e_ticket_test.py' first to create the test database.
+```
+
+**Root Issue:** Integration tests depend on external database setup instead of creating fixtures
+
+**Solution Options:**
+A. Create pytest fixture that sets up test database (PREFERRED)
+B. Create conftest.py fixture that auto-generates e2e_test.db
+C. Convert to use in-memory database like other tests
+
+**Estimated Impact:** +13 tests
+**Effort:** 1-2 hours (need to understand ticket database schema)
+**Priority:** MEDIUM (requires understanding test requirements)
+
+### CATEGORY 3: Monitoring/LLM Integration Tests (MEDIUM FIX - ~30 tests)
+
+**Root Cause:** Tests interact with real LLM providers or monitoring infrastructure
+
+**Affected Files:**
+1. tests/test_trajectory_context.py (12 failures)
+2. tests/test_monitoring_integration.py (8 failures)
+3. tests/test_conductor.py (8 failures)
+4. tests/test_diagnostic_integration.py (6 failures)
+5. tests/test_trajectory_monitoring.py (6 failures)
+6. tests/test_prompt_delivery.py (7 failures)
+7. tests/test_validation_prompts.py (4 failures)
+8. tests/test_structured_analysis.py (3 failures)
+9. tests/test_steering_fix.py (3 failures)
+
+**Common Issues:**
+- Tests may need LLM mocking (we added mock_llm_provider but may not be used everywhere)
+- Tests may need tmux session mocking (we added tmux fixtures but not applied)
+- Tests may expect specific monitoring infrastructure
+
+**Solution:**
+- Apply our conftest.py fixtures (mock_llm_provider, tmux_server, tmux_session)
+- Update tests to use fixtures properly
+- May need additional mocking for monitoring components
+
+**Estimated Impact:** +30-40 tests
+**Effort:** 2-3 hours
+**Priority:** MEDIUM (requires test-by-test review)
+
+### CATEGORY 4: Authentication Tests (EASY FIX - 8 tests)
+
+**Root Cause:** API endpoint 404 errors (endpoints not registered in test app)
+
+**Affected Files:**
+1. tests/test_authentication.py (8 failures)
+
+**Previous Analysis (from Task-32c):**
+- 4 password hashing tests: NOW FIXED ✅
+- 8 API endpoint tests: STILL FAILING ❌
+
+**Error Pattern:** 404 responses on auth endpoints (/register, /login, /refresh)
+
+**Root Issue:**
+- Test client doesn't have auth routes registered
+- OR test setup doesn't initialize FastAPI app correctly
+- OR routes not imported in test module
+
+**Solution:**
+- Check test setup - ensure auth routes are registered
+- Verify TestClient initialization includes all routers
+- May need to update test fixtures after c3 refactoring
+
+**Estimated Impact:** +8 tests
+**Effort:** 30-45 minutes
+**Priority:** HIGH (API tests are important)
+
+### CATEGORY 5: Task Similarity/Deduplication Tests (MEDIUM FIX - ~16 tests)
+
+**Root Cause:** Test logic issues or incomplete mock setup
+
+**Affected Files:**
+1. tests/unit/test_task_similarity_service.py (9 failures)
+2. tests/integration/test_task_deduplication_flow.py (7 failures total, 6 errors + 1 failure)
+
+**Status:**
+- Import path fixed: ✅ (7/16 passing now)
+- Remaining 9 failures: Test logic issues, NOT path issues
+
+**Common Pattern:**
+- Tests that check duplicate detection logic
+- Tests that verify embedding comparisons
+- Tests that handle null/missing embeddings
+
+**Solution:**
+- Review each failing test
+- May need to fix test expectations
+- May need to fix actual service logic
+- May need better mock data
+
+**Estimated Impact:** +9-16 tests
+**Effort:** 1-2 hours
+**Priority:** MEDIUM (unit tests important but not blocking)
+
+### CATEGORY 6: Worktree Integration Tests (MEDIUM FIX - 4 tests)
+
+**Root Cause:** Integration test complexity (multiple components)
+
+**Affected Files:**
+1. tests/test_worktree_integration.py (4 failures: 3 errors + 1 already passing)
+
+**Status:**
+- 10/14 tests passing (from config fix)
+- 3 errors remaining
+
+**Tests:**
+1. test_agent_manager_with_worktree_integration (ERROR)
+2. test_parent_child_agent_integration (ERROR)
+3. test_agent_termination_with_merge (ERROR)
+
+**Root Issue:** These require:
+- AgentManager
+- WorktreeManager
+- LLM provider
+- Tmux session
+- Git operations
+
+**Solution:**
+- Apply proper mocking for all components
+- May need to simplify test setup
+- Check if tests expect specific infrastructure
+
+**Estimated Impact:** +3-4 tests
+**Effort:** 1-2 hours
+**Priority:** LOW (integration tests, complex dependencies)
+
+### CATEGORY 7: Ticket Validation Tests (EASY FIX - 7 tests)
+
+**Root Cause:** Unknown (need error details)
+
+**Affected Files:**
+1. tests/test_ticket_id_validation.py (4 errors)
+2. tests/test_ticket_id_validation_simple.py (3 errors)
+
+**Solution:**
+- Check error messages
+- Likely similar to other test setup issues
+
+**Estimated Impact:** +7 tests
+**Effort:** 30 minutes - 1 hour
+**Priority:** MEDIUM
+
+### CATEGORY 8: Integration Tests (LOW PRIORITY - ~9 tests)
+
+**Root Cause:** Require external services or complex setup
+
+**Affected Files:**
+1. tests/integration/test_qdrant_mcp_integration.py (2 errors)
+2. tests/test_agent_output_integration.py (2 errors)
+3. Other integration tests scattered
+
+**Root Issue:**
+- May need Qdrant server running
+- May need MCP server running
+- May need other services
+
+**Solution:**
+- Mock external services
+- OR skip these tests (integration tests often need real infrastructure)
+
+**Estimated Impact:** +2-9 tests
+**Effort:** 2-4 hours (depends on mocking complexity)
+**Priority:** LOW (integration tests can be skipped if infrastructure not available)
+
+## FIX PRIORITY ORDER
+
+### Phase 1: Quick Wins (30-60 min, ~30-40 tests)
+1. ✅ HIGH: Fix test import paths (6 files) → +20-25 tests
+2. ✅ HIGH: Fix authentication API tests → +8 tests
+3. ✅ HIGH: Fix ticket validation tests → +7 tests
+
+### Phase 2: Medium Effort (2-3 hours, ~40-50 tests)
+4. ✅ MEDIUM: Apply LLM/tmux mocking to monitoring tests → +30-40 tests
+5. ✅ MEDIUM: Fix task similarity test logic → +9-16 tests
+
+### Phase 3: Database Setup (1-2 hours, ~13 tests)
+6. ✅ MEDIUM: Create e2e_test.db fixture for MCP tickets → +13 tests
+
+### Phase 4: Complex Integration (2-4 hours, ~10 tests)
+7. ✅ LOW: Fix worktree integration tests → +3-4 tests
+8. ✅ LOW: Fix/skip other integration tests → +2-9 tests
+
+## ESTIMATED TOTAL EFFORT
+
+**Conservative Estimate:**
+- Phase 1: 1 hour → +40 tests (62% → 71%)
+- Phase 2: 3 hours → +45 tests (71% → 80%)
+- Phase 3: 2 hours → +13 tests (80% → 83%)
+- Phase 4: 3 hours → +10 tests (83% → 85%)
+
+**Total: 9 hours to reach 85% pass rate**
+
+**To reach 95% target:**
+- Need additional 10% = ~46 more tests
+- May require fixing actual bugs, not just test setup
+- Estimated additional 4-6 hours
+
+## ROOT CAUSES SUMMARY
+
+1. **Refactoring Path Issues** (25 tests) - Tests not updated for c1/c2/c3 structure
+2. **Test Database Setup** (13 tests) - Missing database fixtures
+3. **LLM/Monitoring Mocking** (40 tests) - Fixtures exist but not applied
+4. **API Route Registration** (8 tests) - Auth routes not in test client
+5. **Test Logic Issues** (16 tests) - Actual test or service bugs
+6. **Integration Complexity** (10 tests) - Multiple component dependencies
+7. **Unknown/Other** (7 tests) - Need investigation
+
+## NEXT STEPS
+
+1. Start with Phase 1 (quick wins)
+2. Fix import paths in 6 test files
+3. Fix authentication API test setup
+4. Continue systematically through phases
+5. Document each fix
+6. Target 95% pass rate
+
+## CRITICAL INSIGHT
+
+Most remaining failures are TEST SETUP ISSUES, not functionality bugs!
+
+- ~80% are fixture/mocking/path issues
+- ~15% are test logic issues
+- ~5% might be actual bugs
+
+This means we can fix most quickly with systematic test updates.
