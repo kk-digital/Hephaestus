@@ -1,0 +1,80 @@
+TASK-27: Fix C2 Service Import Mismatches
+
+## Status
+PENDING - Blocks test suite
+
+## Priority
+CRITICAL - Tests cannot run until fixed
+
+## Problem Description
+
+The c3 routes import from c2 service modules that don't match actual locations:
+
+**Import Issues:**
+- c3_ticket_routes imports: from src.c2_ticket_services import TicketService
+- Actual location: src/services/ticket_service.py (old location)
+- Partial new location: src/c2_ticket_service/ (singular, not plural)
+
+**Root Cause:**
+During Task-25 (C2 extraction), services were moved to c2_* modules but:
+1. Some services remained in old src/services/ directory
+2. Module naming inconsistency (singular vs plural)
+3. c3 routes created with assumption of completed c2 organization
+
+## Files Affected
+
+**C3 Routes with broken imports:**
+- src/c3_ticket_routes/ticket_routes.py
+- Possibly others (need audit)
+
+**Services in wrong locations:**
+- src/services/ticket_service.py
+- src/services/ticket_search_service.py
+- src/services/ticket_history_service.py
+- src/services/git_service.py (if exists)
+
+**Incorrectly named modules:**
+- src/c2_ticket_service/ (should be c2_ticket_services)
+
+## Solution Steps
+
+### Step 1: Audit Current State
+[ ] List all files in src/services/
+[ ] List all c2_* directories
+[ ] Grep for all c2_* imports in c3 routes
+[ ] Document mismatches
+
+### Step 2: Reorganize Services
+[ ] Rename src/c2_ticket_service/ → src/c2_ticket_services/
+[ ] Move src/services/ticket_*.py → src/c2_ticket_services/
+[ ] Move src/services/git_service.py → appropriate c2 module
+[ ] Create __init__.py with proper exports
+
+### Step 3: Update Imports
+[ ] Update all c3_* routes imports
+[ ] Update any other imports of moved services
+[ ] Create backward compatibility shims in src/services/
+
+### Step 4: Test Imports
+[ ] Test: python -c "from src.c3_ticket_routes import create_ticket_router"
+[ ] Test: python -c "from src.c2_ticket_services import TicketService"
+[ ] Run pytest --collect-only (should collect 406 tests)
+
+### Step 5: Commit
+[ ] git add changes
+[ ] git commit -m "Fix c2 service import mismatches (Task-27)"
+[ ] git push
+
+## Expected Outcome
+
+- All c3 routes can import from c2 services without errors
+- pytest --collect-only succeeds (collects 406 tests)
+- Test suite can run (even if some tests fail)
+
+## Blockers
+
+None - can start immediately
+
+## Estimated Time
+
+30-60 minutes

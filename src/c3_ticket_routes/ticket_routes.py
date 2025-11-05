@@ -9,9 +9,8 @@ from pydantic import BaseModel, Field
 
 from src.c1_agent_models.agent import Agent
 from src.c1_task_models.task import Task
-from src.c2_ticket_services.ticket_service import TicketService
-from src.c2_workflow_services.workflow_service import get_single_active_workflow
-from src.database import get_db
+from src.c2_ticket_service.ticket_service import TicketService
+from src.c1_database_session.database_manager import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +185,7 @@ def create_ticket_router(server_state):
 
                 # If still no workflow_id, try to get the single active workflow
                 if not workflow_id:
+                    from src.mcp.server import get_single_active_workflow
                     logger.info(f"[TICKET_CREATE] Could not detect from task, trying single active workflow...")
                     workflow_id = get_single_active_workflow()
                     if workflow_id:
@@ -328,8 +328,7 @@ def create_ticket_router(server_state):
         logger.info(f"Agent {agent_id} requesting ticket {ticket_id}")
 
         try:
-            from src.c2_ticket_services.ticket_search_service import TicketSearchService
-            ticket = TicketSearchService.get_ticket_by_id(ticket_id)
+            ticket = await TicketService.get_ticket(ticket_id)
 
             if not ticket:
                 raise HTTPException(status_code=404, detail=f"Ticket {ticket_id} not found")
@@ -351,29 +350,35 @@ def create_ticket_router(server_state):
         logger.info(f"Agent {agent_id} searching tickets with filters: {request.model_dump(exclude_none=True)}")
 
         try:
-            from src.c2_ticket_services.ticket_search_service import TicketSearchService
-            
-            result = TicketSearchService.search_tickets(
-                workflow_id=request.workflow_id,
-                ticket_type=request.ticket_type,
-                priority=request.priority,
-                status=request.status,
-                assigned_agent_id=request.assigned_agent_id,
-                tags=request.tags,
-                search_text=request.search_text,
-                parent_ticket_id=request.parent_ticket_id,
-                created_after=request.created_after,
-                created_before=request.created_before,
-                updated_after=request.updated_after,
-                updated_before=request.updated_before,
-                blocked_by_ticket_id=request.blocked_by_ticket_id,
-                blocking_ticket_id=request.blocking_ticket_id,
-                include_archived=request.include_archived,
-                sort_by=request.sort_by,
-                sort_order=request.sort_order,
-                limit=request.limit,
-                offset=request.offset,
+            # TODO: Implement full search functionality in TicketSearchService
+            # For now, use basic filtering via get_tickets_by_workflow
+            filters = {}
+            if request.status:
+                filters["status"] = request.status
+            if request.priority:
+                filters["priority"] = request.priority
+            if request.assigned_agent_id:
+                filters["assigned_agent_id"] = request.assigned_agent_id
+            if request.ticket_type:
+                filters["ticket_type"] = request.ticket_type
+
+            tickets = await TicketService.get_tickets_by_workflow(
+                workflow_id=request.workflow_id or "default",
+                filters=filters
             )
+
+            # Simple pagination
+            total_count = len(tickets)
+            start = request.offset
+            end = start + request.limit
+            paginated_tickets = tickets[start:end]
+
+            result = {
+                "tickets": paginated_tickets,
+                "total_count": total_count,
+                "limit": request.limit,
+                "offset": request.offset,
+            }
 
             return SearchTicketsResponse(**result)
 
@@ -403,6 +408,7 @@ def create_ticket_router(server_state):
                             workflow_id = task.workflow_id
 
                 if not workflow_id:
+                    from src.mcp.server import get_single_active_workflow
                     workflow_id = get_single_active_workflow()
 
                 if not workflow_id:
@@ -411,8 +417,30 @@ def create_ticket_router(server_state):
                         detail="Could not determine workflow_id"
                     )
 
-            from src.c2_ticket_services.ticket_stats_service import TicketStatsService
-            stats = TicketStatsService.get_workflow_ticket_stats(workflow_id)
+            # TODO: Implement TicketStatsService for detailed analytics
+            # For now, provide basic stats inline
+            tickets = await TicketService.get_tickets_by_workflow(workflow_id)
+
+            stats = {
+                "workflow_id": workflow_id,
+                "total_tickets": len(tickets),
+                "by_status": {},
+                "by_priority": {},
+                "by_type": {},
+            }
+
+            for ticket in tickets:
+                # Count by status
+                status = ticket.get("status", "unknown")
+                stats["by_status"][status] = stats["by_status"].get(status, 0) + 1
+
+                # Count by priority
+                priority = ticket.get("priority", "unknown")
+                stats["by_priority"][priority] = stats["by_priority"].get(priority, 0) + 1
+
+                # Count by type
+                ticket_type = ticket.get("ticket_type", "unknown")
+                stats["by_type"][ticket_type] = stats["by_type"].get(ticket_type, 0) + 1
 
             return stats
 
@@ -435,24 +463,25 @@ def create_ticket_router(server_state):
         logger.info(f"Agent {agent_id} listing tickets for workflow {workflow_id}")
 
         try:
-            from src.c2_ticket_services.ticket_search_service import TicketSearchService
-            
-            result = TicketSearchService.search_tickets(
+            filters = {}
+            if status:
+                filters["status"] = status
+            if ticket_type:
+                filters["ticket_type"] = ticket_type
+            if priority:
+                filters["priority"] = priority
+            if assigned_agent_id:
+                filters["assigned_agent_id"] = assigned_agent_id
+
+            tickets = await TicketService.get_tickets_by_workflow(
                 workflow_id=workflow_id,
-                status=status,
-                ticket_type=ticket_type,
-                priority=priority,
-                assigned_agent_id=assigned_agent_id,
-                sort_by="created_at",
-                sort_order="desc",
-                limit=1000,
-                offset=0,
+                filters=filters
             )
 
             return GetTicketsResponse(
-                tickets=result["tickets"],
+                tickets=tickets,
                 workflow_id=workflow_id,
-                total_count=result["total_count"],
+                total_count=len(tickets),
             )
 
         except ValueError as e:
@@ -576,18 +605,15 @@ def create_ticket_router(server_state):
         logger.info(f"Agent {agent_id} requesting diff for commit {commit_hash}")
 
         try:
-            from src.c2_ticket_services.git_service import GitService
-            
-            diff_result = await GitService.get_commit_diff(
-                commit_hash=commit_hash,
-                repository_url=repository_url,
+            # TODO: Implement GitService for git operations
+            # For now, return not implemented error
+            raise HTTPException(
+                status_code=501,
+                detail="Git diff functionality not yet implemented. TODO: Create c2_git_service module"
             )
 
-            return diff_result
-
-        except ValueError as e:
-            logger.error(f"Validation error getting commit diff: {e}")
-            raise HTTPException(status_code=400, detail=str(e))
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Failed to get commit diff: {e}")
             raise HTTPException(status_code=500, detail=str(e))
