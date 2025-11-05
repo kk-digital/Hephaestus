@@ -1,0 +1,338 @@
+INSTRUCTIONS: SSH into Docker Container
+=========================================
+
+## Quick Start
+
+**From your Mac (host machine):**
+
+```bash
+ssh user@localhost -p 2224
+```
+
+**Password**: `password`
+
+That's it! You're now inside the container.
+
+## Container Information
+
+**Container Name**: docker-hephaestus
+**SSH Port**: 2224 (mapped from container port 22)
+**Username**: user
+**Password**: password
+**Home Directory**: /home/user
+**Working Directory**: /home/user/workspace/Hephaestus/
+
+## Full SSH Command with Directory Navigation
+
+```bash
+ssh user@localhost -p 2224 "cd /home/user/workspace/Hephaestus/Hephaestus && pwd"
+```
+
+This connects AND navigates to the repository directory.
+
+## Common SSH Patterns
+
+### 1. Interactive Shell (Most Common)
+
+```bash
+ssh user@localhost -p 2224
+```
+
+Once connected:
+```bash
+cd /home/user/workspace/Hephaestus/Hephaestus
+pwd
+ls -la
+```
+
+### 2. Execute Single Command
+
+```bash
+ssh user@localhost -p 2224 "command_here"
+```
+
+**Examples**:
+```bash
+# Check Python version
+ssh user@localhost -p 2224 "python3 --version"
+
+# Run tests
+ssh user@localhost -p 2224 "cd /home/user/workspace/Hephaestus/Hephaestus && ./.venv/bin/pytest tests/"
+
+# Check git status
+ssh user@localhost -p 2224 "cd /home/user/workspace/Hephaestus/Hephaestus && git status"
+```
+
+### 3. Execute Multiple Commands
+
+```bash
+ssh user@localhost -p 2224 "cd /home/user/workspace/Hephaestus/Hephaestus && git branch && git status && git log -1"
+```
+
+Commands are chained with `&&` (runs next command only if previous succeeds).
+
+### 4. Run Background Command
+
+```bash
+ssh user@localhost -p 2224 "cd /home/user/workspace/Hephaestus/Hephaestus && ./.venv/bin/pytest tests/ 2>&1 | tail -3" &
+```
+
+## Container Directory Structure
+
+```
+/home/user/
+├── workspace/
+│   └── Hephaestus/
+│       └── Hephaestus/          # Main repository (mounted from host)
+│           ├── src/             # Source code
+│           ├── tests/           # Test files
+│           ├── .venv/           # Python virtual environment
+│           ├── tasks/           # Task tracking files
+│           ├── todo.txt         # Todo list
+│           └── ...
+```
+
+## Important Paths
+
+**Repository Root**:
+```
+/home/user/workspace/Hephaestus/Hephaestus
+```
+
+**Python Virtual Environment**:
+```
+/home/user/workspace/Hephaestus/Hephaestus/.venv/bin/python3
+/home/user/workspace/Hephaestus/Hephaestus/.venv/bin/pytest
+```
+
+**Running Tests**:
+```bash
+cd /home/user/workspace/Hephaestus/Hephaestus
+./.venv/bin/pytest tests/
+```
+
+## Quick Commands Reference
+
+### Check Container Status
+```bash
+# From host
+docker ps | grep hephaestus
+```
+
+### Connect to Container
+```bash
+ssh user@localhost -p 2224
+```
+
+### Exit Container
+```bash
+exit
+```
+
+### Test SSH Connection
+```bash
+ssh user@localhost -p 2224 "echo 'Connection successful' && hostname"
+```
+
+Expected output:
+```
+Connection successful
+docker-hephaestus
+```
+
+### Run pytest from Host
+```bash
+ssh user@localhost -p 2224 "cd /home/user/workspace/Hephaestus/Hephaestus && ./.venv/bin/pytest tests/test_authentication.py -v"
+```
+
+### Check Git Status from Host
+```bash
+ssh user@localhost -p 2224 "cd /home/user/workspace/Hephaestus/Hephaestus && git status"
+```
+
+### Get Container Information
+```bash
+ssh user@localhost -p 2224 "uname -a && python3 --version && git --version"
+```
+
+## Bidirectional Mount
+
+**Important**: The repository is **mounted** from the host into the container:
+
+- **Host Path**: `~/claude/claude-docker.hephaestus/Hephaestus/Hephaestus/`
+- **Container Path**: `/home/user/workspace/Hephaestus/Hephaestus/`
+
+Changes in **either location** appear in **both** locations immediately.
+
+**What this means**:
+- Edit files on host → See changes in container
+- Edit files in container → See changes on host
+- Commit in container → Commit visible on host
+- No need to sync files manually
+
+## Common Workflows
+
+### Development Workflow
+
+```bash
+# 1. SSH into container
+ssh user@localhost -p 2224
+
+# 2. Navigate to repository
+cd /home/user/workspace/Hephaestus/Hephaestus
+
+# 3. Check branch
+git branch --show-current
+
+# 4. Pull latest changes
+git pull origin main
+
+# 5. Work on code (edit files)
+
+# 6. Run tests
+./.venv/bin/pytest tests/
+
+# 7. Commit changes
+git add .
+git commit -m "Description of changes"
+
+# 8. Push to Gogs
+git push gogs main
+
+# 9. Exit
+exit
+
+# 10. Push to GitHub from host (requires SSH keys)
+cd ~/claude/claude-docker.hephaestus/Hephaestus/Hephaestus
+git push origin main
+```
+
+### Quick Test Workflow (No SSH Session)
+
+```bash
+# Run tests from host in one command
+ssh user@localhost -p 2224 "cd /home/user/workspace/Hephaestus/Hephaestus && ./.venv/bin/pytest tests/test_authentication.py -v"
+```
+
+### File Editing Workflow
+
+**Option 1**: Edit on host (easier for GUI editors)
+```bash
+# On host
+cd ~/claude/claude-docker.hephaestus/Hephaestus/Hephaestus
+code src/some_file.py  # Or use any editor
+
+# Changes immediately visible in container
+ssh user@localhost -p 2224 "cd /home/user/workspace/Hephaestus/Hephaestus && cat src/some_file.py"
+```
+
+**Option 2**: Edit in container (for CLI editors)
+```bash
+ssh user@localhost -p 2224
+cd /home/user/workspace/Hephaestus/Hephaestus
+nano src/some_file.py  # Or vi, vim, etc.
+```
+
+## Troubleshooting
+
+### Problem: "Connection refused"
+
+**Cause**: Container not running
+
+**Solution**:
+```bash
+cd ~/claude/claude-docker.hephaestus/docker-hephaestus
+docker-compose up -d
+```
+
+### Problem: "Permission denied"
+
+**Cause**: Wrong password or authentication issue
+
+**Solution**: Password is `password` (all lowercase)
+
+### Problem: "Host key verification failed"
+
+**Cause**: Container was recreated and host key changed
+
+**Solution**:
+```bash
+ssh-keygen -R "[localhost]:2224"
+```
+
+Then try connecting again.
+
+### Problem: Can't find pytest
+
+**Solution**: Use full path to venv pytest
+```bash
+./.venv/bin/pytest
+# NOT: pytest
+```
+
+### Check Container is Running
+
+```bash
+docker ps | grep docker-hephaestus
+```
+
+Should show:
+```
+CONTAINER ID   IMAGE                         ... STATUS         PORTS                   NAMES
+...            docker-hephaestus-base        ... Up X minutes   0.0.0.0:2224->22/tcp    docker-hephaestus
+```
+
+### View Container Logs
+
+```bash
+docker logs docker-hephaestus
+```
+
+### Restart Container
+
+```bash
+cd ~/claude/claude-docker.hephaestus/docker-hephaestus
+docker-compose restart
+```
+
+## Advanced: SSH Without Password (Optional)
+
+To avoid typing password every time, add your SSH key to the container:
+
+```bash
+# Generate key if you don't have one
+ssh-keygen -t ed25519 -C "your_email@example.com"
+
+# Copy public key to container
+ssh-copy-id -p 2224 user@localhost
+```
+
+Now you can connect without password:
+```bash
+ssh user@localhost -p 2224
+```
+
+## Summary
+
+**Basic Connection**:
+```bash
+ssh user@localhost -p 2224
+```
+
+**Single Command**:
+```bash
+ssh user@localhost -p 2224 "command"
+```
+
+**Navigate and Execute**:
+```bash
+ssh user@localhost -p 2224 "cd /home/user/workspace/Hephaestus/Hephaestus && command"
+```
+
+**Key Points**:
+- Port: 2224
+- User: user
+- Password: password
+- Repository: /home/user/workspace/Hephaestus/Hephaestus
+- Mounted from host (bidirectional sync)
+- Use .venv for Python commands
