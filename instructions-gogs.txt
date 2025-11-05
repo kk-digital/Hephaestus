@@ -1,0 +1,244 @@
+INSTRUCTIONS: Using Gogs from Docker Container
+================================================
+
+## Overview
+
+This document explains how to pull and push changes to the Gogs server from inside the Docker container.
+
+## Important: Use HTTP, Not SSH
+
+**ALWAYS use HTTP protocol with API token for Gogs access from the container.**
+
+Why HTTP instead of SSH:
+- SSH keys are not configured inside the container
+- HTTP with token is simpler and works immediately
+- No SSH key management needed
+
+## Gogs Server Configuration
+
+**Gogs Server URL**: http://host.docker.internal:3000
+**API Token**: 1f42a441c0d2fc2bdf7cb1f6b3256a40be88e18e
+**Username**: gogs (embedded in URL)
+
+**Important**: From inside container, use `host.docker.internal` to reach the host machine where Gogs is running.
+
+## Remote URL Format
+
+```
+http://gogs:TOKEN@host.docker.internal:3000/ORGANIZATION/REPOSITORY.git
+```
+
+**Example**:
+```
+http://gogs:1f42a441c0d2fc2bdf7cb1f6b3256a40be88e18e@host.docker.internal:3000/kk-digital/Hephaestus.git
+```
+
+## Setup: Add Gogs Remote (One-Time)
+
+**Inside Container**:
+
+```bash
+ssh user@localhost -p 2224
+cd /home/user/workspace/Hephaestus/Hephaestus
+
+# Add Gogs remote (if not already added)
+git remote add gogs http://gogs:1f42a441c0d2fc2bdf7cb1f6b3256a40be88e18e@host.docker.internal:3000/kk-digital/Hephaestus.git
+
+# Verify remotes
+git remote -v
+```
+
+**Expected Output**:
+```
+origin  git@github.com:kk-digital/Hephaestus.git (fetch)
+origin  git@github.com:kk-digital/Hephaestus.git (push)
+gogs    http://gogs:1f42a441c0d2fc2bdf7cb1f6b3256a40be88e18e@host.docker.internal:3000/kk-digital/Hephaestus.git (fetch)
+gogs    http://gogs:1f42a441c0d2fc2bdf7cb1f6b3256a40be88e18e@host.docker.internal:3000/kk-digital/Hephaestus.git (push)
+```
+
+## If Remote Already Exists (Update URL)
+
+If you already have a gogs remote with wrong URL:
+
+```bash
+# Update existing remote to use host.docker.internal
+git remote set-url gogs http://gogs:1f42a441c0d2fc2bdf7cb1f6b3256a40be88e18e@host.docker.internal:3000/kk-digital/Hephaestus.git
+```
+
+## Pull from Gogs (Inside Container)
+
+```bash
+ssh user@localhost -p 2224
+cd /home/user/workspace/Hephaestus/Hephaestus
+
+# Pull from Gogs
+git pull gogs dev-haltingstate-00
+```
+
+**OR pull from current branch**:
+```bash
+git pull gogs $(git branch --show-current)
+```
+
+## Push to Gogs (Inside Container)
+
+```bash
+ssh user@localhost -p 2224
+cd /home/user/workspace/Hephaestus/Hephaestus
+
+# Push to Gogs
+git push gogs dev-haltingstate-00
+```
+
+**OR push current branch**:
+```bash
+git push gogs $(git branch --show-current)
+```
+
+## Complete Workflow: Work Inside Container, Push to Both Remotes
+
+### 1. Work Inside Container
+
+```bash
+ssh user@localhost -p 2224
+cd /home/user/workspace/Hephaestus/Hephaestus
+
+# Make changes
+echo "test" > test.txt
+
+# Commit
+git add test.txt
+git commit -m "Add test file"
+```
+
+### 2. Push from Container to Gogs
+
+```bash
+# Still inside container
+git push gogs dev-haltingstate-00
+```
+
+**Note**: Cannot push to GitHub (origin) from container because SSH keys not configured.
+
+### 3. Push from Host to GitHub
+
+Exit container and push from host:
+
+```bash
+exit  # Exit container
+
+# On host machine
+cd ~/claude/claude-docker.hephaestus/Hephaestus/Hephaestus
+
+# Push to GitHub
+git push origin dev-haltingstate-00
+```
+
+## Bidirectional Sync Workflow
+
+The repository is **mounted** from host into container, so changes in either location appear in both.
+
+**Typical Workflow**:
+
+1. **Work inside container** (development environment)
+2. **Commit inside container**
+3. **Push to Gogs from container** (backup)
+4. **Exit to host**
+5. **Push to GitHub from host** (requires SSH keys)
+
+**Alternative**: Do all git operations from host:
+
+```bash
+# On host
+cd ~/claude/claude-docker.hephaestus/Hephaestus/Hephaestus
+
+# Push to both remotes
+git push origin dev-haltingstate-00
+git push gogs dev-haltingstate-00
+```
+
+## Troubleshooting
+
+### Problem: "Could not resolve host: host.docker.internal"
+
+**Solution**: Check if Docker is configured correctly. On some systems, use `172.17.0.1` instead:
+
+```bash
+git remote set-url gogs http://gogs:1f42a441c0d2fc2bdf7cb1f6b3256a40be88e18e@172.17.0.1:3000/kk-digital/Hephaestus.git
+```
+
+### Problem: Authentication fails
+
+**Solution**: Verify token is correct in the URL. Token is embedded as password:
+```
+http://gogs:TOKEN@host...
+```
+
+### Problem: "Connection refused"
+
+**Solutions**:
+1. Check Gogs is running: `docker ps | grep gogs`
+2. Verify port 3000 is accessible: `curl http://host.docker.internal:3000`
+3. If Gogs not running, start it from host
+
+### Problem: SSH vs HTTP confusion
+
+**Solution**: 
+- **From container**: ALWAYS use HTTP (with host.docker.internal)
+- **From host**: Can use SSH (git@localhost:kk-digital/Hephaestus.git)
+
+## Quick Reference
+
+### Inside Container Commands
+
+```bash
+# SSH into container
+ssh user@localhost -p 2224
+
+# Navigate to repo
+cd /home/user/workspace/Hephaestus/Hephaestus
+
+# Check remotes
+git remote -v
+
+# Pull from Gogs
+git pull gogs dev-haltingstate-00
+
+# Push to Gogs
+git push gogs dev-haltingstate-00
+
+# Check status
+git status
+
+# Check branch
+git branch --show-current
+```
+
+### From Host Commands
+
+```bash
+# Navigate to repo (host side of mount)
+cd ~/claude/claude-docker.hephaestus/Hephaestus/Hephaestus
+
+# Push to GitHub (requires SSH keys)
+git push origin dev-haltingstate-00
+
+# Push to Gogs (can use SSH from host)
+git push gogs dev-haltingstate-00
+```
+
+## Summary
+
+**Key Points**:
+✅ Use HTTP with token from container
+✅ Use host.docker.internal to reach host machine
+✅ Can push to Gogs from container
+✅ Cannot push to GitHub from container (no SSH keys)
+✅ Repository is mounted, changes sync bidirectionally
+✅ Commit inside container, push to Gogs from container
+✅ Push to GitHub from host (or configure SSH keys in container)
+
+**Remote URLs**:
+- GitHub (origin): `git@github.com:kk-digital/Hephaestus.git`
+- Gogs (from container): `http://gogs:TOKEN@host.docker.internal:3000/kk-digital/Hephaestus.git`
+- Gogs (from host): `git@localhost:kk-digital/Hephaestus.git` (SSH)
