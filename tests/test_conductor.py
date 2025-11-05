@@ -21,7 +21,7 @@ def mock_db_manager():
 def mock_agent_manager():
     """Create mock agent manager."""
     mock = Mock()
-    mock.send_message_to_agent = Mock()
+    mock.send_message_to_agent = AsyncMock()  # Must be AsyncMock for await
     mock.terminate_agent = AsyncMock()
     return mock
 

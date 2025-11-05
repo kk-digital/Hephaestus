@@ -23,7 +23,7 @@ def mock_agent_manager():
     """Create mock agent manager."""
     mock = Mock()
     mock.get_agent_output = Mock(return_value="Agent working on task...")
-    mock.send_message_to_agent = Mock()
+    mock.send_message_to_agent = AsyncMock()  # Must be AsyncMock for await
     mock.tmux_server = Mock()
     return mock
 
