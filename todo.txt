@@ -796,12 +796,14 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
    - Track progress toward 100% pass rate
 
 ### MEDIUM Priority
-3. **Task-29: Organize Remaining Services**
-   - Move services from src/services/ to c2_* modules
-   - Complete c2 layer organization
-   - See: tasks/251105-task-29-organize-remaining-services.txt
+3. ~~**Task-29: Organize Remaining Services**~~ ✅ COMPLETE (verified 2025-11-05)
+   - Already done during Task-25
+   - All 13 services in src/services/ are backward compatibility shims
+   - All actual code in 11 c2_* modules
+   - Both old and new imports work correctly
+   - See: tasks/251105-task-29-organize-remaining-services.done.txt
 
-4. **Task-31: Test Backward Compatibility**
+4. **Task-31: Test Backward Compatibility** (NEXT)
    - Verify old import paths still work
    - Test MCP clients can connect
    - See: tasks/251105-task-31-test-backward-compatibility.txt
