@@ -1,0 +1,317 @@
+COMPREHENSIVE TEST FIX PLAN
+
+## Current Unacceptable State
+
+**Test Status:** 224/466 passing (48%) - This is UNACCEPTABLE
+**Errors:** 113 tests
+**Failures:** 116 tests
+
+**The user is RIGHT to call out these issues:**
+1. ✗ Worktree tests should create temp git repos (trivial)
+2. ✗ LLM tests failing despite API keys being set (should work)
+3. ✗ Tmux tests should start tmux if needed (trivial)
+4. ✗ bcrypt should have been caught and fixed earlier (dependency management failure)
+
+## Principle: Fix Tests Properly, Don't Mock Away Real Issues
+
+**WRONG approach:**
+- Mock everything so tests "pass"
+- Skip tests that are "hard"
+- Accept 48% pass rate
+
+**RIGHT approach:**
+- Make tests work with real functionality
+- Mock ONLY when external services unavailable (API costs, etc.)
+- Use test fixtures properly (temp directories, test databases, etc.)
+- Target: 95%+ pass rate with tests actually validating functionality
+
+## Comprehensive Fix Plan
+
+### Phase 1: Infrastructure Fixes (IMMEDIATE - 2 hours)
+
+#### Fix 1.1: Worktree Tests (50+ errors - TRIVIAL)
+
+**Problem:** Tests fail because git repository not initialized
+**Excuse:** "Environment issue" - NO EXCUSE
+**Reality:** Tests should create temporary git repos
+
+**Solution:**
+```python
+# tests/conftest.py
+import pytest
+import tempfile
+import subprocess
+from pathlib import Path
+
+@pytest.fixture
+def temp_git_repo():
+    """Create a temporary git repository for testing."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = Path(tmpdir)
+
+        # Initialize git repo
+        subprocess.run(["git", "init"], cwd=repo_path, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_path, check=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, check=True)
+
+        # Create initial commit
+        (repo_path / "README.md").write_text("Test repo")
+        subprocess.run(["git", "add", "."], cwd=repo_path, check=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo_path, check=True)
+
+        yield repo_path
+```
+
+**Action:**
+- [ ] Add temp_git_repo fixture to conftest.py
+- [ ] Update all worktree tests to use fixture
+- [ ] Verify all 50+ worktree tests pass
+- [ ] Estimated time: 30 minutes
+
+#### Fix 1.2: Tmux Tests (17 errors - TRIVIAL)
+
+**Problem:** Tests fail because tmux not running
+**Excuse:** "Environment dependency" - NO EXCUSE
+**Reality:** Tests should start/stop tmux session
+
+**Solution:**
+```python
+# tests/conftest.py
+import pytest
+import libtmux
+
+@pytest.fixture(scope="session")
+def tmux_server():
+    """Provide a tmux server for testing."""
+    server = libtmux.Server()
+
+    # Ensure tmux is running
+    try:
+        server.list_sessions()
+    except Exception:
+        # Start tmux server if not running
+        subprocess.run(["tmux", "start-server"], check=True)
+        server = libtmux.Server()
+
+    yield server
+
+    # Cleanup: kill test sessions
+    for session in server.list_sessions():
+        if session.name.startswith("test_"):
+            session.kill()
+
+@pytest.fixture
+def tmux_session(tmux_server):
+    """Provide a clean tmux session for each test."""
+    session_name = f"test_{os.getpid()}_{time.time()}"
+    session = tmux_server.new_session(session_name, kill_session=True)
+
+    yield session
+
+    # Cleanup
+    session.kill()
+```
+
+**Action:**
+- [ ] Add tmux fixtures to conftest.py
+- [ ] Update all agent communication tests to use fixtures
+- [ ] Verify all 17 tmux tests pass
+- [ ] Estimated time: 30 minutes
+
+#### Fix 1.3: LLM API Key Configuration (86 errors)
+
+**Problem:** Tests looking for OpenRouter key, but we have OpenAI key
+**Excuse:** "Missing config" - WRONG
+**Reality:** Tests should use AVAILABLE providers, not hardcode OpenRouter
+
+**Solution:**
+- [ ] Check which LLM provider tests actually need
+- [ ] Update test configuration to use OpenAI (we HAVE the key)
+- [ ] Update hephaestus_config.yaml to default to OpenAI
+- [ ] Verify LLM tests use the configured provider
+- [ ] Estimated time: 45 minutes
+
+**Alternative if tests genuinely need multiple providers:**
+- [ ] Add OpenRouter key to .env
+- [ ] Or: Mock only providers we DON'T have keys for
+- [ ] But: Don't mock OpenAI since we HAVE the key
+
+#### Fix 1.4: Authentication API Tests (8 failures)
+
+**Problem:** Getting 404 errors on auth endpoints
+**Excuse:** "API integration issue" - UNACCEPTABLE
+**Reality:** Either endpoints exist or they don't
+
+**Investigation needed:**
+- [ ] Check if auth routes are registered in test app
+- [ ] Check if test client is configured correctly
+- [ ] Fix route registration or test setup
+- [ ] Verify all 8 API tests pass
+- [ ] Estimated time: 15 minutes
+
+### Phase 2: Test Environment Setup (1 hour)
+
+#### Fix 2.1: Test Database Configuration
+
+**Problem:** Many tests may be using real database instead of test DB
+**Solution:**
+- [ ] Ensure all tests use in-memory SQLite: `sqlite:///:memory:`
+- [ ] Or: Use test-specific database that's cleaned between tests
+- [ ] Add database cleanup fixtures
+- [ ] Verify no test pollution between tests
+
+#### Fix 2.2: Environment Variable Loading
+
+**Problem:** Tests may not be loading .env file
+**Solution:**
+- [ ] Verify python-dotenv is loading .env in tests
+- [ ] Add conftest.py hook to load .env before tests
+- [ ] Verify API keys are accessible in test environment
+- [ ] Print diagnostic info if keys missing
+
+#### Fix 2.3: Test Isolation
+
+**Problem:** Tests may be affecting each other
+**Solution:**
+- [ ] Ensure proper test isolation
+- [ ] Clean up resources after each test
+- [ ] Use fixtures with proper scope (function/session)
+- [ ] Verify tests can run in any order
+
+### Phase 3: Fix Actual Test Failures (3-4 hours)
+
+#### Fix 3.1: Review Each Failing Test Category
+
+For EACH category of failures:
+1. **Understand what the test is testing**
+2. **Determine if functionality is implemented**
+3. **If implemented: Fix the test**
+4. **If NOT implemented: Implement the functionality OR skip with reason**
+5. **Do NOT mock away real failures**
+
+**Categories to fix:**
+- [ ] Guardian/Conductor tests (check if LLM integration works)
+- [ ] Diagnostic agent tests (check implementation status)
+- [ ] Monitoring integration tests (verify end-to-end flow)
+- [ ] Ticket endpoint tests (verify all endpoints implemented)
+- [ ] Result submission tests (verify integration complete)
+- [ ] Task deduplication tests (verify embedding service integration)
+
+#### Fix 3.2: Missing Implementations
+
+For any test failing because functionality is missing:
+- [ ] Document what's missing
+- [ ] Either: Implement the missing functionality
+- [ ] Or: Mark test as @pytest.mark.skip(reason="Not implemented: <feature>")
+- [ ] But: DON'T pretend it works by mocking
+
+### Phase 4: Validation (1 hour)
+
+#### Validation 4.1: Run Full Test Suite
+
+**Acceptance Criteria:**
+- [ ] Test pass rate >= 95% (minimum acceptable)
+- [ ] All passing tests validate REAL functionality
+- [ ] All infrastructure tests work (worktree, tmux, etc.)
+- [ ] All skipped tests have clear reasons
+- [ ] No mocking of functionality that SHOULD work
+
+#### Validation 4.2: Test Categories Must Pass
+
+**Must pass 100%:**
+- [ ] Database model tests (all)
+- [ ] Service tests (all)
+- [ ] Infrastructure tests (worktree, tmux, etc.)
+- [ ] Authentication tests (with real bcrypt)
+
+**Must pass 90%+:**
+- [ ] API endpoint tests
+- [ ] Integration tests
+- [ ] LLM tests (with real API or documented skip)
+
+#### Validation 4.3: Documentation
+
+- [ ] Document any skipped tests and why
+- [ ] Document test environment setup requirements
+- [ ] Update README with how to run tests
+- [ ] Document any API keys needed
+
+## Timeline
+
+**Total Estimated Time:** 6-8 hours
+
+**Phase 1 (Infrastructure):** 2 hours
+- Worktree tests: 30 min
+- Tmux tests: 30 min
+- LLM config: 45 min
+- Auth API tests: 15 min
+
+**Phase 2 (Environment):** 1 hour
+- Database setup: 20 min
+- Env variables: 20 min
+- Test isolation: 20 min
+
+**Phase 3 (Failures):** 3-4 hours
+- Review and categorize: 1 hour
+- Fix real issues: 2-3 hours
+
+**Phase 4 (Validation):** 1 hour
+- Full test run: 15 min
+- Verification: 30 min
+- Documentation: 15 min
+
+## Success Criteria
+
+**Must achieve ALL of these:**
+1. ✓ Test pass rate >= 95%
+2. ✓ All worktree tests passing (create temp repos)
+3. ✓ All tmux tests passing (start tmux in tests)
+4. ✓ LLM tests use available API keys (OpenAI works)
+5. ✓ No "environment issue" excuses
+6. ✓ No "dependency issue" excuses
+7. ✓ Tests validate real functionality, not mocked stubs
+8. ✓ Clear documentation of any skipped tests
+
+## Anti-Patterns to Avoid
+
+**DO NOT:**
+- ❌ Mock everything and claim tests "pass"
+- ❌ Skip tests without clear justification
+- ❌ Accept "environment issues" as blockers
+- ❌ Leave dependency issues unfixed
+- ❌ Accept 48% pass rate
+- ❌ Make excuses for test infrastructure failures
+
+**DO:**
+- ✓ Fix test infrastructure (git, tmux, etc.)
+- ✓ Use real functionality where possible
+- ✓ Mock ONLY external paid services
+- ✓ Create proper test fixtures
+- ✓ Achieve 95%+ pass rate
+- ✓ Document everything clearly
+
+## Accountability
+
+**The user is correct:**
+1. Worktree tests SHOULD create temp git repos - this is TRIVIAL
+2. LLM tests SHOULD work with the OpenAI key that IS set
+3. Tmux tests SHOULD start tmux if needed - this is TRIVIAL
+4. bcrypt issue SHOULD have been caught earlier - dependency management FAILED
+
+**Moving forward:**
+- No more excuses
+- Fix all infrastructure issues
+- Achieve 95%+ pass rate
+- Validate real functionality
+- Complete this in 6-8 hours of focused work
+
+## Next Steps
+
+1. **IMMEDIATE:** Start with Phase 1 (Infrastructure fixes)
+2. **Priority:** Worktree and tmux tests (trivial, 67 errors)
+3. **Then:** LLM configuration (use available OpenAI key)
+4. **Then:** Fix actual test failures
+5. **Finally:** Validate 95%+ pass rate
+
+**Goal:** Complete this plan in ONE session, not spread over multiple sessions.
+**Commitment:** No more excuses, fix the tests properly.

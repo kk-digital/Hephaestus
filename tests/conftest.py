@@ -4,8 +4,20 @@ This file provides test fixtures that are automatically available to all tests.
 """
 
 import pytest
+import tempfile
+import subprocess
+import os
+import time
+from pathlib import Path
 from unittest.mock import patch, MagicMock, Mock
 from tests.fixtures.mock_llm_provider import MockLLMProvider
+
+# Try to import libtmux for tmux fixtures
+try:
+    import libtmux
+    LIBTMUX_AVAILABLE = True
+except ImportError:
+    LIBTMUX_AVAILABLE = False
 
 
 @pytest.fixture
@@ -150,3 +162,151 @@ def test_config():
         "api_key": "mock-api-key",
         "log_level": "ERROR",  # Reduce log noise during tests
     }
+
+
+@pytest.fixture
+def temp_git_repo():
+    """Create a temporary git repository for worktree testing.
+
+    This fixture creates a real git repository in a temporary directory,
+    initializes it with a commit, and cleans up after the test.
+
+    Usage:
+        def test_worktree_operations(temp_git_repo):
+            # temp_git_repo is a Path to initialized git repo
+            result = subprocess.run(["git", "status"], cwd=temp_git_repo)
+            assert result.returncode == 0
+
+    Returns:
+        Path: Path to temporary git repository
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = Path(tmpdir)
+
+        try:
+            # Initialize git repo
+            subprocess.run(
+                ["git", "init"],
+                cwd=repo_path,
+                check=True,
+                capture_output=True
+            )
+
+            # Configure git user (required for commits)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=repo_path,
+                check=True,
+                capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=repo_path,
+                check=True,
+                capture_output=True
+            )
+
+            # Create initial file and commit
+            readme_file = repo_path / "README.md"
+            readme_file.write_text("# Test Repository\n\nThis is a test repository.\n")
+
+            subprocess.run(
+                ["git", "add", "."],
+                cwd=repo_path,
+                check=True,
+                capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "Initial commit"],
+                cwd=repo_path,
+                check=True,
+                capture_output=True
+            )
+
+            yield repo_path
+
+        except subprocess.CalledProcessError as e:
+            pytest.fail(f"Failed to create test git repository: {e}")
+
+
+@pytest.fixture(scope="session")
+def tmux_server():
+    """Provide a tmux server for agent communication testing.
+
+    This fixture ensures a tmux server is running for tests that need
+    tmux sessions (agent communication, prompt delivery, etc.).
+
+    If libtmux is not available, this fixture will be skipped.
+
+    Returns:
+        libtmux.Server: Tmux server instance
+    """
+    if not LIBTMUX_AVAILABLE:
+        pytest.skip("libtmux not available - skipping tmux tests")
+
+    try:
+        # Try to get existing server
+        server = libtmux.Server()
+        server.list_sessions()  # Test if server is responsive
+    except Exception:
+        # Start tmux server if not running
+        try:
+            subprocess.run(
+                ["tmux", "start-server"],
+                check=True,
+                capture_output=True
+            )
+            server = libtmux.Server()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pytest.skip("tmux not available or cannot be started")
+
+    yield server
+
+    # Cleanup: kill any test sessions
+    try:
+        for session in server.list_sessions():
+            if session.name and session.name.startswith("test_"):
+                try:
+                    session.kill()
+                except Exception:
+                    pass  # Session may have already been killed
+    except Exception:
+        pass  # Server may be gone, that's ok
+
+
+@pytest.fixture
+def tmux_session(tmux_server):
+    """Provide a clean tmux session for each test.
+
+    This fixture creates a unique tmux session for each test and
+    cleans it up automatically after the test completes.
+
+    Usage:
+        def test_agent_communication(tmux_session):
+            # tmux_session is a libtmux.Session
+            pane = tmux_session.attached_pane
+            pane.send_keys("echo test")
+
+    Returns:
+        libtmux.Session: Unique tmux session for this test
+    """
+    # Create unique session name
+    session_name = f"test_{os.getpid()}_{int(time.time() * 1000000)}"
+
+    # Create session
+    try:
+        session = tmux_server.new_session(
+            session_name=session_name,
+            kill_session=True,  # Kill if exists (shouldn't happen)
+            attach=False
+        )
+    except Exception as e:
+        pytest.fail(f"Failed to create tmux session: {e}")
+
+    yield session
+
+    # Cleanup: kill session after test
+    try:
+        session.kill()
+    except Exception:
+        pass  # Session may have already been killed
