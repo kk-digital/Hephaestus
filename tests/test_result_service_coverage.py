@@ -4,13 +4,13 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
-from src.services.result_service import ResultService
+from src.c2_result_service.result_service import ResultService
 
 
 class TestResultServiceAdditionalCoverage:
     """Additional tests to reach 90% coverage."""
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_get_results_for_agent(self, mock_get_db):
         """Test retrieving results for a specific agent."""
         # Setup mock results
@@ -57,7 +57,7 @@ class TestResultServiceAdditionalCoverage:
         # Verify correct query was made
         mock_db.query.return_value.filter_by.assert_called_once_with(agent_id="agent-123")
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_get_result_content(self, mock_get_db):
         """Test retrieving markdown content of a specific result."""
         # Setup mock result
@@ -79,7 +79,7 @@ class TestResultServiceAdditionalCoverage:
         # Verify correct query was made
         mock_db.query.return_value.filter_by.assert_called_once_with(id="result-1")
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_get_result_content_not_found(self, mock_get_db):
         """Test retrieving content for non-existent result."""
         # Setup mock to return None
@@ -93,7 +93,7 @@ class TestResultServiceAdditionalCoverage:
         # Assertions
         assert content is None
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_verify_result_not_found(self, mock_get_db):
         """Test verifying a result that doesn't exist."""
         # Setup mock to return None
@@ -109,7 +109,7 @@ class TestResultServiceAdditionalCoverage:
                 verified=True
             )
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_verify_result_as_disputed(self, mock_get_db):
         """Test marking a result as disputed instead of verified."""
         # Setup mock result

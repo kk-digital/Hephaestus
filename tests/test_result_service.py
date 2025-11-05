@@ -6,8 +6,8 @@ import os
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
-from src.services.result_service import ResultService
-from src.services.validation_helpers import (
+from src.c2_result_service.result_service import ResultService
+from src.c2_validation_service.validation_helpers import (
     validate_file_path,
     validate_file_size,
     validate_markdown_format,
@@ -54,7 +54,7 @@ class TestResultService:
         yield temp_path
         os.unlink(temp_path)
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_create_result_success(self, mock_get_db, mock_db, valid_markdown_file):
         """Test successful result creation."""
         # Setup mock database
@@ -85,7 +85,7 @@ class TestResultService:
         assert mock_task.has_results == True
         mock_db.commit.assert_called()
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_create_result_file_not_found(self, mock_get_db):
         """Test result creation with non-existent file."""
         with pytest.raises(FileNotFoundError, match="Markdown file not found"):
@@ -97,7 +97,7 @@ class TestResultService:
                 summary="Test",
             )
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_create_result_file_too_large(self, mock_get_db, large_markdown_file):
         """Test result creation with file exceeding size limit."""
         with pytest.raises(ValueError, match="File too large"):
@@ -109,7 +109,7 @@ class TestResultService:
                 summary="Test",
             )
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_create_result_invalid_format(self, mock_get_db, non_markdown_file):
         """Test result creation with non-markdown file."""
         with pytest.raises(ValueError, match="File must be markdown"):
@@ -121,7 +121,7 @@ class TestResultService:
                 summary="Test",
             )
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_create_result_wrong_agent(self, mock_get_db, mock_db, valid_markdown_file):
         """Test result creation by wrong agent."""
         # Setup mock database
@@ -140,7 +140,7 @@ class TestResultService:
                 summary="Test",
             )
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_get_results_for_task(self, mock_get_db, mock_db):
         """Test retrieving results for a task."""
         # Setup mock results
@@ -182,7 +182,7 @@ class TestResultService:
         assert results[1]["result_id"] == "result-2"
         assert results[1]["verification_status"] == "unverified"
 
-    @patch('src.services.result_service.get_db')
+    @patch('src.c2_result_service.result_service.get_db')
     def test_verify_result(self, mock_get_db, mock_db):
         """Test verifying a result."""
         # Setup mock result

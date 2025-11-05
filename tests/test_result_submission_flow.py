@@ -6,8 +6,8 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from datetime import datetime
 
-from src.services.workflow_result_service import WorkflowResultService
-from src.services.result_validator_service import ResultValidatorService
+from src.c2_workflow_result_service.result_service import WorkflowResultService
+from src.c2_validation_service.result_validator_service import ResultValidatorService
 from src.workflow.termination_handler import WorkflowTerminationHandler
 
 
@@ -68,8 +68,8 @@ Used reverse engineering tools to analyze the binary:
         if os.path.exists(self.temp_file_path):
             os.unlink(self.temp_file_path)
 
-    @patch('src.services.workflow_result_service.get_db')
-    @patch('src.services.result_validator_service.PhaseManager')
+    @patch('src.c2_workflow_result_service.result_service.get_db')
+    @patch('src.c2_validation_service.result_validator_service.PhaseManager')
     async def test_complete_submission_flow_stop_all(self, mock_phase_manager, mock_get_db):
         """Test complete flow: submit result -> validate -> terminate workflow."""
 
@@ -177,8 +177,8 @@ Used reverse engineering tools to analyze the binary:
         assert termination_result["workflow_id"] == "workflow-123"
         assert "agent-456" in termination_result["terminated_agents"]
 
-    @patch('src.services.workflow_result_service.get_db')
-    @patch('src.services.result_validator_service.PhaseManager')
+    @patch('src.c2_workflow_result_service.result_service.get_db')
+    @patch('src.c2_validation_service.result_validator_service.PhaseManager')
     async def test_complete_submission_flow_do_nothing(self, mock_phase_manager, mock_get_db):
         """Test complete flow: submit result -> validate -> continue workflow."""
 
@@ -242,8 +242,8 @@ Used reverse engineering tools to analyze the binary:
         assert "continue_workflow" in outcome["next_actions"]
         assert "terminate_workflow" not in outcome["next_actions"]
 
-    @patch('src.services.workflow_result_service.get_db')
-    @patch('src.services.result_validator_service.PhaseManager')
+    @patch('src.c2_workflow_result_service.result_service.get_db')
+    @patch('src.c2_validation_service.result_validator_service.PhaseManager')
     async def test_validation_failure_flow(self, mock_phase_manager, mock_get_db):
         """Test flow when validation fails."""
 

@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.services.validation_helpers import validate_file_path
+from src.c2_validation_service.validation_helpers import validate_file_path
 
 
 class TestValidationHelpersAdditionalCoverage:
@@ -13,7 +13,7 @@ class TestValidationHelpersAdditionalCoverage:
     def test_validate_file_path_relative_path(self):
         """Test validation of relative paths."""
         # Test that relative paths are converted to absolute
-        with patch('src.services.validation_helpers.Path.cwd') as mock_cwd:
+        with patch('src.c2_validation_service.validation_helpers.Path.cwd') as mock_cwd:
             mock_cwd.return_value = Path("/home/user")
 
             # This should not raise

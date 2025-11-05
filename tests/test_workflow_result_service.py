@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime
 
-from src.services.workflow_result_service import WorkflowResultService
+from src.c2_workflow_result_service.result_service import WorkflowResultService
 from src.core.database import get_db, Workflow, Agent, WorkflowResult
 
 
@@ -51,7 +51,7 @@ Result: PASS
         if os.path.exists(self.temp_file_path):
             os.unlink(self.temp_file_path)
 
-    @patch('src.services.workflow_result_service.get_db')
+    @patch('src.c2_workflow_result_service.result_service.get_db')
     def test_submit_result_success(self, mock_get_db):
         """Test successful result submission."""
         # Mock database
@@ -89,7 +89,7 @@ Result: PASS
         mock_db.add.assert_called_once()
         mock_db.commit.assert_called_once()
 
-    @patch('src.services.workflow_result_service.get_db')
+    @patch('src.c2_workflow_result_service.result_service.get_db')
     def test_submit_result_existing_validated_result(self, mock_get_db):
         """Test submission when workflow already has validated result."""
         # Mock database
@@ -132,7 +132,7 @@ Result: PASS
                 markdown_file_path="/non/existent/file.md"
             )
 
-    @patch('src.services.workflow_result_service.get_db')
+    @patch('src.c2_workflow_result_service.result_service.get_db')
     def test_submit_result_workflow_not_found(self, mock_get_db):
         """Test submission with invalid workflow ID."""
         # Mock database
@@ -147,7 +147,7 @@ Result: PASS
                 markdown_file_path=self.temp_file_path
             )
 
-    @patch('src.services.workflow_result_service.get_db')
+    @patch('src.c2_workflow_result_service.result_service.get_db')
     def test_update_result_status_success(self, mock_get_db):
         """Test successful result status update."""
         # Mock database
@@ -187,7 +187,7 @@ Result: PASS
         # Verify database commit
         mock_db.commit.assert_called_once()
 
-    @patch('src.services.workflow_result_service.get_db')
+    @patch('src.c2_workflow_result_service.result_service.get_db')
     def test_update_result_status_invalid_status(self, mock_get_db):
         """Test update with invalid status."""
         with pytest.raises(ValueError, match="Invalid status"):
@@ -197,7 +197,7 @@ Result: PASS
                 feedback="Test feedback"
             )
 
-    @patch('src.services.workflow_result_service.get_db')
+    @patch('src.c2_workflow_result_service.result_service.get_db')
     def test_get_workflow_results(self, mock_get_db):
         """Test getting workflow results."""
         # Mock database
@@ -247,7 +247,7 @@ Result: PASS
         assert result2["validation_feedback"] is None
         assert result2["validated_at"] is None
 
-    @patch('src.services.workflow_result_service.get_db')
+    @patch('src.c2_workflow_result_service.result_service.get_db')
     def test_check_workflow_completion(self, mock_get_db):
         """Test checking workflow completion status."""
         # Mock database
