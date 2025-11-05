@@ -939,6 +939,34 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
 - Updated: tasks/251105-task-32a-llm-provider-mocking.done.txt
 
 
+## Task-32c: Fix Password Hashing - COMPLETE (2025-11-05)
+
+**Status:** ✅ COMPLETE
+
+**Root Cause:**
+- bcrypt 5.0.0 incompatible with passlib 1.7.4
+- bcrypt 5.0 removed `__about__` attribute that passlib expects
+- This is a **dependency compatibility issue**, NOT caused by refactoring
+
+**Solution:**
+- Pinned bcrypt to 4.x: `bcrypt>=4.0.0,<5.0.0` in requirements.txt
+- Downgraded bcrypt from 5.0.0 to 4.3.0 in container
+
+**Results:**
+- Password hashing tests: 0/4 → 4/4 passing (+4 tests)
+- Total tests: 220 → 224 passing (+4)
+- Total failures: 120 → 116 (-4)
+- Test pass rate: 47% → 48%
+
+**Why Not Detected During Refactoring:**
+- Pre-existing dependency issue, NOT caused by refactoring
+- Authentication code was NOT touched during refactoring
+- Likely broke when bcrypt was upgraded to 5.x (environment change)
+
+**Documentation:**
+- Created: tasks/251105-task-32c-fix-password-hashing.done.txt
+
+
 ## Session Status (2025-11-05)
 
 **Tasks Completed This Session:**
@@ -949,11 +977,13 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
 - ✅ Task-31: Test backward compatibility (7/7 tests passed)
 - ✅ Task-32: Analyze remaining errors (documented)
 - ✅ Task-32a: Add LLM provider mocking (+12 tests passing)
-- ✅ Created 7 new task files (27-32, 32a)
-- ✅ Renamed 6 completed task files to .done.txt
+- ✅ Task-32c: Fix password hashing (+4 tests passing)
+- ✅ Created 8 new task files (27-32, 32a, 32c)
+- ✅ Renamed 7 completed task files to .done.txt
 - ✅ Created 2 test results reports
 - ✅ Created comprehensive compatibility test suite
 - ✅ Created LLM mocking infrastructure
+- ✅ Fixed bcrypt dependency compatibility issue
 - ✅ Commits pending push
 
 **Current State:**
@@ -962,7 +992,8 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
 - Import errors fixed
 - Circular imports fixed
 - Backward compatibility fully verified (100% pass rate)
-- Tests running successfully (47% pass rate, 466 tests)
+- Tests running successfully (48% pass rate, 466 tests, 224 passing)
 - No refactoring regressions identified
 - LLM mocking infrastructure in place
+- Password hashing working correctly (bcrypt 4.x)
 - Remaining test errors are infrastructure/mocking issues (NOT code issues)
