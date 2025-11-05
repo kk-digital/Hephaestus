@@ -188,6 +188,7 @@ def test_db():
 def test_client(test_db, monkeypatch):
     """Create a test client with test database."""
     from src.mcp.server import app
+    from unittest.mock import Mock
 
     def get_test_db():
         try:
@@ -198,6 +199,27 @@ def test_client(test_db, monkeypatch):
     # Monkey patch the database dependency
     from src.core import database
     monkeypatch.setattr(database, "get_db", get_test_db)
+
+    # Monkey patch get_db_manager in auth_api to use test database
+    # Create a mock DatabaseManager that uses the test session
+    class MockDatabaseManager:
+        """Mock DatabaseManager that uses test database session."""
+        def get_session(self):
+            """Return test database session as context manager."""
+            class ContextManager:
+                def __enter__(self_cm):
+                    return test_db
+                def __exit__(self_cm, *args):
+                    pass
+            return ContextManager()
+
+        def get_db(self):
+            """Return test database session as context manager (alias)."""
+            return self.get_session()
+
+    # Patch get_db_manager function in auth_api
+    import src.auth.auth_api
+    monkeypatch.setattr(src.auth.auth_api, "get_db_manager", lambda: MockDatabaseManager())
 
     client = TestClient(app)
     return client

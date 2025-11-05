@@ -34,6 +34,13 @@ from src.c1_ticket_models.ticket import (  # noqa: E402
     Ticket, TicketComment, TicketHistory, TicketCommit, BoardConfig
 )
 
+# Import User models from new c1 layer
+from src.c1_user_models.user import (  # noqa: E402
+    User, Role, UserRole, Permission, RolePermission,
+    Team, TeamMember, AuthToken, UserSession, AuditLog,
+    UserPreferences, LoginAttempt
+)
+
 # Import DatabaseManager and get_db from new c1 layer
 from src.c1_database_session.database_manager import DatabaseManager, get_db  # noqa: E402
 
@@ -72,6 +79,19 @@ __all__ = [
     "TicketHistory",
     "TicketCommit",
     "BoardConfig",
+    # User models
+    "User",
+    "Role",
+    "UserRole",
+    "Permission",
+    "RolePermission",
+    "Team",
+    "TeamMember",
+    "AuthToken",
+    "UserSession",
+    "AuditLog",
+    "UserPreferences",
+    "LoginAttempt",
     # Database utilities
     "DatabaseManager",
     "get_db",

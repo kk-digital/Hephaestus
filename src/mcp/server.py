@@ -415,6 +415,11 @@ def get_single_active_workflow() -> Optional[str]:
         return None
 
 
+# Register routes that don't depend on server_state (makes them available in tests)
+# Authentication routes can be registered immediately
+app.include_router(auth_router)
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize server on startup."""
@@ -424,9 +429,6 @@ async def startup_event():
     # Add frontend API routes
     api_router = create_frontend_routes(server_state.db_manager, server_state.agent_manager, server_state.phase_manager)
     app.include_router(api_router)
-
-    # Add authentication routes
-    app.include_router(auth_router)
 
     # Add c3 layer routes (extracted application layer)
     app.include_router(health_router)
