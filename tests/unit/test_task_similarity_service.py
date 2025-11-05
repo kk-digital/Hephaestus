@@ -30,7 +30,8 @@ class TestTaskSimilarityService:
     def similarity_service(self, mock_db_manager, mock_embedding_service):
         """Create a TaskSimilarityService instance for testing."""
         db_manager, _ = mock_db_manager
-        with patch('src.services.task_similarity_service.get_config') as mock_config:
+        # Patch the actual module location after refactoring (correct path: similarity_service.py)
+        with patch('src.c2_task_similarity_service.similarity_service.get_config') as mock_config:
             config = Mock()
             config.task_similarity_threshold = 0.7
             config.task_related_threshold = 0.4

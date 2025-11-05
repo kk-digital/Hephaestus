@@ -12,7 +12,8 @@ class TestEmbeddingService:
     @pytest.fixture
     def embedding_service(self):
         """Create an EmbeddingService instance for testing."""
-        with patch('src.services.embedding_service.openai.OpenAI'):
+        # Patch the actual module location after refactoring
+        with patch('src.c2_embedding_service.embedding_service.openai.OpenAI'):
             service = EmbeddingService("test-api-key")
             return service
 
