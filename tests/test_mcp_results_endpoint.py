@@ -3,20 +3,19 @@
 import pytest
 import tempfile
 import os
-import asyncio
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from datetime import datetime
-import httpx
+from fastapi.testclient import TestClient
 
 
 class TestReportResultsEndpoint:
     """Test suite for the /report_results MCP endpoint."""
 
     @pytest.fixture
-    async def client(self):
-        """Create async HTTP client for testing."""
-        async with httpx.AsyncClient(base_url="http://testserver") as client:
-            yield client
+    def client(self):
+        """Create test client for testing."""
+        from src.mcp.server import app
+        return TestClient(app)
 
     @pytest.fixture
     def valid_markdown_file(self):
