@@ -967,7 +967,7 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
 - Created: tasks/251105-task-32c-fix-password-hashing.done.txt
 
 
-## Session Status (2025-11-05 Continued)
+## Session Status (2025-11-05 Continued - MAJOR PROGRESS!)
 
 **Tasks Completed This Session:**
 - ✅ Task-27: Fix C2 import errors
@@ -987,6 +987,15 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
 - ✅ Created comprehensive test fix plan (251105-comprehensive-test-fix-plan.txt)
 - ✅ Added test infrastructure fixtures (temp_git_repo, tmux_server, tmux_session)
 - ✅ Made libtmux a required dependency (no longer optional)
+- ✅ Fixed config placeholder detection (+36 tests, worktree tests now work)
+- ✅ Fixed test import paths after refactoring (+21 tests)
+- ✅ Exported session prompts (export-prompts-01.txt)
+
+**MAJOR TEST IMPROVEMENTS:**
+- **Start of session**: 224 passed (48%), 116 failed, 113 errors
+- **After config fix**: 260 passed (56%), -42 errors [+36 tests]
+- **After test path fixes**: 281 passed (60%), -31 errors [+21 tests]
+- **TOTAL IMPROVEMENT: +57 tests passing! (48% → 60%)**
 
 **Current State:**
 - Three-layer architecture refactoring continues
@@ -994,18 +1003,16 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
 - Import errors fixed
 - Circular imports fixed
 - Backward compatibility fully verified (100% pass rate)
-- Tests running successfully (48% pass rate, 466 tests, 224 passing)
+- **Tests: 281 passing (60%), 132 failed, 40 errors, 13 skipped**
 - No refactoring regressions identified
 - LLM mocking infrastructure in place
 - Password hashing working correctly (bcrypt 4.x)
 - Test infrastructure fixtures added (git, tmux)
-- Remaining work: Update tests to use fixtures, target 95%+ pass rate
+- Config placeholder detection working (worktree tests fixed)
+- Test import paths updated for c1/c2/c3 structure
 
-**Comprehensive Test Fix Plan:**
-See tasks/251105-comprehensive-test-fix-plan.txt for complete plan:
-- Phase 1: Infrastructure fixes (git, tmux, LLM config, auth API) - 2 hours
-- Phase 2: Environment setup (database, env vars, isolation) - 1 hour
-- Phase 3: Fix actual test failures (no mocking, real functionality) - 3-4 hours
-- Phase 4: Validation (95%+ pass rate) - 1 hour
-- Total estimated: 6-8 hours
-- Target: 95%+ pass rate, tests validate REAL functionality
+**Remaining Work to 95% Target:**
+- 40 errors remaining (down from 113!)
+- 132 failures (some may be test logic issues)
+- Categories: MCP ticket endpoints (13), agent communication (9), integrations
+- Target: 95%+ pass rate (currently 60%)
