@@ -49,7 +49,11 @@ class Config:
 
         # Git settings
         git = config.get('git', {})
-        self.main_repo_path = Path(git.get('main_repo_path', str(Path.cwd())))
+        main_repo_path_str = git.get('main_repo_path', str(Path.cwd()))
+        # Detect placeholder values and use current directory instead
+        if 'your_project' in str(main_repo_path_str).lower():
+            main_repo_path_str = str(Path.cwd())
+        self.main_repo_path = Path(main_repo_path_str)
         self.worktree_branch_prefix = git.get('worktree_branch_prefix', 'agent-')
         self.auto_commit = git.get('auto_commit', True)
         self.conflict_resolution_strategy = git.get('conflict_resolution', 'newest_file_wins')
