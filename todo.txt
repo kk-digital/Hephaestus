@@ -967,7 +967,7 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
 - Created: tasks/251105-task-32c-fix-password-hashing.done.txt
 
 
-## Session Status (2025-11-05)
+## Session Status (2025-11-05 Continued)
 
 **Tasks Completed This Session:**
 - ✅ Task-27: Fix C2 import errors
@@ -984,7 +984,9 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
 - ✅ Created comprehensive compatibility test suite
 - ✅ Created LLM mocking infrastructure
 - ✅ Fixed bcrypt dependency compatibility issue
-- ✅ Commits pending push
+- ✅ Created comprehensive test fix plan (251105-comprehensive-test-fix-plan.txt)
+- ✅ Added test infrastructure fixtures (temp_git_repo, tmux_server, tmux_session)
+- ✅ Made libtmux a required dependency (no longer optional)
 
 **Current State:**
 - Three-layer architecture refactoring continues
@@ -996,4 +998,14 @@ Our three-layer architecture with 15 c1 modules is SUPERIOR - kept ours.
 - No refactoring regressions identified
 - LLM mocking infrastructure in place
 - Password hashing working correctly (bcrypt 4.x)
-- Remaining test errors are infrastructure/mocking issues (NOT code issues)
+- Test infrastructure fixtures added (git, tmux)
+- Remaining work: Update tests to use fixtures, target 95%+ pass rate
+
+**Comprehensive Test Fix Plan:**
+See tasks/251105-comprehensive-test-fix-plan.txt for complete plan:
+- Phase 1: Infrastructure fixes (git, tmux, LLM config, auth API) - 2 hours
+- Phase 2: Environment setup (database, env vars, isolation) - 1 hour
+- Phase 3: Fix actual test failures (no mocking, real functionality) - 3-4 hours
+- Phase 4: Validation (95%+ pass rate) - 1 hour
+- Total estimated: 6-8 hours
+- Target: 95%+ pass rate, tests validate REAL functionality

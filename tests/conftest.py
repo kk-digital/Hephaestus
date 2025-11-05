@@ -12,12 +12,9 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock, Mock
 from tests.fixtures.mock_llm_provider import MockLLMProvider
 
-# Try to import libtmux for tmux fixtures
-try:
-    import libtmux
-    LIBTMUX_AVAILABLE = True
-except ImportError:
-    LIBTMUX_AVAILABLE = False
+# Import libtmux - REQUIRED dependency for tmux fixtures
+# Will crash if not available (correct behavior)
+import libtmux
 
 
 @pytest.fixture
@@ -236,13 +233,9 @@ def tmux_server():
     This fixture ensures a tmux server is running for tests that need
     tmux sessions (agent communication, prompt delivery, etc.).
 
-    If libtmux is not available, this fixture will be skipped.
-
     Returns:
         libtmux.Server: Tmux server instance
     """
-    if not LIBTMUX_AVAILABLE:
-        pytest.skip("libtmux not available - skipping tmux tests")
 
     try:
         # Try to get existing server
