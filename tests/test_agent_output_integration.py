@@ -27,7 +27,7 @@ class TestAgentOutputIntegration:
             db_path = tmp.name
 
         # Initialize database
-        from src.core.database import Base, engine
+        from src.core.database import Base
         from sqlalchemy import create_engine
 
         test_engine = create_engine(f"sqlite:///{db_path}")
