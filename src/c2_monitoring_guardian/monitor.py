@@ -13,8 +13,8 @@ from src.agents.manager import AgentManager
 from src.interfaces import LLMProviderInterface, get_cli_agent
 from src.memory.rag import RAGSystem
 from src.phases import PhaseManager
-from src.monitoring.guardian import Guardian
-from src.monitoring.conductor import Conductor, SystemDecision
+from src.c2_monitoring_guardian.guardian import Guardian
+from src.c2_monitoring_guardian.conductor import Conductor, SystemDecision
 from src.monitoring.trajectory_context import TrajectoryContext
 
 logger = logging.getLogger(__name__)

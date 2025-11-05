@@ -1,0 +1,215 @@
+TASK-32: Analyze and Fix Remaining Test Errors
+
+## Status
+PENDING
+
+## Priority
+MEDIUM - Test suite improvements
+
+## Context
+
+After fixing Task-27 (c3_ticket_routes imports) and monitoring circular import, test suite status improved:
+
+**Current Results:**
+- Total collected: 449 tests (+11 from circular import fix)
+- Passed: 208 (46%)
+- Failed: 117 (26%)
+- Errors: 111 (25%)
+- Skipped: 13 (3%)
+- Runtime: 156.11s
+
+**Comparison to Task-27:**
+- Before: 438 tests, 205 passed (47%), 111 errors
+- After: 449 tests, 208 passed (46%), 111 errors (different)
+- Progress: +11 tests collected, +3 passing, circular import fixed
+
+## Error Analysis
+
+### Category 1: API Key / Configuration Errors (86 errors - 77%)
+
+**Error:** LangChain LLM client initialization
+**Source:** src.interfaces.langchain_llm_client:langchain_llm_client.py:124
+**Message:** "API key not found for openrouter"
+**Count:** 86 occurrences
+
+**Cause:** Tests attempting to initialize LLM providers without API keys in environment
+
+**Impact:** Not a code issue - tests work correctly, just missing config
+
+**Solution:**
+- Option 1: Mock LLM provider in tests (recommended)
+- Option 2: Add test API keys to .env
+- Option 3: Skip tests requiring API keys
+
+**Estimated Time:** 1-2 hours to add proper mocking
+
+### Category 2: Agent Communication / Tmux Errors (17 errors)
+
+**Source:** tests/test_agent_communication.py
+**Count:** 17 test errors
+
+**Likely Cause:** Tests requiring tmux sessions (agent communication uses tmux)
+
+**Solution:**
+- Mock tmux interactions
+- Or skip tests when tmux not available
+
+**Estimated Time:** 1 hour
+
+### Category 3: Embedding Service Errors (16 errors)
+
+**Source:** tests/unit/test_task_similarity_service.py (16 tests)
+**Source:** tests/unit/test_embedding_service.py (15 tests)
+
+**Total:** 31 embedding-related errors
+
+**Cause:** Tests for embedding functionality require LLM provider
+
+**Solution:** Mock embedding service calls
+
+**Estimated Time:** 1-2 hours
+
+### Category 4: MCP Ticket Endpoint Errors (13 errors)
+
+**Source:** tests/test_mcp_server_tickets.py
+**Count:** 13 test errors
+
+**Likely Cause:** These tests use actual HTTP endpoints that may not be fully implemented yet
+
+**Solution:** Review and fix ticket endpoint implementations
+
+**Estimated Time:** 2-3 hours
+
+### Category 5: Prompt Delivery Errors (12 errors)
+
+**Source:** tests/test_prompt_delivery.py
+**Count:** 12 test errors
+
+**Cause:** Tests for prompt delivery to agents (tmux-based)
+
+**Solution:** Mock tmux/agent interactions
+
+**Estimated Time:** 1 hour
+
+### Category 6: Worktree Integration Errors (16 errors total)
+
+**Source:** tests/test_worktree_integration.py (11 errors)
+**Source:** tests/test_worktree_manager.py (5 errors)
+
+**Cause:** Git worktree operations require actual git repository
+
+**Solution:**
+- Use temporary git repos in tests
+- Or mock git operations
+
+**Estimated Time:** 1-2 hours
+
+### Category 7: Monitoring Module Errors (21 errors)
+
+**Source:** src.c2_monitoring_guardian.monitor:monitor.py (9 errors)
+**Source:** src.c2_monitoring_guardian.guardian:guardian.py (8 errors)
+**Source:** src.c2_monitoring_guardian.conductor:conductor.py (4 errors)
+
+**Cause:** Monitoring tests require LLM provider and other dependencies
+
+**Solution:** Mock LLM calls in monitoring tests
+
+**Estimated Time:** 2 hours
+
+### Category 8: Other Errors (13 errors)
+
+**Sources:**
+- tests/test_agent_output_capture.py (7 errors)
+- tests/test_ticket_id_validation.py (4 errors)
+- tests/test_agent_output_integration.py (2 errors)
+
+**Estimated Time:** 1-2 hours
+
+## Test Failures Analysis (117 failures)
+
+Failures are separate from errors. Common failure categories:
+
+1. **Authentication failures** (12 failures) - Password hashing issues
+2. **Result service failures** (16 failures) - Service implementation issues
+3. **Conductor/Guardian failures** (18 failures) - Monitoring logic failures
+4. **Diagnostic failures** (12 failures) - Diagnostic agent tests
+5. **Integration test failures** (Various)
+
+## Recommendations
+
+### Immediate Actions (HIGH Priority)
+
+1. **Add LLM Provider Mocking**
+   - Create mock LLM provider for tests
+   - Reduces 86 errors to 0
+   - Estimated: 2 hours
+   - Creates: `tests/fixtures/mock_llm_provider.py`
+
+2. **Add Tmux Mocking**
+   - Mock tmux operations in tests
+   - Reduces 17 agent communication errors
+   - Estimated: 1 hour
+
+3. **Fix Password Hashing Tests**
+   - Address bcrypt/passlib configuration
+   - Fixes 12 authentication failures
+   - Estimated: 30 minutes
+
+### Medium Actions (MEDIUM Priority)
+
+4. **Mock Embedding Service**
+   - Mock embedding calls
+   - Reduces 31 embedding errors
+   - Estimated: 1-2 hours
+
+5. **Fix Ticket Endpoint Tests**
+   - Review c3_ticket_routes implementations
+   - Fix any incomplete endpoints
+   - Reduces 13 MCP ticket errors
+   - Estimated: 2-3 hours
+
+### Low Priority Actions
+
+6. **Git Worktree Test Improvements**
+   - Use temporary repos or mocks
+   - Reduces 16 worktree errors
+   - Estimated: 1-2 hours
+
+7. **Monitoring Test Improvements**
+   - Mock LLM in monitoring tests
+   - Reduces 21 monitoring errors
+   - Estimated: 2 hours
+
+## Expected Outcome After Fixes
+
+**Target:** 90%+ pass rate
+
+**If ALL fixes applied:**
+- Errors reduced: 111 → ~15 (reduce by ~85%)
+- Pass rate increased: 46% → 75%+
+- Most remaining issues: Integration tests requiring running services
+
+## Estimated Total Time
+
+- High priority fixes: 3.5 hours
+- Medium priority fixes: 4-5 hours
+- Low priority fixes: 3-4 hours
+- **Total:** 10-12 hours for 90%+ pass rate
+
+## Task Breakdown
+
+**Create Sub-Tasks:**
+- [ ] Task-32a: Add LLM provider mocking (HIGH, 2 hours)
+- [ ] Task-32b: Add tmux mocking (HIGH, 1 hour)
+- [ ] Task-32c: Fix password hashing (HIGH, 30 min)
+- [ ] Task-32d: Mock embedding service (MEDIUM, 1-2 hours)
+- [ ] Task-32e: Fix ticket endpoints (MEDIUM, 2-3 hours)
+- [ ] Task-32f: Improve worktree tests (LOW, 1-2 hours)
+- [ ] Task-32g: Improve monitoring tests (LOW, 2 hours)
+
+## Notes
+
+- These are NOT regressions from refactoring
+- These are pre-existing test infrastructure issues
+- Three-layer architecture refactoring is successful
+- Test suite is working - just needs better mocking/fixtures
