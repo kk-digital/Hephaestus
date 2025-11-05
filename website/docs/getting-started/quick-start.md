@@ -11,13 +11,77 @@ A simple 3-phase bug fixing workflow:
 
 ## Prerequisites
 
-- **Claude Code** installed (AI coding assistant that agents run in)
+- **Claude Code**, **OpenCode**, **Droid**, or **Codex** installed (CLI AI tool that agents run in)
 - **tmux** installed (terminal multiplexer for agent isolation)
 - **Git** (for worktree isolation - your project directory must be a git repo)
 - **Python 3.10+**
 - **Node.js** and **npm** (for the frontend UI)
 - **Docker** (for running Qdrant vector store)
 - **API Keys**: OpenAI, OpenRouter (or Anthropic - see LLM Configuration below)
+
+## Validate Your Setup (macOS)
+
+Before proceeding with configuration, we recommend validating that everything is installed correctly:
+
+```bash
+python check_setup_macos.py
+```
+
+**What this script checks:**
+- ✅ **CLI Tools** - tmux, git, docker, node, npm, Claude Code, OpenCode, Python 3.10+
+- ✅ **API Keys** - .env file and required keys (OPENAI_API_KEY, OPENROUTER_API_KEY, etc.)
+- ✅ **MCP Servers** - Claude MCP accessible, Hephaestus and Qdrant MCP servers configured
+- ✅ **Configuration** - hephaestus_config.yaml exists and has required fields
+- ✅ **Working Directory** - Project directory exists, is git repo, has commits, has PRD.md
+- ✅ **Services** - Docker daemon running, Qdrant accessible on port 6333
+- ✅ **Dependencies** - Python packages and frontend node_modules installed
+
+**Example output:**
+```
+🔍 Hephaestus Setup Validation
+
+Checking CLI Tools...
+Checking API Keys...
+Checking MCP Servers...
+Checking Configuration...
+Checking Working Directory...
+Checking Services...
+Checking Dependencies...
+
+============================================================
+SETUP VALIDATION SUMMARY
+============================================================
+
+Cli Tools:
+  ✓ tmux
+  ✓ git
+  ✓ docker
+  ✓ node
+  ✓ npm
+  ✓ Claude Code
+  ✓ OpenCode (optional)
+  ✓ Python 3.10+
+
+Api Keys:
+  ✓ .env file exists
+  ✓ OPENAI_API_KEY
+  ✓ OPENROUTER_API_KEY (optional)
+  ✓ ANTHROPIC_API_KEY (optional)
+
+[... more categories ...]
+
+============================================================
+✓ ALL CHECKS PASSED
+Passed: 31/31 (100.0%)
+============================================================
+```
+
+The script provides a color-coded report:
+- **Green ✓** - Item is set up correctly
+- **Red ✗** - Item needs attention
+- **Overall status** - `100%` = all pass, `80%+` = mostly ready, `<80%` = setup incomplete
+
+If any checks fail, proceed to the relevant setup sections below to fix them.
 
 ## LLM Configuration
 
@@ -63,18 +127,20 @@ llm:
 
 ### Agent CLI Configuration
 
-Agents run inside **Claude Code**. Configure which Claude model to use:
+Agents run inside a CLI AI tool. Choose which CLI tool to use:
 
-**Using Claude Code (Default)**:
+#### CLI Tool Options
+
+**Claude Code (Default)**:
 ```yaml
 agents:
   default_cli_tool: "claude"
-  cli_model: "sonnet"  # or "opus", "haiku"
+  cli_model: "sonnet"  # Options: "sonnet", "opus", "haiku", "GLM-4.6"
 ```
 
-This uses your **Anthropic subscription** through Claude Code.
+Uses your **Anthropic subscription** through Claude Code. Supports Claude models and GLM-4.6 for cheaper alternative.
 
-**Using GLM-4.6 (Cheaper Alternative)**:
+**Using GLM-4.6 (cheaper model through Claude Code)**:
 ```yaml
 agents:
   default_cli_tool: "claude"
@@ -89,6 +155,25 @@ GLM_API_TOKEN=your-glm-token
 ```
 
 GLM-4.6 is significantly cheaper than Claude models while maintaining good performance.
+
+**OpenCode (Open-Source Alternative)**:
+```yaml
+agents:
+  default_cli_tool: "opencode"
+  cli_model: "anthropic/claude-sonnet-4"  # Uses provider/model format
+```
+
+**OpenCode benefits:**
+- Supports 75+ LLM providers (Anthropic, OpenAI, OpenRouter, etc.)
+- Open-source and free
+- Uses `provider/model` format (e.g., `anthropic/claude-sonnet-4`, `openai/gpt-4`)
+
+**Install OpenCode:**
+```bash
+npm install -g @opencodehq/opencode
+# or
+pip install opencode
+```
 
 ## MCP Server Setup
 
@@ -397,9 +482,52 @@ Open your browser to `http://localhost:3000`. You'll see:
 
 ## Using Example Workflows
 
-Instead of building your own workflow from scratch, you can use pre-built workflows in `example_workflows/`:
+### Quick Start: Personal Task Manager
 
-**PRD to Software Builder** (complete working example):
+Instead of building your own workflow from scratch, use our pre-built **Personal Task Manager** example:
+
+**All-in-One Runner** (simplest approach):
+```bash
+# Terminal 1: Start Qdrant (if not already running)
+docker run -d -p 6333:6333 qdrant/qdrant
+
+# Terminal 2: Run the complete example
+python run_example.py
+```
+
+The `run_example.py` script will:
+1. **Check and setup sub-agents** in `~/.claude/agents/`
+2. **Prompt for project path** (creates directory automatically)
+3. **Copy PRD.md and .gitignore** to your project
+4. **Initialize git repository** with initial commit
+5. **Update config** with your project path
+6. **Start Hephaestus** with the PRD to Software Builder workflow
+7. **Create initial task** to analyze the Personal Task Manager PRD
+
+**What you get:**
+- A complete Personal Task Manager app with:
+  - FastAPI backend + React frontend
+  - SQLite database
+  - Task CRUD operations (create, view, edit, delete)
+  - Proper project structure with separate `frontend/` and `backend/` directories
+
+**The workflow will:**
+1. Parse the PRD and identify components
+2. Create Kanban tickets for each component
+3. Design each component in parallel (Phase 2)
+4. Implement each component (Phase 3)
+5. Test each component (Phase 4)
+6. Document the system (Phase 5)
+7. Submit final result when complete
+
+**Track progress at:**
+- Kanban Board: http://localhost:8001/tickets
+- Frontend UI: http://localhost:3000/
+
+### Advanced: Build Your Own Workflow
+
+For custom workflows, use `example_workflows/prd_to_software/`:
+
 ```bash
 # Terminal 1: Start Qdrant
 docker run -d -p 6333:6333 qdrant/qdrant
@@ -412,7 +540,7 @@ python run_prd_workflow.py
 ```
 
 **Note**: Make sure you have:
-1. Set up your working directory path in `hephaestus_config.yaml` (see Working Directory Setup above)
+1. Set up your working directory path in `hephaustus_config.yaml` (see Working Directory Setup above)
 2. Created a `PRD.md` file in your project directory
 3. Initialized the directory as a git repository (`git init`)
 
@@ -425,7 +553,6 @@ The `run_prd_workflow.py` script shows how to:
 - Handle workflow lifecycle
 
 Other example workflows:
-- `example_workflows/prd_to_software/` - Full software development pipeline
 - `example_workflows/crackme_solving/` - Reverse engineering workflow
 
 See `run_prd_workflow.py` for a complete example of workflow configuration and execution.

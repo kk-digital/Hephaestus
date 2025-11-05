@@ -1,0 +1,165 @@
+TASK-26 ROUTE INVENTORY: Complete Analysis of server.py
+========================================================
+
+Date: 2025-11-05
+File: src/mcp/server.py (4,238 lines)
+Total Routes: 46 HTTP endpoints
+
+## Route Groups by Functional Domain
+
+### 1. Task Management Routes (5 routes)
+Location: Lines 1146-1804
+- POST /create_task - Create new agent task
+- GET /validate_agent_id/{agent_id} - Validate agent ID
+- POST /update_task_status - Update task status
+- POST /api/bump_task_priority - Increase task priority
+- POST /api/cancel_queued_task - Cancel queued task
+- POST /api/restart_task - Restart failed/cancelled task
+Estimated: ~650 lines
+
+### 2. Memory and Results Routes (4 routes)
+Location: Lines 1803-2247
+- POST /save_memory - Save agent memory/discovery
+- POST /report_results - Report task results
+- POST /give_validation_review - Submit validation review
+- POST /submit_result - Submit task result
+- POST /submit_result_validation - Submit result validation
+Estimated: ~440 lines
+
+### 3. Ticket Management Routes (12 routes)
+Location: Lines 2438-3183
+- POST /api/tickets/create - Create new ticket
+- POST /api/tickets/update - Update ticket fields
+- POST /api/tickets/change-status - Change ticket status
+- POST /api/tickets/comment - Add comment to ticket
+- GET /api/tickets/{ticket_id} - Get single ticket
+- POST /api/tickets/search - Search tickets
+- GET /api/tickets/stats/{workflow_id} - Get ticket statistics
+- GET /api/tickets - List all tickets (paginated)
+- POST /api/tickets/resolve - Mark ticket resolved
+- POST /api/tickets/link-commit - Link commit to ticket
+- POST /api/tickets/request-clarification - Request clarification
+- GET /api/tickets/commit-diff/{commit_sha} - Get commit diff
+Estimated: ~750 lines
+
+### 4. Workflow Management Routes (1 route)
+Location: Lines 2340-3308
+- GET /workflows/{workflow_id}/results - Get workflow results
+- GET /api/workflows - List all workflows
+Estimated: ~100 lines
+
+### 5. Agent Management Routes (3 routes)
+Location: Lines 3338-3793
+- POST /api/terminate_agent - Terminate running agent
+- GET /agent_status - Get agent status
+- GET /task_progress - Get task progress
+Estimated: ~450 lines
+
+### 6. Queue Management Routes (1 route)
+Location: Lines 3731-3732
+- GET /api/queue_status - Get task queue status
+Estimated: ~15 lines
+
+### 7. Messaging Routes (2 routes)
+Location: Lines 2354-2439
+- POST /api/broadcast_message - Broadcast message to all agents
+- POST /api/send_message - Send message to specific agent
+Estimated: ~90 lines
+
+### 8. WebSocket Routes (1 route)
+Location: Lines 3860-3861
+- WS /ws - WebSocket connection for real-time updates
+Estimated: ~20 lines
+
+### 9. Health Routes (1 route)
+Location: Lines 3878-3879
+- GET /health - Health check endpoint
+Estimated: ~10 lines
+
+### 10. OAuth/Auth Routes (8 routes)
+Location: Lines 3889-4032
+- GET /.well-known/oauth-authorization-server - OAuth server metadata
+- GET /.well-known/openid-configuration - OpenID configuration
+- POST /oauth/register - Register OAuth client
+- GET /oauth/authorize - OAuth authorization (GET)
+- POST /oauth/authorize - OAuth authorization (POST)
+- POST /oauth/token - OAuth token endpoint
+- POST /oauth/revoke - Revoke OAuth token
+- GET /userinfo - Get user info
+Estimated: ~150 lines
+
+### 11. MCP Protocol Routes (5 routes)
+Location: Lines 4041-4200
+- GET / - Root endpoint (MCP server info)
+- GET /tools - List available MCP tools
+- POST /tools/execute - Execute MCP tool
+- GET /resources - List available MCP resources
+- GET /resources/{resource_uri:path} - Get specific MCP resource
+- GET /sse - Server-sent events endpoint
+Estimated: ~160 lines
+
+### 12. Background Workers (3 functions, not routes)
+Location: Lines 653-1108
+- startup_event() - FastAPI startup handler
+- shutdown_event() - FastAPI shutdown handler
+- process_queue() - Background queue processor
+- background_queue_processor() - Async background processor
+Estimated: ~450 lines
+
+## C3 Extraction Plan
+
+### Phase 1: Quick Wins (Small, Independent Routes)
+Target: 5 packages, ~245 lines
+- c3_health_routes (health check) - 10 lines
+- c3_queue_routes (queue status) - 15 lines
+- c3_workflow_routes (workflow listing/results) - 100 lines
+- c3_websocket_routes (WebSocket endpoint) - 20 lines
+- c3_messaging_routes (broadcast, send message) - 90 lines
+Estimated time: 30-45 minutes
+
+### Phase 2: Moderate (Medium Routes)
+Target: 3 packages, ~1,250 lines
+- c3_task_routes (task creation, status, priority) - 650 lines
+- c3_memory_routes (save memory, report results, validation) - 440 lines
+- c3_agent_routes (agent status, terminate, task progress) - 450 lines
+Estimated time: 60-75 minutes
+
+### Phase 3: Complex (Large, Multi-Function Routes)
+Target: 4 packages, ~1,060 lines
+- c3_ticket_routes (12 endpoints, search, stats, CRUD) - 750 lines
+- c3_mcp_routes (MCP protocol: tools, resources, SSE) - 160 lines
+- c3_oauth_routes (8 OAuth/Auth endpoints) - 150 lines
+- c3_startup_routes (lifespan, background workers) - 450 lines (NOT routes, but startup logic)
+Estimated time: 90-120 minutes
+
+## Total Extraction Stats
+
+- Total routes: 46 HTTP endpoints
+- Total lines: ~3,235 lines (routes only, excluding background workers)
+- Background workers: ~450 lines (startup/shutdown/queue processing)
+- c3 packages to create: 11-12
+- Estimated total time: 3-4 hours
+
+## Extraction Strategy
+
+Same pattern as c2 services (strangler fig):
+1. Extract route group to c3_{domain}_routes/
+2. Create {domain}_routes.py with all endpoints
+3. Import necessary c2 services (dependency on c2 layer)
+4. Create shim in server.py OR import and register with FastAPI app
+5. Test endpoints with curl/pytest
+6. Commit
+
+## Dependencies
+
+Routes depend on:
+- c2 services (already extracted) ✓
+- c1 models (already extracted) ✓
+- FastAPI app instance (needs to stay in server.py or move to c3_app/)
+
+## Next Steps
+
+1. Start with Phase 1 (quick wins)
+2. Extract c3_health_routes first (simplest)
+3. Continue through all phases
+4. Handle FastAPI app initialization separately (c3_app/ or keep in server.py)

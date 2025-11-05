@@ -1,0 +1,163 @@
+TASK-24 REMAINING WORK: Monitoring & Worktree Files
+===================================================
+
+Date: 2025-11-04
+Status: CRITICAL - Files partially ported, need import fixes
+
+## Current State
+
+Just checked out upstream versions of 4 files:
+- src/monitoring/monitor.py
+- src/monitoring/conductor.py
+- src/monitoring/guardian.py
+- src/core/worktree_manager.py
+
+**PROBLEM**: These files now have:
+1. Inline enum definitions (reverted our extraction)
+2. Imports from monolithic src.core.database (reverted our c1 modules)
+
+## Required Fixes
+
+### Fix 1: Restore Enum Imports
+
+**File**: src/monitoring/monitor.py
+**Current** (WRONG - upstream monolithic):
+```python
+from enum import Enum
+class AgentState(Enum):
+    HEALTHY = "healthy"
+    # ... rest of enum
+class MonitoringDecision(Enum):
+    CONTINUE = "continue"
+    # ... rest of enum
+```
+
+**Target** (CORRECT - our c1 extraction):
+```python
+from src.c1_monitoring_enums import AgentState, MonitoringDecision
+# Remove inline enum class definitions
+```
+
+**File**: src/monitoring/conductor.py
+**Current** (WRONG):
+```python
+from enum import Enum
+class ConductorState(Enum):
+    # ... enum definition
+```
+
+**Target** (CORRECT):
+```python
+from src.c1_conductor_enums import ConductorState
+# Remove inline enum class definition
+```
+
+**File**: src/monitoring/guardian.py
+**Current** (WRONG):
+```python
+from enum import Enum
+class GuardianAction(Enum):
+    # ... enum definition
+```
+
+**Target** (CORRECT):
+```python
+from src.c1_guardian_enums import GuardianAction
+# Remove inline enum class definition
+```
+
+**File**: src/core/worktree_manager.py
+**Current** (WRONG):
+```python
+from enum import Enum
+class MergeStatus(Enum):
+    # ... enum definition
+class CommitType(Enum):
+    # ... enum definition
+```
+
+**Target** (CORRECT):
+```python
+from src.c1_worktree_enums import MergeStatus, CommitType
+# Remove inline enum class definitions
+```
+
+### Fix 2: Restore Database Model Imports
+
+**All 4 files** currently import from:
+```python
+from src.core.database import DatabaseManager, Agent, Task, AgentLog, ...
+```
+
+**PROBLEM**: src.core.database is now a SHIM that imports from c1 modules.
+
+**SOLUTION**: Actually, the shim should work! Let's verify:
+- src/core/database.py imports from c1 modules and re-exports
+- These files import from src.core.database
+- This should work via the shim
+
+**ACTION**: Leave database imports as-is, they should work through shim.
+
+### Fix 3: Test Imports
+
+After fixing enums:
+1. Check that all imports resolve
+2. Verify backward compatibility shims work
+3. Run tests
+
+## Execution Steps
+
+1. Edit src/monitoring/monitor.py:
+   - Add: from src.c1_monitoring_enums import AgentState, MonitoringDecision
+   - Remove: from enum import Enum
+   - Remove: class AgentState(Enum): ... (entire class definition)
+   - Remove: class MonitoringDecision(Enum): ... (entire class definition)
+
+2. Edit src/monitoring/conductor.py:
+   - Add: from src.c1_conductor_enums import ConductorState
+   - Remove: from enum import Enum
+   - Remove: class ConductorState(Enum): ... (entire class definition)
+
+3. Edit src/monitoring/guardian.py:
+   - Add: from src.c1_guardian_enums import GuardianAction
+   - Remove: from enum import Enum
+   - Remove: class GuardianAction(Enum): ... (entire class definition)
+
+4. Edit src/core/worktree_manager.py:
+   - Add: from src.c1_worktree_enums import MergeStatus, CommitType
+   - Remove: from enum import Enum
+   - Remove: class MergeStatus(Enum): ... (entire class definition)
+   - Remove: class CommitType(Enum): ... (entire class definition)
+
+5. Commit: "Port upstream: monitoring and worktree functional changes, restore enum imports"
+
+6. Test:
+   - pytest tests/ --ignore=tests/manual_validation_test.py
+   - Verify all imports work
+   - Check backward compatibility
+
+## Risk Assessment
+
+**Medium Risk**: These files have functional logic changes from upstream that we want, but structural changes (enum extraction) that we need to preserve.
+
+**Mitigation**: Carefully edit each file to:
+1. Keep upstream functional changes
+2. Restore our enum imports
+3. Remove inline enum definitions
+4. Test after each file
+
+## Estimated Time
+
+- Edit 4 files: 30 minutes (need to find and remove enum class definitions)
+- Test: 15 minutes
+- Debug any import issues: 15 minutes
+
+Total: 1 hour
+
+## Success Criteria
+
+1. All 4 files use c1 enum imports (not inline definitions)
+2. All functional changes from upstream are present
+3. Tests pass
+4. No import errors
+5. Backward compatibility maintained

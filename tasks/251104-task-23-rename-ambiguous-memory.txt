@@ -1,0 +1,115 @@
+TASK-23: Research and Rename Ambiguous "Memory" Model
+======================================================
+
+Date: 2025-11-04
+Status: DEFERRED
+Priority: Medium
+Estimated: 2-3 hours
+
+## Problem
+
+The current "Memory" model name is ambiguous and unclear:
+- Could be agent memory (discoveries, learnings)
+- Could be board memory (chess/game state)
+- Could be task history memory
+- Could be workflow memory
+
+Looking at the actual model definition (src/core/database.py:177-202):
+```python
+class Memory(Base):
+    """Memory model for storing agent discoveries and learnings."""
+
+    __tablename__ = "memories"
+
+    id = Column(String, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    agent_id = Column(String, ForeignKey("agents.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    memory_type = Column(
+        String,
+        CheckConstraint(
+            "memory_type IN ('error_fix', 'discovery', 'decision', 'learning', 'warning', 'codebase_knowledge')"
+        ),
+        nullable=False,
+    )
+    embedding_id = Column(String)  # Reference to vector store
+    related_task_id = Column(String, ForeignKey("tasks.id"))
+    tags = Column(JSON)  # JSON array of tags
+    related_files = Column(JSON)  # JSON array of file paths
+    extra_data = Column(JSON)  # Additional metadata (renamed from metadata)
+
+    # Relationships
+    agent = relationship("Agent", back_populates="memories")
+    task = relationship("Task", back_populates="memories")
+```
+
+**Conclusion**: This is AGENT MEMORY (discoveries and learnings by agents), not board memory or task history.
+
+## Proposed Solution
+
+Rename "Memory" to one of:
+- AgentMemory (clearest, most specific)
+- AgentDiscovery (emphasizes the discovery aspect)
+- AgentLearning (emphasizes the learning aspect)
+- AgentKnowledge (emphasizes the knowledge base aspect)
+
+**Recommendation**: AgentMemory (most accurate and specific)
+
+## Changes Required
+
+### 1. Database Model Rename
+- Rename class `Memory` → `AgentMemory`
+- Keep `__tablename__ = "memories"` (database table name unchanged)
+- Update all relationship references
+
+### 2. Module/Package Rename
+- During refactoring: Create `c1_agent_memory/` not `c1_memory_models/`
+- File: `c1_agent_memory/agent_memory.py`
+- Update imports throughout codebase
+
+### 3. API/Route Updates
+- Update FastAPI models that reference Memory
+- Update MCP server endpoints
+- Update CLI/SDK references
+
+### 4. Test Updates
+- Update test fixtures
+- Update test assertions
+- Update test data
+
+### 5. Documentation Updates
+- Update design docs
+- Update API documentation
+- Update README if Memory is mentioned
+
+## Search Commands
+
+Find all references to Memory model:
+```bash
+grep -r "Memory" src/ --include="*.py" | grep -v "__pycache__" | wc -l
+grep -r "memories" src/ --include="*.py" | grep -v "__pycache__" | wc -l
+grep -r "from.*Memory" src/ --include="*.py"
+grep -r "import.*Memory" src/ --include="*.py"
+```
+
+## Deferred Rationale
+
+This task is deferred to AFTER the three-layer architecture refactoring because:
+1. Refactoring is already complex enough
+2. Renaming can be done as a separate focused task
+3. Database table name doesn't need to change
+4. Can be done safely after structure stabilizes
+
+## Next Steps When Ready
+
+1. Create renaming script to automate changes
+2. Update all imports systematically
+3. Run full test suite
+4. Update documentation
+5. Commit with clear message explaining rename
+
+## Related Files
+
+- src/core/database.py:177-202 (Memory model definition)
+- All files importing Memory (to be identified)
+- tests/ (all test files referencing Memory)

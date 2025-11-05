@@ -49,7 +49,11 @@ class Config:
 
         # Git settings
         git = config.get('git', {})
-        self.main_repo_path = Path(git.get('main_repo_path', str(Path.cwd())))
+        main_repo_path_str = git.get('main_repo_path', str(Path.cwd()))
+        # Detect placeholder values and use current directory instead
+        if 'your_project' in str(main_repo_path_str).lower():
+            main_repo_path_str = str(Path.cwd())
+        self.main_repo_path = Path(main_repo_path_str)
         self.worktree_branch_prefix = git.get('worktree_branch_prefix', 'agent-')
         self.auto_commit = git.get('auto_commit', True)
         self.conflict_resolution_strategy = git.get('conflict_resolution', 'newest_file_wins')
@@ -295,6 +299,36 @@ class Config:
         if self.llm_provider == "anthropic" and not self.anthropic_api_key:
             raise ValueError("ANTHROPIC_API_KEY is required when using Anthropic provider")
         return True
+
+    def to_env_dict(self) -> dict:
+        """Export configuration as environment variables dict for subprocess.
+        
+        Returns:
+            Dictionary of environment variables for spawned processes
+        """
+        env = {}
+        
+        # Database and storage paths
+        if self.database_path:
+            env["DATABASE_PATH"] = str(self.database_path)
+        if self.qdrant_url:
+            env["QDRANT_URL"] = self.qdrant_url
+        if self.qdrant_collection_prefix:
+            env["QDRANT_COLLECTION_PREFIX"] = self.qdrant_collection_prefix
+        
+        # Server settings  
+        if self.mcp_host:
+            env["MCP_HOST"] = self.mcp_host
+        if self.mcp_port:
+            env["MCP_PORT"] = str(self.mcp_port)
+        
+        # Worktree settings
+        if self.worktree_base_path:
+            env["WORKTREE_BASE_PATH"] = str(self.worktree_base_path)
+        if hasattr(self, 'working_directory') and self.working_directory:
+            env["WORKING_DIRECTORY"] = str(self.working_directory)
+        
+        return env
 
 
 # Global config instance

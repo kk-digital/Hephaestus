@@ -1,0 +1,503 @@
+TASK-14 PHASE 1: Layering Analysis and Module Mapping
+=====================================================
+
+Date: 2025-11-04
+Status: IN PROGRESS
+
+## Executive Summary
+
+This document analyzes the current Hephaestus codebase (29,308 lines of Python across 93 files) and maps all modules to the proposed c0-c4 layer architecture. The analysis identifies:
+
+- 10 files over 500 lines (candidates for splitting)
+- 93 total Python files across 15 directories
+- Clear layer mapping for all existing modules
+- Recommendations for breaking down large files
+
+## Large Files Analysis
+
+### Files Requiring Breakdown (>1000 lines)
+
+1. **src/mcp/server.py** (4,216 lines) - LARGEST FILE
+   - Contains: 20+ Request/Response models, lifespan management, FastAPI app, route handlers
+   - Breakdown recommendation:
+     - c0-layer: Extract all Pydantic models → c0-models/mcp_models.py
+     - c4-layer: Keep FastAPI app → c4-mcp-server/app.py
+     - c4-layer: Extract routes → c4-mcp-server/routes/
+       - task_routes.py (~500 lines)
+       - memory_routes.py (~300 lines)
+       - validation_routes.py (~400 lines)
+       - ticket_routes.py (~300 lines)
+       - agent_routes.py (~300 lines)
+       - worktree_routes.py (~200 lines)
+       - websocket_routes.py (~200 lines)
+   - Estimated breakdown: 4,216 lines → 7-8 files of 300-600 lines each
+
+2. **src/monitoring/monitor.py** (1,602 lines)
+   - Contains: IntelligentMonitor class, MonitoringLoop class, agent state management
+   - Breakdown recommendation:
+     - c2-layer: Extract core monitoring logic → c2-monitoring/monitor_core.py (~800 lines)
+     - c2-layer: Extract monitoring loop → c2-monitoring/monitoring_loop.py (~600 lines)
+     - c0-layer: Extract enums → c0-models/monitoring_enums.py (~200 lines)
+   - Estimated breakdown: 1,602 lines → 3 files of 200-800 lines each
+
+3. **src/mcp/api.py** (1,595 lines)
+   - Contains: FrontendAPI class with many route handlers
+   - Breakdown recommendation:
+     - c4-layer: Extract route handlers → c4-frontend-api/routes/
+       - task_api.py (~300 lines)
+       - agent_api.py (~300 lines)
+       - ticket_api.py (~300 lines)
+       - workflow_api.py (~200 lines)
+       - validation_api.py (~200 lines)
+       - monitoring_api.py (~200 lines)
+     - c4-layer: Keep main API class → c4-frontend-api/api.py (~100 lines)
+   - Estimated breakdown: 1,595 lines → 7 files of 100-300 lines each
+
+4. **src/core/worktree_manager.py** (1,367 lines)
+   - Contains: WorktreeManager class, git operations, conflict resolution
+   - Breakdown recommendation:
+     - c0-layer: Extract models/enums → c0-models/worktree_models.py (~200 lines)
+     - c2-layer: Extract core worktree logic → c2-worktree/worktree_manager.py (~600 lines)
+     - c2-layer: Extract conflict resolution → c2-worktree/conflict_resolver.py (~400 lines)
+     - c2-layer: Extract git operations → c2-worktree/git_operations.py (~167 lines)
+   - Estimated breakdown: 1,367 lines → 4 files of 167-600 lines each
+
+5. **src/services/ticket_service.py** (1,216 lines)
+   - Contains: TicketService class with many CRUD operations
+   - Breakdown recommendation:
+     - c3-layer: Extract ticket CRUD → c3-ticket-service/crud_operations.py (~400 lines)
+     - c3-layer: Extract ticket queries → c3-ticket-service/queries.py (~400 lines)
+     - c3-layer: Extract ticket business logic → c3-ticket-service/business_logic.py (~300 lines)
+     - c3-layer: Keep main service class → c3-ticket-service/ticket_service.py (~116 lines)
+   - Estimated breakdown: 1,216 lines → 4 files of 116-400 lines each
+
+6. **src/agents/manager.py** (1,187 lines)
+   - Contains: AgentManager class coordinating agent lifecycle
+   - Breakdown recommendation:
+     - c3-layer: Extract agent lifecycle → c3-agent-manager/lifecycle.py (~400 lines)
+     - c3-layer: Extract agent state management → c3-agent-manager/state_manager.py (~400 lines)
+     - c3-layer: Extract agent coordination → c3-agent-manager/coordinator.py (~300 lines)
+     - c3-layer: Keep main manager → c3-agent-manager/agent_manager.py (~87 lines)
+   - Estimated breakdown: 1,187 lines → 4 files of 87-400 lines each
+
+### Files Possibly Requiring Breakdown (500-1000 lines)
+
+7. src/core/database.py (987 lines) - SQLAlchemy models (c1-layer)
+8. src/interfaces/langchain_llm_client.py (797 lines) - LLM client (c1-layer)
+9. src/interfaces/llm_interface.py (740 lines) - LLM providers (c1-layer)
+10. src/sdk/client.py (662 lines) - SDK client (c4-layer)
+
+## Module Directory Analysis
+
+Current structure (15 directories):
+
+```
+src/
+├── agents/         (2 files, 1,187 lines)  → c3-layer (agent orchestration)
+├── auth/           (5 files, ~600 lines)   → c4-layer (authentication API)
+├── core/           (8 files, ~4,500 lines) → SPLIT (c1: database, c2: business logic, c0: models)
+├── interfaces/     (6 files, ~2,500 lines) → c1-layer (external service wrappers)
+├── mcp/            (3 files, 5,811 lines)  → c4-layer (MCP server + API)
+├── memory/         (3 files, ~1,100 lines) → c2-layer (memory management)
+├── monitoring/     (7 files, ~4,000 lines) → c2-layer (monitoring business logic)
+├── phases/         (4 files, ~1,200 lines) → c2-layer (phase workflow logic)
+├── prompts/        (unknown)               → c0-layer (prompt templates)
+├── sdk/            (23 files, ~2,500 lines)→ c4-layer (CLI, TUI applications)
+├── services/       (12 files, ~3,500 lines)→ c3-layer (high-level services)
+├── validation/     (6 files, ~1,500 lines) → c2-layer (validation logic)
+├── workflow/       (2 files, ~325 lines)   → c2-layer (workflow logic)
+```
+
+Total: 93 files, 29,308 lines
+
+## Proposed Layer Mapping
+
+### c0-layer (Base Utilities, Data Models)
+**Characteristics:** No internal imports, only stdlib + third-party
+
+**Modules to create:**
+- c0-models/ - All Pydantic models and data classes
+  - mcp_models.py (from server.py - Request/Response models)
+  - worktree_models.py (from worktree_manager.py)
+  - monitoring_enums.py (from monitor.py)
+  - phase_models.py (from phases/models.py)
+  - sdk_models.py (from sdk/models.py)
+  - ticket_models.py (TBD)
+  - agent_models.py (TBD)
+
+- c0-exceptions/ - Exception classes
+  - from sdk/exceptions.py
+  - additional exception classes from other modules
+
+- c0-constants/ - Constants and configurations
+  - configuration schemas
+  - constant values
+
+- c0-prompts/ - Prompt templates
+  - from src/prompts/
+
+**Estimated size:** 15-20 files, ~3,000-4,000 lines
+
+### c1-layer (Foundation: Database, External Services)
+**Characteristics:** Imports only c0, provides database and external service access
+
+**Modules to create:**
+- c1-database/ - Database access
+  - models.py (from core/database.py - SQLAlchemy models)
+  - session.py (database session management)
+  - base.py (declarative base, engine setup)
+
+- c1-qdrant/ - Qdrant vector database
+  - client.py (Qdrant client wrapper)
+  - from memory/vector_store.py
+
+- c1-llm/ - LLM provider abstractions
+  - providers.py (from interfaces/llm_interface.py)
+  - langchain_client.py (from interfaces/langchain_llm_client.py)
+  - openrouter_client.py (from interfaces/openrouter_client.py)
+  - multi_provider.py (from interfaces/multi_provider_llm.py)
+
+- c1-embedding/ - Embedding provider abstractions
+  - service.py (from services/embedding_service.py)
+  - Add LM Studio provider (Task-10)
+
+- c1-config/ - Configuration loading
+  - config.py (from core/config.py)
+  - simple_config.py (from core/simple_config.py)
+  - llm_config.py (from core/llm_config.py)
+  - auth_config.py (from auth/auth_config.py)
+  - sdk_config.py (from sdk/config.py)
+
+**Estimated size:** 15-20 files, ~5,000-6,000 lines
+
+### c2-layer (Core Business Logic)
+**Characteristics:** Imports c0-c1, contains domain logic
+
+**Modules to create:**
+- c2-tasks/ - Task entities and business rules
+  - task_logic.py (task validation, state transitions)
+  - task_similarity.py (from services/task_similarity_service.py)
+  - task_blocking.py (from services/task_blocking_service.py)
+
+- c2-phases/ - Phase workflow logic
+  - phase_logic.py (from phases/phase_manager.py)
+  - phase_loader.py (from phases/phase_loader.py)
+
+- c2-agents/ - Agent orchestration logic
+  - (extracted from agents/manager.py)
+
+- c2-tickets/ - Ticket management logic
+  - (extracted from services/ticket_service.py)
+
+- c2-memory/ - Memory management
+  - rag.py (from memory/rag.py)
+  - memory_logic.py
+
+- c2-monitoring/ - Monitoring business logic
+  - monitor_core.py (from monitoring/monitor.py)
+  - monitoring_loop.py (from monitoring/monitor.py)
+  - guardian.py (from monitoring/guardian.py)
+  - conductor.py (from monitoring/conductor.py)
+  - trajectory_context.py (from monitoring/trajectory_context.py)
+  - prompt_loader.py (from monitoring/prompt_loader.py)
+
+- c2-validation/ - Validation logic
+  - validator_agent.py (from validation/validator_agent.py)
+  - result_validator_agent.py (from validation/result_validator_agent.py)
+  - prompt_builder.py (from validation/prompt_builder.py)
+  - result_prompt_builder.py (from validation/result_prompt_builder.py)
+  - check_executors.py (from validation/check_executors.py)
+
+- c2-worktree/ - Worktree management
+  - worktree_manager.py (from core/worktree_manager.py)
+  - conflict_resolver.py
+  - git_operations.py
+
+- c2-workflow/ - Workflow logic
+  - termination_handler.py (from workflow/termination_handler.py)
+
+**Estimated size:** 40-50 files, ~10,000-12,000 lines
+
+### c3-layer (Services: Coordination)
+**Characteristics:** Imports c0-c2, coordinates multiple c2 modules
+
+**Modules to create:**
+- c3-task-service/ - Task service coordination
+  - (new service coordinating c2-tasks modules)
+
+- c3-agent-manager/ - Agent manager service
+  - agent_manager.py (from agents/manager.py)
+  - lifecycle.py
+  - state_manager.py
+  - coordinator.py
+
+- c3-phase-manager/ - Phase manager service
+  - (coordinating c2-phases logic)
+
+- c3-ticket-service/ - Ticket service
+  - ticket_service.py (from services/ticket_service.py)
+  - crud_operations.py
+  - queries.py
+  - business_logic.py
+
+- c3-ticket-history/ - Ticket history service
+  - from services/ticket_history_service.py
+
+- c3-ticket-search/ - Ticket search service
+  - from services/ticket_search_service.py
+
+- c3-queue/ - Queue service
+  - from services/queue_service.py
+
+- c3-result/ - Result service
+  - from services/result_service.py
+
+- c3-result-validator/ - Result validator service
+  - from services/result_validator_service.py
+
+- c3-workflow-result/ - Workflow result service
+  - from services/workflow_result_service.py
+
+**Estimated size:** 20-25 files, ~5,000-6,000 lines
+
+### c4-layer (Applications: APIs, CLI, UI)
+**Characteristics:** Imports c0-c3, entry points for users
+
+**Modules to create:**
+- c4-mcp-server/ - MCP server application
+  - app.py (from mcp/server.py - FastAPI app + lifespan)
+  - routes/
+    - task_routes.py
+    - memory_routes.py
+    - validation_routes.py
+    - ticket_routes.py
+    - agent_routes.py
+    - worktree_routes.py
+    - websocket_routes.py
+
+- c4-frontend-api/ - Frontend API
+  - api.py (from mcp/api.py)
+  - routes/
+    - task_api.py
+    - agent_api.py
+    - ticket_api.py
+    - workflow_api.py
+    - validation_api.py
+    - monitoring_api.py
+
+- c4-auth-api/ - Authentication API
+  - auth_api.py (from auth/auth_api.py)
+  - auth_middleware.py (from auth/auth_middleware.py)
+  - auth_utils.py (from auth/auth_utils.py)
+
+- c4-cli/ - CLI application
+  - cli_interface.py (from interfaces/cli_interface.py)
+  - process_manager.py (from sdk/process_manager.py)
+
+- c4-sdk/ - SDK client
+  - client.py (from sdk/client.py)
+
+- c4-tui/ - Terminal UI
+  - app.py (from sdk/tui/app.py)
+  - screens/ (from sdk/tui/screens/)
+  - widgets/ (from sdk/tui/widgets/)
+  - popups/ (from sdk/tui/popups/)
+
+**Estimated size:** 35-40 files, ~8,000-9,000 lines
+
+## Module Breakdown Recommendations
+
+### Priority 1: Break Down Immediately (>1000 lines)
+
+1. **src/mcp/server.py** (4,216 lines) → 8 files
+2. **src/monitoring/monitor.py** (1,602 lines) → 3 files
+3. **src/mcp/api.py** (1,595 lines) → 7 files
+4. **src/core/worktree_manager.py** (1,367 lines) → 4 files
+5. **src/services/ticket_service.py** (1,216 lines) → 4 files
+6. **src/agents/manager.py** (1,187 lines) → 4 files
+
+Total: 12,183 lines → 30 files (average 406 lines per file)
+
+### Priority 2: Consider Breaking Down (500-1000 lines)
+
+7. **src/core/database.py** (987 lines) - Can split models by category
+8. **src/interfaces/langchain_llm_client.py** (797 lines) - Can extract provider configs
+9. **src/interfaces/llm_interface.py** (740 lines) - Can split providers into separate files
+10. **src/sdk/client.py** (662 lines) - Can extract API methods by category
+
+Total: 3,186 lines → could become 12-15 files (average 212-265 lines per file)
+
+### Priority 3: Keep As-Is (<500 lines)
+
+All other 83 files are under 500 lines and can be moved to layers as-is.
+
+## Circular Dependency Analysis
+
+**Method:** Analyze import statements to identify circular dependencies
+
+**To be completed:** Run import analysis tool to detect circular dependencies
+
+**Expected issues:**
+- mcp/server.py likely imports from many modules
+- services/ modules may import from each other
+- core/ modules may have bidirectional dependencies
+
+**Mitigation strategy:**
+- Extract interfaces to c0-layer
+- Use dependency injection where possible
+- Break circular deps by extracting shared code to lower layer
+
+## Import Restrictions by Layer
+
+### Allowed Imports
+
+```
+c0-layer: Python stdlib + third-party packages ONLY
+c1-layer: c0 + stdlib + third-party
+c2-layer: c0 + c1 + stdlib + third-party
+c3-layer: c0 + c1 + c2 + stdlib + third-party
+c4-layer: c0 + c1 + c2 + c3 + stdlib + third-party
+```
+
+### Forbidden Imports
+
+```
+c0 cannot import: c1, c2, c3, c4
+c1 cannot import: c2, c3, c4
+c2 cannot import: c3, c4
+c3 cannot import: c4
+c4 can import anything (top layer)
+```
+
+## Migration Strategy
+
+### Recommended Approach: Incremental with Symlinks
+
+**Phase 1:** Create layer structure
+```
+src/
+├── c0-layer/
+├── c1-layer/
+├── c2-layer/
+├── c3-layer/
+├── c4-layer/
+└── [old directories remain for now]
+```
+
+**Phase 2:** Extract c0-layer first (no dependencies)
+- Extract all Pydantic models
+- Extract all exception classes
+- Extract all constants
+- Update imports in old modules to point to c0-layer
+- Run tests
+
+**Phase 3:** Extract c1-layer (depends only on c0)
+- Extract database models and session
+- Extract LLM clients
+- Extract Qdrant client
+- Extract configuration loaders
+- Update imports
+- Run tests
+
+**Phase 4:** Extract c2-layer (depends on c0, c1)
+- Extract business logic modules
+- Update imports
+- Run tests
+
+**Phase 5:** Extract c3-layer (depends on c0, c1, c2)
+- Extract service coordination modules
+- Update imports
+- Run tests
+
+**Phase 6:** Extract c4-layer (depends on c0, c1, c2, c3)
+- Extract API/CLI/UI entry points
+- Update imports
+- Run tests
+
+**Phase 7:** Remove old structure
+- Delete old directories
+- Remove any remaining symlinks
+- Final test run
+
+### Testing Strategy
+
+After each phase:
+1. Run full test suite (449 tests)
+2. Verify no import errors
+3. Verify no circular dependencies
+4. Check test coverage hasn't decreased
+
+## Estimated Effort
+
+### By Phase
+- Phase 1 (structure creation): 1-2 hours
+- Phase 2 (c0-layer): 4-6 hours
+- Phase 3 (c1-layer): 6-8 hours
+- Phase 4 (c2-layer): 8-10 hours
+- Phase 5 (c3-layer): 6-8 hours
+- Phase 6 (c4-layer): 6-8 hours
+- Phase 7 (cleanup): 2-3 hours
+
+**Total: 33-45 hours**
+
+### By File Breakdown
+- Breaking down 6 large files (Priority 1): 8-12 hours
+- Moving remaining files: 15-20 hours
+- Import updates and fixes: 10-13 hours
+
+**Total: 33-45 hours**
+
+## Next Steps
+
+1. Review this analysis with team/user
+2. Get approval for layer mapping
+3. Create Phase 2 implementation plan (c0-layer extraction)
+4. Begin implementation with c0-layer
+5. Iterate through remaining phases
+
+## Files Reference
+
+**Large files requiring breakdown:**
+- src/mcp/server.py (4,216 lines) → c4-mcp-server/ + c0-models/
+- src/monitoring/monitor.py (1,602 lines) → c2-monitoring/
+- src/mcp/api.py (1,595 lines) → c4-frontend-api/
+- src/core/worktree_manager.py (1,367 lines) → c2-worktree/ + c0-models/
+- src/services/ticket_service.py (1,216 lines) → c3-ticket-service/
+- src/agents/manager.py (1,187 lines) → c3-agent-manager/
+
+**Total codebase:**
+- 93 Python files
+- 29,308 lines of code
+- 15 directories
+- Will become: ~120-130 files in 5 layer directories
+
+## Success Criteria
+
+1. ✅ All code organized into c0-c4 layers
+2. ✅ No files over 800 lines
+3. ✅ No imports from higher layers to lower layers
+4. ✅ All 449 tests passing
+5. ✅ No circular dependencies detected
+6. ✅ Import validation script working
+7. ✅ Documentation updated
+
+## Risks
+
+1. **Test breakage:** Mitigation - Run tests after each phase
+2. **Import errors:** Mitigation - Use absolute imports, update systematically
+3. **Circular dependencies:** Mitigation - Identify and break before moving
+4. **Lost context:** Mitigation - Use git mv to preserve history
+5. **Time overrun:** Mitigation - Break work into small phases, commit often
+
+## Conclusion
+
+The Hephaestus codebase is well-structured but has several large files that should be broken down. The proposed c0-c4 layer architecture provides clear boundaries and dependency direction. The incremental migration strategy minimizes risk while providing clear progress checkpoints.
+
+The largest gains will come from:
+1. Breaking down src/mcp/server.py (4,216 lines) into 8 focused files
+2. Splitting src/monitoring/monitor.py (1,602 lines) into 3 modules
+3. Organizing src/mcp/api.py (1,595 lines) into 7 route files
+
+Once these 3 files are broken down, the remaining work is primarily moving files to appropriate layers and updating imports.
+
+Estimated total effort: 33-45 hours across 7 phases.

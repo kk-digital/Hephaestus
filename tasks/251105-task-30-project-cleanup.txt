@@ -1,0 +1,135 @@
+TASK-30: Project Cleanup and Organization
+
+## Status
+PENDING
+
+## Priority
+LOW - Nice to have, not blocking
+
+## Objective
+
+Organize scattered documentation and temporary files into proper directory structure.
+
+## Current State
+
+Documentation files scattered across project root:
+- EMBEDDINGS-EXPLAINED.txt
+- LMSTUDIO-EMBEDDINGS.txt
+- DEPENDENCY-ANALYSIS.txt
+- SESSION-SUMMARY-*.txt
+- Other analysis files
+
+## Proposed Structure
+
+```
+Hephaestus/
+├── cleanup/           (NEW - temporary/one-time files)
+│   ├── migration-notes/
+│   ├── analysis/
+│   └── scratch/
+├── reports/           (NEW - analysis reports)
+│   ├── embeddings/
+│   ├── architecture/
+│   └── testing/
+├── design_docs/       (EXISTING - keep)
+├── tasks/             (EXISTING - keep)
+└── ...
+```
+
+## Tasks
+
+### Step 1: Create Directories
+[ ] mkdir cleanup/
+[ ] mkdir cleanup/migration-notes/
+[ ] mkdir cleanup/analysis/
+[ ] mkdir reports/
+[ ] mkdir reports/embeddings/
+[ ] mkdir reports/architecture/
+[ ] mkdir reports/testing/
+
+### Step 2: Categorize Files
+[ ] List all .txt, .md files in project root
+[ ] Categorize each:
+  - Temporary/scratch → cleanup/
+  - Analysis/reports → reports/
+  - Documentation → design_docs/
+  - Keep in root (README, LICENSE, etc.)
+
+### Step 3: Move Files
+
+**Embeddings Documentation:**
+[ ] mv EMBEDDINGS-EXPLAINED.txt → reports/embeddings/
+[ ] mv LMSTUDIO-EMBEDDINGS.txt → reports/embeddings/
+
+**Architecture Analysis:**
+[ ] mv DEPENDENCY-ANALYSIS.txt → reports/architecture/
+[ ] mv *-layer-*.txt → reports/architecture/
+
+**Session Summaries:**
+[ ] mv SESSION-SUMMARY-*.txt → cleanup/migration-notes/
+
+**Test Results:**
+[ ] mv test-results-*.txt → reports/testing/
+
+### Step 4: Update References
+[ ] Search for hardcoded paths to moved files
+[ ] Update references in:
+  - README.md
+  - todo.txt
+  - Task files
+  - Other documentation
+
+### Step 5: Create Index Files
+[ ] Create cleanup/README.md (explain structure)
+[ ] Create reports/README.md (explain structure)
+[ ] List contents of each subdirectory
+
+### Step 6: Update .gitignore
+[ ] Add cleanup/scratch/ to .gitignore
+[ ] Keep cleanup/migration-notes/ tracked
+[ ] Keep all reports/ tracked
+
+## Files to Keep in Root
+
+- README.md
+- LICENSE
+- requirements.txt
+- pyproject.toml
+- docker-compose.yml
+- Dockerfile
+- .env.example
+- .gitignore
+- todo.txt
+
+## Validation
+
+[ ] Project root has < 15 files
+[ ] All documentation in proper subdirectories
+[ ] No broken links to moved files
+[ ] Git history preserved for moved files
+
+## Commit Strategy
+
+Option 1: Single commit
+```bash
+git add cleanup/ reports/
+git commit -m "Organize project documentation (Task-30)"
+```
+
+Option 2: Multiple commits (per category)
+```bash
+git add reports/embeddings/
+git commit -m "Move embedding docs to reports/ (Task-30)"
+# ... repeat for each category
+```
+
+## Estimated Time
+
+30-45 minutes
+
+## Benefits
+
+- Cleaner project root
+- Easier navigation
+- Clear separation of temporary vs permanent files
+- Better onboarding for new developers

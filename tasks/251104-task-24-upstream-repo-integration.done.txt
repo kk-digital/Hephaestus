@@ -1,0 +1,189 @@
+TASK-24: Integrate Upstream Hephaestus Repository Updates
+==========================================================
+
+Date: 2025-11-04
+Status: Active
+Priority: HIGH
+Upstream Repo: https://github.com/Ido-Levi/Hephaestus
+
+## Overview
+
+The upstream Hephaestus repository (Ido-Levi/Hephaestus) has updates that need to be integrated into our refactored three-layer architecture branch.
+
+## Objectives
+
+1. Pull upstream changes from Ido-Levi/Hephaestus into our branch
+2. Identify files that changed in upstream
+3. Port upstream changes into our layered structure (c1/c2/c3)
+4. Resolve conflicts between upstream changes and our refactoring
+5. Test that upstream features work with new architecture
+
+## Workflow
+
+### Phase 1: Setup Upstream Remote
+
+[ ] Add upstream remote (if not exists):
+    ```bash
+    git remote add upstream https://github.com/Ido-Levi/Hephaestus.git
+    git fetch upstream
+    ```
+
+[ ] Check current remotes:
+    ```bash
+    git remote -v
+    # Should show:
+    # origin: kk-digital/Hephaestus (our fork)
+    # upstream: Ido-Levi/Hephaestus (original)
+    # gogs: local backup
+    ```
+
+### Phase 2: Analyze Upstream Changes
+
+[ ] Fetch latest upstream:
+    ```bash
+    git fetch upstream
+    ```
+
+[ ] Compare upstream/main with our refactor branch:
+    ```bash
+    git log refactor/three-layer-architecture..upstream/main --oneline
+    ```
+
+[ ] Identify changed files:
+    ```bash
+    git diff refactor/three-layer-architecture..upstream/main --name-status
+    ```
+
+[ ] Create change analysis report:
+    - List all files modified in upstream
+    - Categorize by change type (A=added, M=modified, D=deleted)
+    - Identify which c1/c2/c3 modules are affected
+    - Document breaking changes or new features
+
+### Phase 3: Port Changes to Layered Structure
+
+For each upstream change:
+
+[ ] Determine target location in layered structure:
+    - Models → c1_*_models/
+    - Enums → c1_*_enums/
+    - Services → c2_*_service/
+    - Routes/API → c3_*_routes/
+    - Config → (evaluate case-by-case)
+
+[ ] Apply change to new location
+
+[ ] Update imports if file moved
+
+[ ] Test change works in new structure
+
+[ ] Commit with message: "Port upstream: {original change description}"
+
+### Phase 4: Conflict Resolution
+
+[ ] Identify conflicts:
+    - Files we refactored that upstream also modified
+    - Features added in upstream that depend on old structure
+    - Breaking changes in upstream that affect our refactoring
+
+[ ] For each conflict:
+    - Document the conflict
+    - Determine resolution strategy (keep ours, keep theirs, merge)
+    - Apply resolution
+    - Test resolution
+    - Document decision in this task file
+
+### Phase 5: Testing and Validation
+
+[ ] Run full test suite:
+    ```bash
+    pytest tests/ --ignore=tests/manual_validation_test.py
+    ```
+
+[ ] Verify upstream features work:
+    - Test new features added in upstream
+    - Verify bug fixes from upstream are present
+    - Check that refactored code still works
+
+[ ] Compare functionality:
+    - Before integration (our branch)
+    - After integration (merged)
+    - Upstream (original)
+
+### Phase 6: Documentation
+
+[ ] Update CHANGELOG.md with upstream changes
+
+[ ] Document porting decisions in this task file
+
+[ ] Update README if upstream changed setup/usage
+
+[ ] Create integration report showing:
+    - Files changed in upstream
+    - How each change was ported
+    - Conflicts resolved
+    - Tests passing
+
+## Change Categories
+
+### Category 1: New Files in Upstream
+- Action: Add to appropriate c1/c2/c3 location
+- Example: If upstream adds new model → c1_new_feature_models/
+
+### Category 2: Modified Files We Refactored
+- Action: Port changes to new c1/c2/c3 location
+- Example: If upstream modifies database.py → Port to relevant c1 module
+
+### Category 3: Modified Files We Haven't Refactored Yet
+- Action: Apply changes directly, refactor later
+- Example: If upstream modifies a file in old structure we haven't touched
+
+### Category 4: Deleted Files in Upstream
+- Action: Remove from our structure (if we kept it)
+- Note: Check if we already deleted it during refactoring
+
+## Tracking Progress
+
+### Files Changed in Upstream (TBD after git diff)
+```
+# Will be filled after Phase 2
+# Format:
+# STATUS    FILE_PATH    TARGET_LOCATION    STATUS
+# M         src/foo.py   c2_foo_service/    ✓ Ported
+# A         src/bar.py   c1_bar_models/     [ ] Pending
+# D         src/baz.py   N/A                ✓ Already removed
+```
+
+## Notes
+
+- Keep backward compatibility shims in old locations
+- Commit frequently (one commit per ported change)
+- Test after each significant port
+- Document any deviations from upstream in comments
+
+## Time Estimate
+
+- Phase 1 (Setup): 5 minutes
+- Phase 2 (Analysis): 15-30 minutes (depends on # of changes)
+- Phase 3 (Porting): 2-4 hours (depends on # of changes)
+- Phase 4 (Conflicts): 30 minutes - 2 hours (depends on conflicts)
+- Phase 5 (Testing): 30 minutes
+- Phase 6 (Documentation): 30 minutes
+
+Total: 4-8 hours (highly variable based on upstream changes)
+
+## Decision Log
+
+### Decisions Made During Integration
+
+(Will be filled as integration proceeds)
+
+Format:
+```
+Decision #1: [Date]
+  Issue: {description}
+  Options: {A, B, C}
+  Chosen: {option X}
+  Rationale: {why}
+  Result: {outcome}
+```

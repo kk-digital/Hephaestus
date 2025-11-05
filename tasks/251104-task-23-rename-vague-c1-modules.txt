@@ -1,0 +1,132 @@
+TASK-23: Rename Vague C1 Module Names
+======================================
+
+Date: 2025-11-04
+Status: Active  
+Priority: HIGH (do before continuing extraction)
+
+## Problem
+
+Several c1 modules have vague names that don't clearly indicate what they contain:
+
+1. **c1_validation_enums** - Vague. Validation of what? Enums for what validation?
+2. **c1_validation_models** - Vague. Models for what kind of validation?
+3. **c1_validation_utils** - Vague. Utilities for what validation?
+
+General module names are problematic because:
+- Not immediately clear what the module contains
+- Could mean many different things (data validation? task validation? result validation?)
+- Makes imports ambiguous:  - what is being validated?
+
+## Principle: Module Names Must Be Specific
+
+**GOOD module names:**
+- c1_task_validation_enums (enums for task validation checks)
+- c1_result_validation_models (models for result validation)
+- c1_data_validation_utils (utilities for data validation)
+
+**BAD module names:**
+- c1_validation_* (validation of WHAT?)
+- c1_config_* (config for WHAT?)
+- c1_utils_* (utils for WHAT?)
+
+## Analysis: What Do These Validation Modules Actually Do?
+
+### c1_validation_enums/
+
+**Current name**: c1_validation_enums
+**Contents**: ValidationCheckType enum
+**Usage**: Used by result validation system (checking if task results meet criteria)
+**Better name**: c1_result_validation_enums
+
+**Reasoning**: These enums define types of validation checks for task RESULTS, not general validation.
+
+### c1_validation_models/ (if exists)
+
+**Current name**: c1_validation_models
+**Contents**: Unknown - need to check if this exists
+**Proposed action**: Investigate, rename based on actual purpose
+
+### c1_validation_utils/  
+
+**Planned name**: c1_validation_utils
+**Contents**: validation_helpers.py, result_validation_helpers.py
+**Better name**: c1_result_validation_utils
+
+**Reasoning**: These utilities validate task RESULTS, not general validation.
+
+## Proposed Renames
+
+### Phase 1: Rename Validation Modules
+
+[ ] c1_validation_enums → c1_result_validation_enums
+    - Update __init__.py
+    - Update all imports across codebase
+    - Test
+    - Commit
+
+[ ] c1_validation_models → TBD (check if exists, determine purpose)
+    - If result validation models: c1_result_validation_models
+    - If task validation models: c1_task_validation_models
+    - Update __init__.py
+    - Update all imports
+    - Test
+    - Commit
+
+[ ] Planned c1_validation_utils → c1_result_validation_utils
+    - Use correct name from the start
+    - Don't create vague name then rename
+
+### Phase 2: Review All C1 Module Names
+
+Review ALL c1 modules for vagueness:
+
+Current c1 modules:
+- c1_agent_models ✓ (specific: agent data models)
+- c1_task_models ✓ (specific: task data models)
+- c1_memory_models ✓ (specific: memory/discovery models)
+- c1_workflow_models ✓ (specific: workflow data models)
+- c1_monitoring_models ✓ (specific: monitoring data models)
+- c1_ticket_models ✓ (specific: ticket data models)
+- c1_database_session ✓ (specific: database session management)
+- c1_worktree_enums ✓ (specific: git worktree enums)
+- c1_monitoring_enums ✓ (specific: monitoring enums)
+- c1_conductor_enums ✓ (specific: conductor system enums)
+- c1_guardian_enums ✓ (specific: guardian system enums)
+- c1_validation_enums ❌ (VAGUE - validation of what?)
+- c1_llm_enums ✓ (specific: LLM component routing enums)
+- c1_user_models ✓ (specific: user data models)
+
+## Renaming Procedure
+
+For each module being renamed:
+
+1. Create new directory with specific name
+2. Copy all files from old directory
+3. Update __init__.py in new directory
+4. Find all imports of old module name
+5. Update all imports to new module name
+6. Run tests to verify
+7. If tests pass: Delete old directory
+8. Commit with message: Rename {old} → {new} for clarity
+
+## Implementation Priority
+
+1. **IMMEDIATE**: Don't create c1_validation_utils (use specific name)
+2. **HIGH**: Rename existing c1_validation_enums → c1_result_validation_enums
+3. **MEDIUM**: Check c1_validation_models existence and rename if needed
+4. **ONGOING**: Apply specificity principle to all future c1 modules
+
+## Notes
+
+- This task should be completed BEFORE continuing with coarse pass extraction
+- All future c1 modules must follow specificity principle
+- Update Task-22 incremental migration plan with corrected names
+- Add specificity check to architecture validator script
+
+## Time Estimate
+
+- Rename c1_validation_enums: 15 minutes
+- Check/rename c1_validation_models: 10 minutes
+- Update Task-22 plan: 5 minutes
+Total: 30 minutes

@@ -1,0 +1,165 @@
+TASK-29: Organize Remaining Services from src/services/
+
+## Status
+✅ COMPLETE (Already done during Task-25)
+
+## Completion Date
+2025-11-05 (verified)
+
+## Priority
+MEDIUM - Cleanup and architectural consistency
+
+## Verification Results
+
+**Audit Date:** 2025-11-05
+
+**Finding:** All services already migrated to c2 modules during Task-25!
+
+**src/services/ Contents:**
+- 13 files, all are backward compatibility shims (2-13 lines each)
+- No actual service code remains in src/services/
+- All shims correctly point to c2_* modules
+
+**Migrated Services:**
+1. embedding_service.py → c2_embedding_service
+2. queue_service.py → c2_queue_service
+3. result_service.py → c2_result_service
+4. result_validation_helpers.py → c2_validation_service
+5. result_validator_service.py → c2_validation_service
+6. task_blocking_service.py → c2_task_blocking_service
+7. task_similarity_service.py → c2_task_similarity_service
+8. ticket_history_service.py → c2_ticket_service
+9. ticket_search_service.py → c2_ticket_service
+10. ticket_service.py → c2_ticket_service
+11. validation_helpers.py → c2_validation_service
+12. workflow_result_service.py → c2_workflow_result_service
+
+**C2 Modules Created:**
+- c2_agent_service ✓
+- c2_embedding_service ✓
+- c2_monitoring_guardian ✓
+- c2_queue_service ✓
+- c2_result_service ✓
+- c2_task_blocking_service ✓
+- c2_task_similarity_service ✓
+- c2_ticket_service ✓
+- c2_validation_service ✓
+- c2_workflow_result_service ✓
+- c2_worktree_service ✓
+
+**Total:** 11 c2 service modules
+
+**Backward Compatibility Tests:**
+✅ Old imports work: `from src.services.ticket_service import TicketService`
+✅ New imports work: `from src.c2_ticket_service.ticket_service import TicketService`
+
+**Conclusion:**
+Task-29 objective was already achieved during Task-25 (C2 extraction).
+No additional work required.
+
+## Original Objective
+
+Move all remaining services from src/services/ to appropriate c2_* modules.
+
+## Discovery Phase
+
+### Step 1: Audit src/services/
+[ ] List all .py files in src/services/
+[ ] Categorize each service by domain:
+  - Ticket services
+  - Agent services
+  - Task services
+  - Workflow services
+  - Other
+
+### Step 2: Check c2_* modules
+[ ] List all c2_* directories
+[ ] Identify which services belong in which c2 module
+[ ] Note any services that don't fit existing c2 modules
+
+## Known Services to Migrate
+
+**Ticket Services** (→ c2_ticket_services/):
+- src/services/ticket_service.py
+- src/services/ticket_search_service.py
+- src/services/ticket_history_service.py
+
+**Git Services** (→ c2_worktree_service/ or new c2_git_service/):
+- src/services/git_service.py (if exists)
+
+**Unknown** (need audit):
+- Any other files in src/services/
+
+## Migration Steps (Per Service)
+
+For each service file:
+
+1. **Determine Target Module**
+   [ ] Identify which c2_* module it belongs to
+   [ ] Create c2 module if none exists
+
+2. **Move Service**
+   [ ] Copy service to c2 module
+   [ ] Update imports within service
+   [ ] Add to c2 module __init__.py
+
+3. **Create Compatibility Shim**
+   [ ] Leave import shim in old location:
+   ```python
+   # src/services/ticket_service.py
+   from src.c2_ticket_services.ticket_service import TicketService
+   __all__ = ["TicketService"]
+   ```
+
+4. **Update Imports**
+   [ ] Search for imports of old location
+   [ ] Update to new c2 location
+   [ ] Test imports work
+
+5. **Test**
+   [ ] Verify old imports still work (backward compat)
+   [ ] Verify new imports work
+   [ ] Run affected tests
+
+## Expected Directory Structure After
+
+```
+src/
+├── c2_ticket_services/
+│   ├── __init__.py
+│   ├── ticket_service.py
+│   ├── ticket_search_service.py
+│   └── ticket_history_service.py
+├── c2_worktree_service/
+│   ├── __init__.py
+│   ├── worktree_service.py
+│   └── git_service.py (maybe)
+├── services/  (compatibility shims only)
+│   ├── __init__.py
+│   ├── ticket_service.py (imports from c2)
+│   └── ...
+```
+
+## Validation
+
+[ ] All services in src/services/ are shims (< 5 lines each)
+[ ] All actual service code in c2_* modules
+[ ] pytest --collect-only succeeds
+[ ] All imports work (both old and new paths)
+
+## Documentation
+
+[ ] Update ARCHITECTURE.md with c2 layer structure
+[ ] Document migration in todo.txt
+[ ] Note any services that needed new c2 modules
+
+## Estimated Time
+
+1-2 hours
+
+## Notes
+
+- Maintain backward compatibility with shims
+- Don't break existing code
+- Prefer moving to existing c2 modules over creating new ones
+- If creating new c2 module, follow naming convention: c2_<domain>_service

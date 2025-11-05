@@ -1,0 +1,51 @@
+Refactoring Baseline - Three-Layer Architecture
+================================================
+
+Date: 2025-11-04
+Branch: refactor/three-layer-architecture
+Base commit: b4bbdb3 (Fix Python 3.13 compatibility)
+
+## Test Baseline
+
+Test collection: **449 tests collected**
+Status: All tests collect successfully
+Error: 1 manual test (tests/manual_validation_test.py) tries to connect to server - expected
+
+SDK Tests: 16 of 17 passed (1 outdated test expectation - not a blocker)
+
+## Dependency Versions
+
+- Python: 3.13.5
+- SQLAlchemy: 2.0.44 (Python 3.13 compatible)
+- requests: 2.32.5 (langchain-community compatible)
+- pytest: 8.4.2
+
+## Current State
+
+Total files: 93 Python files
+Total lines: 29,308 lines of code
+Largest files requiring splitting:
+1. src/mcp/server.py - 4,216 lines
+2. src/monitoring/monitor.py - 1,602 lines
+3. src/mcp/api.py - 1,595 lines
+4. src/core/worktree_manager.py - 1,367 lines
+5. src/services/ticket_service.py - 1,216 lines
+6. src/agents/manager.py - 1,187 lines
+7. src/core/database.py - 987 lines
+
+## Refactoring Plan
+
+See tasks/251104-task-{17,18,19,20}-*.txt for complete planning documents:
+- Task-17: Three-layer architecture specification
+- Task-18: Refactoring plan with stages
+- Task-19: File-by-file destination mapping
+- Task-20: Validation scripts and testing strategy
+
+## Success Criteria
+
+After refactoring:
+- All 449 tests still collect
+- All passing tests still pass
+- No new import errors
+- Layer dependencies validated (c3 → c2 → c1, no circular deps)
+- All files in flat structure (src/c{N}_{noun}_{module}/)

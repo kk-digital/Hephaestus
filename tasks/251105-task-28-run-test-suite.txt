@@ -1,0 +1,111 @@
+TASK-28: Run Full Test Suite and Document Results
+
+## Status
+PENDING - Blocked by Task-27
+
+## Priority
+HIGH - Need to verify refactoring didn't break functionality
+
+## Dependencies
+
+**Blocks:**
+- Task-27 must be complete (import fixes)
+
+**Blocked by:**
+Nothing after Task-27 complete
+
+## Objective
+
+Run the complete test suite and document:
+1. Total tests collected
+2. Pass/fail/skip counts
+3. Any error patterns
+4. Performance regressions (if any)
+
+## Test Execution Steps
+
+### Step 1: Quick Import Test
+[ ] Verify server.py imports: python -c "from src.mcp.server import app"
+[ ] Verify test collection: pytest --collect-only
+[ ] Should collect 406 tests with 0 errors
+
+### Step 2: Run Test Suite
+[ ] Run full suite: pytest tests/ -v --tb=short
+[ ] Capture output to file: pytest tests/ -v > test-results.txt 2>&1
+[ ] Note execution time
+
+### Step 3: Analyze Results
+[ ] Count passing tests
+[ ] Count failing tests
+[ ] Count skipped tests
+[ ] Group failures by category (import, integration, unit, etc.)
+
+### Step 4: Document Failures
+For each failing test:
+[ ] Test name
+[ ] Error type (ImportError, AssertionError, etc.)
+[ ] Root cause (if obvious)
+[ ] Related to refactoring? (yes/no)
+
+### Step 5: Report
+[ ] Create test-results-251105.txt in tasks/
+[ ] Update todo.txt with summary
+[ ] Commit results
+
+## Expected Outcomes
+
+**Best Case:**
+- All 406 tests pass
+- No regressions from refactoring
+
+**Likely Case:**
+- Most tests pass
+- Some failures due to:
+  - Missing imports
+  - Path changes
+  - Service initialization issues
+
+**Acceptable:**
+- > 90% pass rate
+- Failures are fixable
+- No critical functionality broken
+
+## Test Categories
+
+1. Unit tests (c1 models, c2 services)
+2. Integration tests (c3 routes, workflows)
+3. End-to-end tests (full agent workflows)
+4. MCP protocol tests
+5. WebSocket tests
+
+## Reporting Format
+
+```
+TEST SUITE RESULTS (2025-11-05)
+
+Environment:
+- Python: 3.13.5
+- pytest: 8.4.2
+- Branch: refactor/three-layer-architecture
+
+Results:
+- Total collected: XXX tests
+- Passed: XXX (XX%)
+- Failed: XXX (XX%)
+- Skipped: XXX (XX%)
+- Execution time: XX.XXs
+
+Failures by Category:
+- Import errors: XX
+- Integration failures: XX
+- Unit test failures: XX
+- Other: XX
+
+Action Items:
+1. [List fixes needed]
+2. ...
+```
+
+## Estimated Time
+
+15-30 minutes (depending on failures)

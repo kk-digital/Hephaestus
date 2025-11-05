@@ -1,0 +1,127 @@
+Next Session Quick Start Guide
+================================
+
+Branch: refactor/three-layer-architecture
+Current Status: Preparation complete, ready for Stage 1.1 (file splitting)
+
+## Quick Commands
+
+### Start Work
+Linux docker-hephaestus 6.10.14-linuxkit #1 SMP Wed Sep  3 15:35:15 UTC 2025 aarch64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+
+### Key Files to Reference
+
+**Main Report (opened in Sublime Text)**:
+- Host: /Users/sp/claude/claude-docker.hephaestus/Hephaestus/Hephaestus/reports/251104-module-structure-and-naming.txt
+- Container: /home/user/workspace/Hephaestus/reports/251104-module-structure-and-naming.txt
+
+**Planning Documents**:
+- Architecture spec: tasks/251104-task-17-three-layer-architecture.txt
+- Refactoring plan: tasks/251104-task-18-refactor-plan.txt
+- File mapping: tasks/251104-task-19-file-mapping.txt
+- Validation scripts: tasks/251104-task-20-validation-scripts.txt
+
+**Baseline**:
+- Refactoring baseline: REFACTORING-BASELINE.txt
+- Test baseline: refactoring-test-baseline.txt
+- Session summary: SESSION-SUMMARY-251104.txt
+
+**Progress Tracking**:
+- Todo list: todo.txt
+
+### Files Marked for Splitting (Stage 1.1)
+
+Priority order:
+1. src/core/database.py (987 lines → 8-9 files)
+2. src/mcp/server.py (4,216 lines → 13 files)
+3. src/monitoring/monitor.py (1,602 lines → 5 files)
+4. src/mcp/api.py (1,595 lines → 6 files)
+5. src/core/worktree_manager.py (1,367 lines → 4 files)
+6. src/services/ticket_service.py (1,216 lines → 5 files)
+7. src/agents/manager.py (1,187 lines → 5 files)
+
+Each file has destination comments at the top showing split plan.
+
+### Validation Commands
+
+======================================================================
+Three-Layer Architecture Validator
+======================================================================
+
+✅ All layer dependencies are valid!
+
+Layer rules:
+  - c1 imports: stdlib + external packages only
+  - c2 imports: c1 + stdlib + external packages
+  - c3 imports: c1 + c2 + stdlib + external packages
+On branch refactor/three-layer-architecture
+Your branch is ahead of 'origin/refactor/three-layer-architecture' by 5 commits.
+  (use "git push" to publish your local commits)
+
+nothing to commit, working tree clean
+
+### Testing After Each Split
+
+======================================================================
+Three-Layer Architecture Validator
+======================================================================
+
+✅ All layer dependencies are valid!
+
+Layer rules:
+  - c1 imports: stdlib + external packages only
+  - c2 imports: c1 + stdlib + external packages
+  - c3 imports: c1 + c2 + stdlib + external packages
+
+### Commit Strategy
+
+After each file split:
+On branch refactor/three-layer-architecture
+Your branch is ahead of 'origin/refactor/three-layer-architecture' by 5 commits.
+  (use "git push" to publish your local commits)
+
+nothing to commit, working tree clean
+
+## Architecture Quick Reference
+
+**Naming Convention**: c{N}_{noun}_{function}
+- Examples: c1_agent_models, c2_task_service, c3_task_routes
+
+**Layer Rules**:
+- c1 imports: stdlib + external ONLY
+- c2 imports: c1 + stdlib + external
+- c3 imports: c1 + c2 + stdlib + external
+
+**Structure**: Flat packages at src/ level (NO nesting)
+
+
+## Next Steps
+
+**Stage 1.1**: Start with database.py
+1. Read destination comments in database.py
+2. Create first split file (e.g., c1_database_session/base.py)
+3. Extract Base, declarative_base, engine setup
+4. Update imports in database.py
+5. Test imports work
+6. Commit
+7. Repeat for next component
+
+**Estimated Time**: 6-8 hours for all 7 files
+
+## Current State
+
+- Python 3.13 compatibility: FIXED ✓
+- Test collection: 449 tests ✓
+- Architecture validator: Working ✓
+- All files marked: Yes ✓
+- Documentation: Complete ✓
+- Branch status: Clean ✓
+
+Ready to proceed!

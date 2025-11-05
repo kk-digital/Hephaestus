@@ -1,0 +1,805 @@
+TASK-18: Comprehensive Refactoring Plan - Three-Layer Architecture
+===================================================================
+
+Date: 2025-11-04
+Status: PLANNING
+Depends on: TASK-17
+
+## Overview
+
+This document provides a comprehensive, stage-by-stage plan for refactoring Hephaestus
+into the three-layer flat architecture (c1, c2, c3).
+
+**Strategy**:
+- Split large files first (reduces merge conflicts)
+- Add comments marking destination before moving
+- Test after each significant change
+- Commit frequently (after each file split/move)
+- One layer at a time (c1 → c2 → c3)
+
+## Pre-Refactor Baseline
+
+### Current State
+- 93 Python files across 15 directories
+- 29,308 total lines of code
+- 6 files over 1,000 lines requiring splitting
+- 449 tests (all passing with SQLAlchemy 2.0.44)
+
+### Largest Files (Priority for Splitting)
+1. **src/mcp/server.py** - 4,216 lines
+2. **src/monitoring/monitor.py** - 1,602 lines
+3. **src/mcp/api.py** - 1,595 lines
+4. **src/core/worktree_manager.py** - 1,367 lines
+5. **src/services/ticket_service.py** - 1,216 lines
+6. **src/agents/manager.py** - 1,187 lines
+7. **src/core/database.py** - 987 lines
+
+## Refactoring Stages
+
+### STAGE 0: Preparation and Setup (1-2 hours)
+**Goal**: Set up infrastructure for refactoring
+
+**Tasks**:
+1. Create refactoring branch: `refactor/three-layer-architecture`
+2. Document current test baseline (449 tests passing)
+3. Create validation scripts
+4. Set up automated testing for each commit
+5. Back up current working state
+
+**Deliverables**:
+- Branch created
+- Baseline test report saved
+- Validation scripts ready
+- Backup confirmed
+
+**Testing**: Run full test suite, save results as baseline
+
+**Commit**: "Setup refactoring infrastructure for three-layer architecture"
+
+---
+
+### STAGE 1: Split Large Files (6-8 hours)
+**Goal**: Break down 6 large files into logical components BEFORE moving to layers
+
+**Why First**:
+- Reduces cognitive load during layer migration
+- Makes destination mapping clearer
+- Smaller files = easier to move and test
+- Prevents massive merge conflicts
+
+**Substages**:
+
+#### Stage 1.1: Split src/core/database.py (987 lines)
+**Current**: All SQLAlchemy models in one file
+**Split into**:
+- `src/core/database_base.py` - Base, declarative_base, engine setup (~100 lines)
+- `src/core/database_session.py` - SessionLocal, get_db() (~50 lines)
+- `src/core/models_task.py` - Task, TaskRequest, TaskResponse models (~150 lines)
+- `src/core/models_agent.py` - Agent, AgentLog, AgentResult models (~150 lines)
+- `src/core/models_ticket.py` - Ticket, TicketHistory models (~100 lines)
+- `src/core/models_workflow.py` - Workflow, Phase, WorkflowResult models (~150 lines)
+- `src/core/models_memory.py` - Memory model (~50 lines)
+- `src/core/models_validation.py` - ValidationReview model (~50 lines)
+- `src/core/models_monitoring.py` - GuardianAnalysis, ConductorAnalysis, etc. (~150 lines)
+
+**Add comments**:
+```python
+# DESTINATION: c1_database_session/base.py
+# DESTINATION: c1_task_models/task_models.py
+# DESTINATION: c1_agent_models/agent_models.py
+```
+
+**Testing**:
+- Run imports: `python -c "from src.core.database import Task, Agent, Memory"`
+- Run test suite: Should still pass 449 tests
+- Check no import errors
+
+**Commit after each split**:
+- "Split database.py: Extract database_base and session"
+- "Split database.py: Extract task models"
+- "Split database.py: Extract agent models"
+- etc.
+
+#### Stage 1.2: Split src/mcp/server.py (4,216 lines)
+**Current**: Massive FastAPI app with all routes
+**Split into**:
+- `src/mcp/server_app.py` - FastAPI app, lifespan, ServerState (~300 lines)
+- `src/mcp/server_state.py` - ServerState class only (~200 lines)
+- `src/mcp/routes_tasks.py` - All /tasks/* routes (~400 lines)
+- `src/mcp/routes_agents.py` - All /agents/* routes (~300 lines)
+- `src/mcp/routes_tickets.py` - All /tickets/* routes (~400 lines)
+- `src/mcp/routes_workflows.py` - All /workflows/* and /phases/* routes (~400 lines)
+- `src/mcp/routes_results.py` - All /results/* routes (~300 lines)
+- `src/mcp/routes_validation.py` - All /validation/* routes (~200 lines)
+- `src/mcp/routes_monitoring.py` - All /monitoring/* and /health/* routes (~300 lines)
+- `src/mcp/routes_memories.py` - All /memories/* routes (~300 lines)
+- `src/mcp/routes_queue.py` - All /queue/* routes (~200 lines)
+- `src/mcp/routes_blocking.py` - All /blocking/* routes (~100 lines)
+- `src/mcp/routes_mcp_protocol.py` - MCP protocol routes (/, /tools, /resources) (~200 lines)
+
+**Add comments**:
+```python
+# DESTINATION: c3_mcp_server/app.py
+# DESTINATION: c3_orchestration_routes/task_routes.py
+# DESTINATION: c3_workflow_routes/workflow_routes.py
+```
+
+**Testing**:
+- Import check: All routes should import cleanly
+- Run server startup test
+- Full test suite: 449 tests should pass
+
+**Commit after each route split**:
+- "Split server.py: Extract task routes"
+- "Split server.py: Extract agent routes"
+- etc.
+
+#### Stage 1.3: Split src/mcp/api.py (1,595 lines)
+**Current**: Frontend API routes
+**Split into**:
+- `src/mcp/api_base.py` - Router setup, dependencies (~100 lines)
+- `src/mcp/api_tasks.py` - Task-related frontend routes (~300 lines)
+- `src/mcp/api_agents.py` - Agent-related frontend routes (~300 lines)
+- `src/mcp/api_tickets.py` - Ticket-related frontend routes (~300 lines)
+- `src/mcp/api_workflows.py` - Workflow-related frontend routes (~300 lines)
+- `src/mcp/api_monitoring.py` - Monitoring/health frontend routes (~200 lines)
+
+**Add comments**:
+```python
+# DESTINATION: c3_frontend_api/api.py (or split into multiple route files)
+```
+
+**Testing**: Frontend API tests should pass
+
+**Commit**: "Split api.py into logical route groups"
+
+#### Stage 1.4: Split src/monitoring/monitor.py (1,602 lines)
+**Current**: MonitoringLoop with all monitoring logic
+**Split into**:
+- `src/monitoring/monitor_core.py` - MonitoringLoop class (~400 lines)
+- `src/monitoring/monitor_analysis.py` - Analysis methods (~300 lines)
+- `src/monitoring/monitor_guardian.py` - Guardian integration (~300 lines)
+- `src/monitoring/monitor_conductor.py` - Conductor integration (~300 lines)
+- `src/monitoring/monitor_intervention.py` - Intervention logic (~200 lines)
+
+**Add comments**:
+```python
+# DESTINATION: c2_monitoring_guardian/monitor_core.py
+```
+
+**Testing**: Monitoring tests should pass
+
+**Commit**: "Split monitor.py into focused modules"
+
+#### Stage 1.5: Split src/core/worktree_manager.py (1,367 lines)
+**Current**: Git worktree management
+**Split into**:
+- `src/core/worktree_manager.py` - Main WorktreeManager class (~400 lines)
+- `src/core/worktree_operations.py` - Worktree create/delete/list (~300 lines)
+- `src/core/worktree_conflict.py` - Conflict resolution (~300 lines)
+- `src/core/worktree_cleanup.py` - Cleanup and maintenance (~200 lines)
+
+**Add comments**:
+```python
+# DESTINATION: c2_worktree_manager/worktree_manager.py
+```
+
+**Testing**: Worktree tests should pass
+
+**Commit**: "Split worktree_manager.py into operation modules"
+
+#### Stage 1.6: Split src/services/ticket_service.py (1,216 lines)
+**Current**: All ticket service logic
+**Split into**:
+- `src/services/ticket_service.py` - Core TicketService class (~300 lines)
+- `src/services/ticket_create.py` - Creation logic (~200 lines)
+- `src/services/ticket_update.py` - Update logic (~200 lines)
+- `src/services/ticket_query.py` - Query logic (~200 lines)
+- `src/services/ticket_history.py` - History tracking (~200 lines)
+
+**Add comments**:
+```python
+# DESTINATION: c2_ticket_service/ticket_service.py
+```
+
+**Testing**: Ticket service tests should pass
+
+**Commit**: "Split ticket_service.py into focused modules"
+
+#### Stage 1.7: Split src/agents/manager.py (1,187 lines)
+**Current**: AgentManager with all agent logic
+**Split into**:
+- `src/agents/manager.py` - Core AgentManager class (~300 lines)
+- `src/agents/lifecycle.py` - Agent lifecycle (start, stop, monitor) (~300 lines)
+- `src/agents/communication.py` - Agent communication (~200 lines)
+- `src/agents/output_capture.py` - Output capture logic (~200 lines)
+- `src/agents/process_management.py` - Process management (~200 lines)
+
+**Add comments**:
+```python
+# DESTINATION: c2_agent_service/agent_manager.py
+# DESTINATION: c2_agent_service/agent_lifecycle.py
+```
+
+**Testing**: Agent manager tests should pass
+
+**Commit**: "Split manager.py into agent management modules"
+
+**STAGE 1 COMPLETE**:
+- All large files split into manageable pieces
+- Comments added showing final destinations
+- All tests passing (449 tests)
+- Multiple commits for traceability
+
+---
+
+### STAGE 2: Create Layer 1 (c1_*) Foundation (4-6 hours)
+**Goal**: Create all c1_* packages and migrate foundation code
+
+**Why c1 First**:
+- No dependencies on other Hephaestus code
+- Provides foundation for c2 and c3
+- Easiest to test in isolation
+
+**Substages**:
+
+#### Stage 2.1: Create c1 Package Structure
+**Tasks**:
+1. Create all c1_* directories in src/
+2. Create __init__.py files
+3. Add .gitkeep or placeholder files
+
+**Packages to create**:
+```bash
+mkdir -p src/c1_agent_models
+mkdir -p src/c1_agent_enums
+mkdir -p src/c1_agent_exceptions
+mkdir -p src/c1_task_models
+mkdir -p src/c1_task_enums
+mkdir -p src/c1_task_exceptions
+mkdir -p src/c1_ticket_models
+mkdir -p src/c1_ticket_enums
+mkdir -p src/c1_workflow_models
+mkdir -p src/c1_system_constants
+mkdir -p src/c1_database_session
+mkdir -p src/c1_database_models
+mkdir -p src/c1_llm_provider
+mkdir -p src/c1_embedding_provider
+mkdir -p src/c1_vector_store
+mkdir -p src/c1_config_loader
+mkdir -p src/c1_auth_config
+```
+
+**Testing**: Directory structure created correctly
+
+**Commit**: "Create c1 layer package structure"
+
+#### Stage 2.2: Migrate Models (c1_*_models)
+**Tasks**:
+1. Move Task models from `src/core/models_task.py` → `src/c1_task_models/task_models.py`
+2. Move Agent models from `src/core/models_agent.py` → `src/c1_agent_models/agent_models.py`
+3. Move Ticket models from `src/core/models_ticket.py` → `src/c1_ticket_models/ticket_models.py`
+4. Move Workflow models from `src/core/models_workflow.py` → `src/c1_workflow_models/workflow_models.py`
+5. Update __init__.py exports in each package
+6. Add compatibility imports in old locations (for gradual migration)
+
+**Example compatibility import**:
+```python
+# src/core/database.py (OLD LOCATION)
+# Temporary compatibility import during migration
+from src.c1_task_models.task_models import Task, TaskRequest, TaskResponse
+```
+
+**Testing**:
+- Import from new locations works
+- Import from old locations still works (compatibility)
+- Run test suite: 449 tests should pass
+
+**Commit after each model migration**:
+- "Migrate task models to c1_task_models"
+- "Migrate agent models to c1_agent_models"
+- etc.
+
+#### Stage 2.3: Migrate Enums and Constants
+**Tasks**:
+1. Extract enums from models files
+2. Create c1_*_enums packages
+3. Create c1_system_constants package
+4. Update imports
+
+**Testing**: All imports resolve, tests pass
+
+**Commit**: "Migrate enums and constants to c1 layer"
+
+#### Stage 2.4: Migrate Exceptions
+**Tasks**:
+1. Extract exception classes
+2. Create c1_*_exceptions packages
+3. Update import statements
+
+**Testing**: Exception handling still works
+
+**Commit**: "Migrate exceptions to c1 layer"
+
+#### Stage 2.5: Migrate Database Session
+**Tasks**:
+1. Move database setup from `src/core/database_base.py` → `src/c1_database_session/base.py`
+2. Move session management from `src/core/database_session.py` → `src/c1_database_session/session.py`
+3. Move ORM models to `src/c1_database_models/`
+
+**Testing**: Database connection works, queries work
+
+**Commit**: "Migrate database session to c1_database_session"
+
+#### Stage 2.6: Migrate External Service Clients
+**Tasks**:
+1. Move LLM interfaces → `src/c1_llm_provider/`
+2. Move embedding interfaces → `src/c1_embedding_provider/`
+3. Move Qdrant client → `src/c1_vector_store/`
+4. Move config loading → `src/c1_config_loader/`
+
+**Testing**: External services can be instantiated
+
+**Commit**: "Migrate external service clients to c1 layer"
+
+**STAGE 2 VALIDATION**:
+- Run full test suite: 449 tests must pass
+- Run layer validation script
+- Verify c1 imports nothing from c2 or c3
+- Check no circular dependencies
+
+**STAGE 2 COMPLETE**:
+- All c1 packages populated
+- Foundation layer complete
+- Tests passing
+- Old locations have compatibility imports
+
+---
+
+### STAGE 3: Create Layer 2 (c2_*) Services (6-8 hours)
+**Goal**: Create all c2_* packages and migrate business logic
+
+**Substages**:
+
+#### Stage 3.1: Create c2 Package Structure
+**Tasks**:
+1. Create all c2_* directories
+2. Create __init__.py files
+
+**Packages to create**:
+```bash
+mkdir -p src/c2_auth_manager
+mkdir -p src/c2_task_service
+mkdir -p src/c2_agent_service
+mkdir -p src/c2_ticket_service
+mkdir -p src/c2_workflow_service
+mkdir -p src/c2_phase_manager
+mkdir -p src/c2_queue_processor
+mkdir -p src/c2_memory_engine
+mkdir -p src/c2_monitoring_guardian
+mkdir -p src/c2_validation_engine
+mkdir -p src/c2_worktree_manager
+```
+
+**Commit**: "Create c2 layer package structure"
+
+#### Stage 3.2: Migrate Task Service
+**Tasks**:
+1. Move from `src/services/task_service.py` → `src/c2_task_service/task_service.py`
+2. Update imports to use c1 layer
+3. Add compatibility imports in old location
+
+**Testing**: Task service tests pass
+
+**Commit**: "Migrate task service to c2_task_service"
+
+#### Stage 3.3: Migrate Agent Service
+**Tasks**:
+1. Move from `src/agents/manager.py` → `src/c2_agent_service/agent_manager.py`
+2. Move from `src/agents/lifecycle.py` → `src/c2_agent_service/agent_lifecycle.py`
+3. Update imports to use c1 layer
+
+**Testing**: Agent service tests pass
+
+**Commit**: "Migrate agent service to c2_agent_service"
+
+#### Stage 3.4: Migrate Ticket Service
+**Tasks**:
+1. Move from `src/services/ticket_service.py` → `src/c2_ticket_service/ticket_service.py`
+2. Move ticket history, search, etc.
+3. Update imports
+
+**Testing**: Ticket service tests pass
+
+**Commit**: "Migrate ticket service to c2_ticket_service"
+
+#### Stage 3.5: Migrate Workflow and Phase Services
+**Tasks**:
+1. Migrate workflow service → `src/c2_workflow_service/`
+2. Migrate phase manager → `src/c2_phase_manager/`
+
+**Testing**: Workflow tests pass
+
+**Commit**: "Migrate workflow and phase services to c2 layer"
+
+#### Stage 3.6: Migrate Queue Processor
+**Tasks**:
+1. Move queue logic → `src/c2_queue_processor/`
+
+**Testing**: Queue tests pass
+
+**Commit**: "Migrate queue processor to c2_queue_processor"
+
+#### Stage 3.7: Migrate Monitoring
+**Tasks**:
+1. Move monitoring logic → `src/c2_monitoring_guardian/`
+2. Move guardian logic
+3. Move conductor logic
+
+**Testing**: Monitoring tests pass
+
+**Commit**: "Migrate monitoring to c2_monitoring_guardian"
+
+#### Stage 3.8: Migrate Validation, Worktree, Memory
+**Tasks**:
+1. Migrate validation → `src/c2_validation_engine/`
+2. Migrate worktree → `src/c2_worktree_manager/`
+3. Migrate memory/RAG → `src/c2_memory_engine/`
+
+**Testing**: All service tests pass
+
+**Commit for each**: "Migrate {service} to c2 layer"
+
+**STAGE 3 VALIDATION**:
+- Run full test suite: 449 tests must pass
+- Run layer validation script
+- Verify c2 imports only from c1
+- Check no imports from c3
+
+**STAGE 3 COMPLETE**:
+- All c2 packages populated
+- Business logic layer complete
+- Tests passing
+
+---
+
+### STAGE 4: Create Layer 3 (c3_*) Applications (4-6 hours)
+**Goal**: Create all c3_* packages and migrate routes/interfaces
+
+**Substages**:
+
+#### Stage 4.1: Create c3 Package Structure
+**Tasks**:
+1. Create all c3_* directories
+2. Create __init__.py files
+
+**Packages to create**:
+```bash
+mkdir -p src/c3_mcp_server
+mkdir -p src/c3_module_registry
+mkdir -p src/c3_orchestration_routes
+mkdir -p src/c3_workflow_routes
+mkdir -p src/c3_ticketing_routes
+mkdir -p src/c3_monitoring_routes
+mkdir -p src/c3_infrastructure_routes
+mkdir -p src/c3_memory_routes
+mkdir -p src/c3_frontend_api
+mkdir -p src/c3_auth_api
+mkdir -p src/c3_cli_interface
+mkdir -p src/c3_sdk_client
+mkdir -p src/c3_tui_app
+```
+
+**Commit**: "Create c3 layer package structure"
+
+#### Stage 4.2: Create Module Registry
+**Tasks**:
+1. Create `src/c3_module_registry/base_module.py` (BaseModule interface)
+2. Create `src/c3_module_registry/registry.py` (ModuleRegistry)
+3. Test module registration
+
+**Testing**: Module registry can register and retrieve modules
+
+**Commit**: "Create module registry system"
+
+#### Stage 4.3: Migrate MCP Server Core
+**Tasks**:
+1. Move FastAPI app → `src/c3_mcp_server/app.py`
+2. Move lifespan → `src/c3_mcp_server/lifespan.py`
+3. Move ServerState → `src/c3_mcp_server/server_state.py`
+
+**Testing**: Server starts without errors
+
+**Commit**: "Migrate MCP server core to c3_mcp_server"
+
+#### Stage 4.4: Migrate Routes to Modules
+**Tasks**:
+1. Migrate task/agent/queue/blocking routes → `src/c3_orchestration_routes/`
+2. Migrate workflow/phase/result/validation routes → `src/c3_workflow_routes/`
+3. Migrate ticket routes → `src/c3_ticketing_routes/`
+4. Migrate monitoring/health routes → `src/c3_monitoring_routes/`
+5. Migrate auth/oauth/websocket routes → `src/c3_infrastructure_routes/`
+6. Migrate memory/embedding routes → `src/c3_memory_routes/`
+
+**Testing after each module**:
+- Module can be imported
+- Routes register correctly
+- API endpoints respond
+
+**Commit for each**: "Migrate {module} routes to c3 layer"
+
+#### Stage 4.5: Migrate Other Interfaces
+**Tasks**:
+1. Migrate frontend API → `src/c3_frontend_api/`
+2. Migrate auth API → `src/c3_auth_api/`
+3. Migrate CLI → `src/c3_cli_interface/`
+4. Migrate SDK → `src/c3_sdk_client/`
+5. Migrate TUI → `src/c3_tui_app/`
+
+**Testing**: Each interface works independently
+
+**Commit for each**: "Migrate {interface} to c3 layer"
+
+**STAGE 4 VALIDATION**:
+- Run full test suite: 449 tests must pass
+- Test all API endpoints
+- Run layer validation script
+- Verify c3 imports from c2 and c1 only
+
+**STAGE 4 COMPLETE**:
+- All c3 packages populated
+- Application layer complete
+- All tests passing
+- All routes functional
+
+---
+
+### STAGE 5: Cleanup and Validation (2-3 hours)
+**Goal**: Remove old code, validate architecture, update documentation
+
+**Tasks**:
+
+#### Stage 5.1: Remove Old Directories
+**Tasks**:
+1. Remove `src/core/` (moved to c1 and c2)
+2. Remove `src/mcp/` (moved to c3)
+3. Remove `src/services/` (moved to c2)
+4. Remove `src/agents/` (moved to c2)
+5. Remove `src/monitoring/` (moved to c2)
+6. Remove old compatibility imports
+
+**Testing**: Nothing imports from old locations
+
+**Commit**: "Remove old directory structure after migration"
+
+#### Stage 5.2: Run Full Validation
+**Tasks**:
+1. Run layer validation script
+2. Run dependency checker
+3. Run full test suite
+4. Run integration tests
+5. Performance testing
+
+**Expected Results**:
+- 449 tests pass
+- No layer violations
+- No circular dependencies
+- Performance unchanged
+
+**Commit**: "Validate three-layer architecture"
+
+#### Stage 5.3: Update Documentation
+**Tasks**:
+1. Update README.md with new structure
+2. Update INSTALLATION.txt with new imports
+3. Update .claude/CLAUDE.md with new structure
+4. Create architecture diagram
+5. Update developer guide
+
+**Commit**: "Update documentation for three-layer architecture"
+
+**STAGE 5 COMPLETE**:
+- Old code removed
+- Architecture validated
+- Documentation updated
+- Ready for production
+
+---
+
+### STAGE 6: Merge and Deploy (1 hour)
+**Goal**: Merge refactoring branch to main, deploy
+
+**Tasks**:
+1. Final test run on refactoring branch
+2. Create pull request
+3. Code review
+4. Merge to main
+5. Deploy to production
+6. Monitor for issues
+
+**Commit**: "Merge three-layer architecture refactoring"
+
+---
+
+## Testing Strategy
+
+### After Each File Split
+```bash
+# Import test
+python -c "from src.{module} import {Class}"
+
+# Quick smoke test
+pytest tests/ -k "test_{relevant}" -x
+
+# Full test suite (if quick tests pass)
+pytest tests/
+```
+
+### After Each Stage
+```bash
+# Full test suite
+pytest tests/ -v
+
+# Layer validation
+python validate_architecture.py
+
+# Dependency check
+python check_imports.py
+
+# Performance benchmark
+python benchmark.py
+```
+
+### Final Validation
+```bash
+# All tests
+pytest tests/ -v --cov
+
+# Layer validation
+python validate_architecture.py
+
+# Integration tests
+pytest tests/integration/ -v
+
+# Load tests
+locust -f load_test.py
+```
+
+## Commit Strategy
+
+### Commit Message Format
+```
+{stage}: {description}
+
+- Detail 1
+- Detail 2
+
+Testing: {test results}
+```
+
+### Examples
+```
+Stage 1.1: Split database.py - Extract task models
+
+- Extracted Task, TaskRequest, TaskResponse to models_task.py
+- Added destination comments for c1_task_models
+- All imports work from new location
+
+Testing: 449 tests pass
+```
+
+```
+Stage 2.2: Migrate task models to c1_task_models
+
+- Moved models_task.py to c1_task_models/task_models.py
+- Updated imports throughout codebase
+- Added compatibility import in database.py
+
+Testing: 449 tests pass, no import errors
+```
+
+## Rollback Strategy
+
+### If Tests Fail
+1. Identify failing test
+2. Check if it's a real issue or test needs updating
+3. Fix issue or update test
+4. If unfixable, revert last commit: `git revert HEAD`
+
+### If Stage Blocked
+1. Complete current substage
+2. Commit current work
+3. Create issue documenting blocker
+4. Continue with next independent substage
+5. Return to blocked substage later
+
+### Emergency Rollback
+```bash
+# Revert to last stable commit
+git reset --hard {last-stable-commit}
+
+# Or revert entire stage
+git revert {stage-start-commit}..HEAD
+```
+
+## Progress Tracking
+
+### Checklist
+- [ ] Stage 0: Preparation
+- [ ] Stage 1.1: Split database.py
+- [ ] Stage 1.2: Split server.py
+- [ ] Stage 1.3: Split api.py
+- [ ] Stage 1.4: Split monitor.py
+- [ ] Stage 1.5: Split worktree_manager.py
+- [ ] Stage 1.6: Split ticket_service.py
+- [ ] Stage 1.7: Split manager.py
+- [ ] Stage 2: Create c1 layer
+- [ ] Stage 3: Create c2 layer
+- [ ] Stage 4: Create c3 layer
+- [ ] Stage 5: Cleanup
+- [ ] Stage 6: Merge
+
+### Time Tracking
+| Stage | Estimated | Actual | Notes |
+|-------|-----------|--------|-------|
+| 0     | 1-2h      |        |       |
+| 1     | 6-8h      |        |       |
+| 2     | 4-6h      |        |       |
+| 3     | 6-8h      |        |       |
+| 4     | 4-6h      |        |       |
+| 5     | 2-3h      |        |       |
+| 6     | 1h        |        |       |
+| Total | 24-34h    |        |       |
+
+## Risk Mitigation
+
+### High Risk Areas
+1. **Database models**: Used everywhere, high import count
+   - Mitigation: Use compatibility imports during transition
+   - Extensive testing after migration
+
+2. **Server routes**: Complex dependencies, many endpoints
+   - Mitigation: Split first, then migrate
+   - Test each endpoint after migration
+
+3. **Service coordination**: Complex call chains
+   - Mitigation: Migrate services as units
+   - Integration tests after each service
+
+### Medium Risk Areas
+1. **External service clients**: May have connection issues
+   - Mitigation: Mock in tests, verify connection separately
+
+2. **Background tasks**: May not restart correctly
+   - Mitigation: Test background task lifecycle
+
+## Success Criteria
+
+### Technical
+- [ ] All 449 tests pass
+- [ ] No layer violations (validated by script)
+- [ ] No circular dependencies
+- [ ] Performance within 10% of baseline
+- [ ] All API endpoints functional
+
+### Code Quality
+- [ ] All files under 500 lines
+- [ ] Clear separation of concerns
+- [ ] Proper dependency injection
+- [ ] Good test coverage maintained
+
+### Documentation
+- [ ] Architecture diagram created
+- [ ] All packages documented
+- [ ] Migration guide complete
+- [ ] Developer guide updated
+
+## Next Steps
+
+1. Review this plan with team
+2. Get approval for refactoring approach
+3. Create refactoring branch
+4. Begin Stage 0 (Preparation)
+5. Execute stages sequentially
+6. Monitor progress daily
+7. Adjust plan as needed

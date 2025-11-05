@@ -1,0 +1,577 @@
+TASK-19: File-by-File Destination Mapping
+==========================================
+
+Date: 2025-11-04
+Status: PLANNING
+Depends on: TASK-17, TASK-18
+
+## Overview
+
+This document maps every current file to its final destination in the three-layer
+architecture (c1, c2, c3). Use this as a reference when splitting and moving files.
+
+## Mapping Legend
+
+```
+SOURCE FILE → DESTINATION PACKAGE/file.py
+[Size] [Layer] [Type] Description
+```
+
+**Layer**:
+- c1 = Foundation (models, enums, exceptions, clients, config)
+- c2 = Services (business logic, coordination)
+- c3 = Applications (routes, interfaces, MCP server)
+
+**Type**:
+- MODEL = Pydantic/SQLAlchemy model
+- ENUM = Enumeration
+- EXCEPTION = Custom exception
+- SERVICE = Business logic service
+- ROUTE = HTTP endpoint/route
+- CLIENT = External service client
+- UTIL = Utility function
+- CONFIG = Configuration
+
+## Current Large Files (Priority for Splitting)
+
+### 1. src/core/database.py (987 lines)
+**Status**: MUST SPLIT BEFORE MIGRATING
+
+**Split Plan**:
+```
+src/core/database.py (987 lines) →
+
+SPLIT INTO:
+  src/core/database_base.py (100 lines) → c1_database_session/base.py
+    - declarative_base
+    - Base class
+    - Engine configuration
+
+  src/core/database_session.py (50 lines) → c1_database_session/session.py
+    - SessionLocal
+    - get_db() dependency
+
+  src/core/models_task.py (150 lines) → c1_task_models/task_models.py
+    - Task (SQLAlchemy ORM)
+    - TaskRequest (Pydantic)
+    - TaskResponse (Pydantic)
+
+  src/core/models_agent.py (150 lines) → c1_agent_models/agent_models.py
+    - Agent (SQLAlchemy ORM)
+    - AgentLog (SQLAlchemy ORM)
+    - AgentResult (SQLAlchemy ORM)
+    - AgentConfig (Pydantic)
+
+  src/core/models_ticket.py (100 lines) → c1_ticket_models/ticket_models.py
+    - Ticket (SQLAlchemy ORM)
+    - TicketHistory (SQLAlchemy ORM)
+    - TicketComment (SQLAlchemy ORM)
+
+  src/core/models_workflow.py (150 lines) → c1_workflow_models/workflow_models.py
+    - Workflow (SQLAlchemy ORM)
+    - Phase (SQLAlchemy ORM)
+    - PhaseDefinition (Pydantic)
+    - WorkflowResult (SQLAlchemy ORM)
+
+  src/core/models_memory.py (50 lines) → c1_memory_models/memory_models.py
+    - Memory (SQLAlchemy ORM)
+    - MemoryQuery (Pydantic)
+
+  src/core/models_validation.py (50 lines) → c1_validation_models/validation_models.py
+    - ValidationReview (SQLAlchemy ORM)
+
+  src/core/models_monitoring.py (150 lines) → c1_monitoring_models/monitoring_models.py
+    - GuardianAnalysis (SQLAlchemy ORM)
+    - ConductorAnalysis (SQLAlchemy ORM)
+    - DetectedDuplicate (SQLAlchemy ORM)
+    - SteeringIntervention (SQLAlchemy ORM)
+```
+
+**Testing After Split**:
+```bash
+# Test imports from split files
+python -c "from src.core.database_base import Base"
+python -c "from src.core.models_task import Task"
+python -c "from src.core.models_agent import Agent"
+
+# Run full test suite
+pytest tests/ -v
+```
+
+**Commits**:
+1. "Split database.py: Extract base and session"
+2. "Split database.py: Extract task models"
+3. "Split database.py: Extract agent models"
+4. "Split database.py: Extract ticket models"
+5. "Split database.py: Extract workflow models"
+6. "Split database.py: Extract memory and validation models"
+7. "Split database.py: Extract monitoring models"
+
+---
+
+### 2. src/mcp/server.py (4,216 lines)
+**Status**: MUST SPLIT BEFORE MIGRATING
+
+**Split Plan**:
+```
+src/mcp/server.py (4,216 lines) →
+
+SPLIT INTO:
+  src/mcp/server_app.py (300 lines) → c3_mcp_server/app.py
+    - FastAPI app initialization
+    - Lifespan context manager
+    - CORS setup
+    - Module registration
+
+  src/mcp/server_state.py (200 lines) → c3_mcp_server/server_state.py
+    - ServerState class
+    - State initialization
+    - Dependencies
+
+  src/mcp/routes_tasks.py (400 lines) → c3_orchestration_routes/task_routes.py
+    - POST /tasks/create
+    - GET /tasks/{task_id}
+    - GET /tasks/list
+    - POST /tasks/{task_id}/cancel
+    - POST /tasks/{task_id}/result
+    - ... (all task endpoints)
+
+  src/mcp/routes_agents.py (300 lines) → c3_orchestration_routes/agent_routes.py
+    - POST /agents/launch
+    - GET /agents/{agent_id}
+    - POST /agents/{agent_id}/stop
+    - GET /agents/list
+    - ... (all agent endpoints)
+
+  src/mcp/routes_tickets.py (400 lines) → c3_ticketing_routes/ticket_routes.py
+    - POST /tickets/create
+    - GET /tickets/{ticket_id}
+    - PATCH /tickets/{ticket_id}
+    - DELETE /tickets/{ticket_id}
+    - GET /tickets/list
+    - ... (all ticket endpoints)
+
+  src/mcp/routes_workflows.py (400 lines) → c3_workflow_routes/workflow_routes.py
+    - POST /workflows/create
+    - GET /workflows/{workflow_id}
+    - POST /workflows/{workflow_id}/start
+    - GET /phases/list
+    - ... (workflow and phase endpoints)
+
+  src/mcp/routes_results.py (300 lines) → c3_workflow_routes/result_routes.py
+    - POST /results/submit
+    - GET /results/{result_id}
+    - GET /results/workflow/{workflow_id}
+
+  src/mcp/routes_validation.py (200 lines) → c3_workflow_routes/validation_routes.py
+    - POST /validation/submit
+    - GET /validation/{validation_id}
+    - POST /validation/{validation_id}/approve
+
+  src/mcp/routes_monitoring.py (300 lines) → c3_monitoring_routes/monitoring_routes.py
+    - GET /monitoring/status
+    - GET /monitoring/metrics
+    - GET /monitoring/guardian
+    - GET /monitoring/conductor
+
+  src/mcp/routes_health.py (200 lines) → c3_monitoring_routes/health_routes.py
+    - GET /health/live
+    - GET /health/ready
+    - GET /health/status
+    - POST /health/shutdown
+
+  src/mcp/routes_memories.py (300 lines) → c3_memory_routes/memory_routes.py
+    - POST /memories/store
+    - GET /memories/query
+    - GET /memories/{memory_id}
+    - DELETE /memories/{memory_id}
+
+  src/mcp/routes_queue.py (200 lines) → c3_orchestration_routes/queue_routes.py
+    - GET /queue/status
+    - GET /queue/pending
+    - POST /queue/priority
+
+  src/mcp/routes_blocking.py (100 lines) → c3_orchestration_routes/blocking_routes.py
+    - POST /blocking/read
+    - POST /blocking/write
+    - POST /blocking/execute
+
+  src/mcp/routes_mcp_protocol.py (200 lines) → c3_mcp_server/mcp_routes.py
+    - GET / (capabilities)
+    - POST /tools/list
+    - POST /tools/call
+    - POST /resources/list
+    - GET /sse (server-sent events)
+```
+
+**Testing After Split**:
+```bash
+# Import each route module
+python -c "from src.mcp.routes_tasks import router"
+python -c "from src.mcp.routes_agents import router"
+
+# Test server starts
+python -m src.mcp.server_app
+
+# Run API tests
+pytest tests/integration/test_api.py -v
+```
+
+**Commits**: One commit per route file (13 total)
+
+---
+
+### 3. src/mcp/api.py (1,595 lines)
+**Status**: SPLIT BEFORE MIGRATING
+
+**Split Plan**:
+```
+src/mcp/api.py (1,595 lines) →
+
+SPLIT INTO:
+  src/mcp/api_base.py (100 lines) → c3_frontend_api/base.py
+    - Router initialization
+    - Dependencies
+    - CORS for frontend
+
+  src/mcp/api_tasks.py (300 lines) → c3_frontend_api/task_api.py
+    - Frontend-specific task routes
+
+  src/mcp/api_agents.py (300 lines) → c3_frontend_api/agent_api.py
+    - Frontend-specific agent routes
+
+  src/mcp/api_tickets.py (300 lines) → c3_frontend_api/ticket_api.py
+    - Frontend-specific ticket routes
+
+  src/mcp/api_workflows.py (300 lines) → c3_frontend_api/workflow_api.py
+    - Frontend-specific workflow routes
+
+  src/mcp/api_monitoring.py (200 lines) → c3_frontend_api/monitoring_api.py
+    - Frontend-specific monitoring routes
+```
+
+**Commits**: One commit per API module (6 total)
+
+---
+
+### 4. src/monitoring/monitor.py (1,602 lines)
+**Status**: SPLIT BEFORE MIGRATING
+
+**Split Plan**:
+```
+src/monitoring/monitor.py (1,602 lines) →
+
+SPLIT INTO:
+  src/monitoring/monitor_core.py (400 lines) → c2_monitoring_guardian/monitor_core.py
+    - MonitoringLoop class
+    - Main monitoring logic
+
+  src/monitoring/monitor_analysis.py (300 lines) → c2_monitoring_guardian/analysis.py
+    - Analysis methods
+    - Metric calculation
+
+  src/monitoring/monitor_guardian.py (300 lines) → c2_monitoring_guardian/guardian.py
+    - Guardian integration
+    - Guardian queries
+
+  src/monitoring/monitor_conductor.py (300 lines) → c2_monitoring_guardian/conductor.py
+    - Conductor integration
+    - Conductor analysis
+
+  src/monitoring/monitor_intervention.py (200 lines) → c2_monitoring_guardian/intervention.py
+    - Intervention logic
+    - Corrective actions
+```
+
+**Commits**: One commit per module (5 total)
+
+---
+
+### 5. src/core/worktree_manager.py (1,367 lines)
+**Status**: SPLIT BEFORE MIGRATING
+
+**Split Plan**:
+```
+src/core/worktree_manager.py (1,367 lines) →
+
+SPLIT INTO:
+  src/core/worktree_manager.py (400 lines) → c2_worktree_manager/worktree_manager.py
+    - WorktreeManager class
+    - Main interface
+
+  src/core/worktree_operations.py (300 lines) → c2_worktree_manager/operations.py
+    - Create worktree
+    - Delete worktree
+    - List worktrees
+
+  src/core/worktree_conflict.py (300 lines) → c2_worktree_manager/conflict.py
+    - Conflict detection
+    - Conflict resolution
+
+  src/core/worktree_cleanup.py (200 lines) → c2_worktree_manager/cleanup.py
+    - Cleanup logic
+    - Maintenance tasks
+```
+
+**Commits**: One commit per module (4 total)
+
+---
+
+### 6. src/services/ticket_service.py (1,216 lines)
+**Status**: SPLIT BEFORE MIGRATING
+
+**Split Plan**:
+```
+src/services/ticket_service.py (1,216 lines) →
+
+SPLIT INTO:
+  src/services/ticket_service.py (300 lines) → c2_ticket_service/ticket_service.py
+    - TicketService class
+    - Main interface
+
+  src/services/ticket_create.py (200 lines) → c2_ticket_service/create.py
+    - Ticket creation logic
+
+  src/services/ticket_update.py (200 lines) → c2_ticket_service/update.py
+    - Ticket update logic
+
+  src/services/ticket_query.py (200 lines) → c2_ticket_service/query.py
+    - Ticket query logic
+
+  src/services/ticket_history.py (200 lines) → c2_ticket_service/history.py
+    - History tracking
+```
+
+**Commits**: One commit per module (5 total)
+
+---
+
+### 7. src/agents/manager.py (1,187 lines)
+**Status**: SPLIT BEFORE MIGRATING
+
+**Split Plan**:
+```
+src/agents/manager.py (1,187 lines) →
+
+SPLIT INTO:
+  src/agents/manager.py (300 lines) → c2_agent_service/agent_manager.py
+    - AgentManager class
+    - Main interface
+
+  src/agents/lifecycle.py (300 lines) → c2_agent_service/lifecycle.py
+    - Start agent
+    - Stop agent
+    - Monitor agent
+
+  src/agents/communication.py (200 lines) → c2_agent_service/communication.py
+    - Agent communication
+    - Message passing
+
+  src/agents/output_capture.py (200 lines) → c2_agent_service/output_capture.py
+    - Output capture
+    - Log streaming
+
+  src/agents/process_management.py (200 lines) → c2_agent_service/process.py
+    - Process management
+    - Resource tracking
+```
+
+**Commits**: One commit per module (5 total)
+
+---
+
+## Complete File Mapping
+
+### Current src/ Structure → New c1/c2/c3 Structure
+
+#### Layer 1 (c1_*) - Foundation
+
+```
+src/core/database.py (models) → c1_{entity}_models/{entity}_models.py
+src/core/enums.py → c1_{entity}_enums/{entity}_enums.py
+src/core/exceptions.py → c1_{entity}_exceptions/{entity}_exceptions.py
+
+src/interfaces/llm_interface.py → c1_llm_provider/base_provider.py
+src/interfaces/langchain_llm_client.py → c1_llm_provider/langchain_provider.py
+src/interfaces/openai_llm_client.py → c1_llm_provider/openai_provider.py
+src/interfaces/anthropic_llm_client.py → c1_llm_provider/anthropic_provider.py
+
+src/interfaces/embedding_interface.py → c1_embedding_provider/base_provider.py
+src/interfaces/openai_embedding_client.py → c1_embedding_provider/openai_provider.py
+src/interfaces/lmstudio_embedding_client.py → c1_embedding_provider/lmstudio_provider.py
+
+src/interfaces/qdrant_client.py → c1_vector_store/qdrant_client.py
+
+src/config/config.py → c1_config_loader/config.py
+src/config/settings.py → c1_config_loader/settings.py
+
+src/auth/auth_config.py → c1_auth_config/auth_config.py
+```
+
+#### Layer 2 (c2_*) - Services
+
+```
+src/services/task_service.py → c2_task_service/task_service.py
+src/services/task_similarity.py → c2_task_service/similarity.py
+
+src/agents/manager.py → c2_agent_service/agent_manager.py
+src/agents/coordinator.py → c2_agent_service/coordinator.py
+
+src/services/ticket_service.py → c2_ticket_service/ticket_service.py
+src/services/ticket_history_service.py → c2_ticket_service/history.py
+src/services/ticket_search_service.py → c2_ticket_service/search.py
+
+src/workflow/workflow_execution.py → c2_workflow_service/execution.py
+src/workflow/termination_handler.py → c2_workflow_service/termination.py
+
+src/phases/phase_loader.py → c2_phase_manager/phase_loader.py
+src/phases/phase_manager.py → c2_phase_manager/phase_manager.py
+
+src/services/queue_service.py → c2_queue_processor/queue_service.py
+src/services/background_queue.py → c2_queue_processor/background.py
+
+src/memory/rag_engine.py → c2_memory_engine/rag_engine.py
+src/memory/memory_manager.py → c2_memory_engine/memory_manager.py
+
+src/monitoring/monitor.py → c2_monitoring_guardian/monitor_core.py
+src/monitoring/guardian.py → c2_monitoring_guardian/guardian.py
+src/monitoring/conductor.py → c2_monitoring_guardian/conductor.py
+src/monitoring/dependency_monitor.py → c2_monitoring_guardian/dependency.py
+
+src/validation/validator_agent.py → c2_validation_engine/validator.py
+src/validation/check_executor.py → c2_validation_engine/executor.py
+
+src/core/worktree_manager.py → c2_worktree_manager/worktree_manager.py
+
+src/auth/auth_manager.py → c2_auth_manager/auth_manager.py
+src/auth/auth_utils.py → c2_auth_manager/utils.py
+```
+
+#### Layer 3 (c3_*) - Applications
+
+```
+src/mcp/server.py (app) → c3_mcp_server/app.py
+src/mcp/server.py (state) → c3_mcp_server/server_state.py
+src/mcp/lifespan.py → c3_mcp_server/lifespan.py
+
+[NEW] → c3_module_registry/base_module.py
+[NEW] → c3_module_registry/registry.py
+
+src/mcp/server.py (task routes) → c3_orchestration_routes/task_routes.py
+src/mcp/server.py (agent routes) → c3_orchestration_routes/agent_routes.py
+src/mcp/server.py (queue routes) → c3_orchestration_routes/queue_routes.py
+src/mcp/server.py (blocking routes) → c3_orchestration_routes/blocking_routes.py
+
+src/mcp/server.py (workflow routes) → c3_workflow_routes/workflow_routes.py
+src/mcp/server.py (phase routes) → c3_workflow_routes/phase_routes.py
+src/mcp/server.py (result routes) → c3_workflow_routes/result_routes.py
+src/mcp/server.py (validation routes) → c3_workflow_routes/validation_routes.py
+
+src/mcp/server.py (ticket routes) → c3_ticketing_routes/ticket_routes.py
+src/services/ticket_history_service.py (routes) → c3_ticketing_routes/history_routes.py
+src/services/ticket_search_service.py (routes) → c3_ticketing_routes/search_routes.py
+
+src/mcp/server.py (monitoring routes) → c3_monitoring_routes/monitoring_routes.py
+src/mcp/server.py (health routes) → c3_monitoring_routes/health_routes.py
+src/mcp/server.py (dashboard routes) → c3_monitoring_routes/dashboard_routes.py
+
+src/auth/auth_api.py → c3_infrastructure_routes/auth_routes.py
+src/auth/oauth.py → c3_infrastructure_routes/oauth_routes.py
+src/websocket/handler.py → c3_infrastructure_routes/websocket.py
+src/communication/routes.py → c3_infrastructure_routes/communication_routes.py
+
+src/mcp/server.py (memory routes) → c3_memory_routes/memory_routes.py
+src/mcp/server.py (embedding routes) → c3_memory_routes/embedding_routes.py
+
+src/mcp/api.py → c3_frontend_api/api.py
+
+src/sdk/client.py → c3_sdk_client/client.py
+
+src/cli/cli.py → c3_cli_interface/cli.py
+src/cli/process_manager.py → c3_cli_interface/process_manager.py
+
+src/tui/app.py → c3_tui_app/app.py
+src/tui/popups/ → c3_tui_app/popups/
+src/tui/screens/ → c3_tui_app/screens/
+src/tui/widgets/ → c3_tui_app/widgets/
+```
+
+## Migration Checklist Template
+
+For each file/module migration:
+
+```
+[ ] 1. Add destination comments to source file
+[ ] 2. Create destination package if not exists
+[ ] 3. Copy file to destination
+[ ] 4. Update imports in destination file
+[ ] 5. Update imports in other files to use new location
+[ ] 6. Add compatibility import in old location (if needed)
+[ ] 7. Test imports work
+[ ] 8. Run relevant tests
+[ ] 9. Run full test suite
+[ ] 10. Commit with descriptive message
+[ ] 11. Update progress tracking
+```
+
+## Destination Comment Template
+
+Add to top of each file before splitting/moving:
+
+```python
+"""
+REFACTORING NOTES:
+------------------
+This file will be split/moved during three-layer architecture refactoring.
+
+DESTINATIONS:
+- Class/Function A → c1_package/file.py (Line X-Y)
+- Class/Function B → c2_package/file.py (Line Z-W)
+- ...
+
+DEPENDENCIES:
+- Imports from: [list]
+- Imported by: [list]
+
+TESTING:
+- Unit tests: tests/test_xxx.py
+- Integration tests: tests/integration/test_xxx.py
+
+Last updated: 2025-11-04
+"""
+```
+
+## Progress Tracking File
+
+Create `refactoring-progress.md`:
+
+```markdown
+# Three-Layer Refactoring Progress
+
+## Stage 1: File Splitting
+- [x] database.py → 8 files (7/7 commits)
+- [ ] server.py → 13 files (0/13 commits)
+- [ ] api.py → 6 files (0/6 commits)
+- [ ] monitor.py → 5 files (0/5 commits)
+- [ ] worktree_manager.py → 4 files (0/4 commits)
+- [ ] ticket_service.py → 5 files (0/5 commits)
+- [ ] manager.py → 5 files (0/5 commits)
+
+## Stage 2: c1 Layer Migration
+- [ ] Models (0/5 packages)
+- [ ] Enums (0/3 packages)
+- [ ] Exceptions (0/3 packages)
+- [ ] Database (0/2 packages)
+- [ ] External Clients (0/3 packages)
+- [ ] Config (0/1 package)
+
+... etc
+```
+
+## Next Steps
+
+1. Review this mapping with team
+2. Verify all files are accounted for
+3. Begin Stage 1.1 (Split database.py)
+4. Update progress tracking after each substage
+5. Adjust mapping if issues discovered

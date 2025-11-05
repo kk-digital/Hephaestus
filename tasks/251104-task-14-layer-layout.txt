@@ -1,0 +1,554 @@
+TASK-14: Proposed Layer Layout with Module Names
+================================================
+
+Date: 2025-11-04
+Status: PROPOSED
+
+This document defines the exact directory structure and module naming for the c0-c4 layered architecture.
+
+## Naming Conventions
+
+- **Layer prefix:** c0, c1, c2, c3, c4
+- **Module naming:** {layer}-{domain}-{component}
+- **Directory naming:** Hyphen-separated lowercase
+- **File naming:** Underscore-separated lowercase (Python convention)
+- **Lexicographic ordering:** All modules listed alphabetically within each layer
+
+## Complete Layer Structure
+
+```
+src/
+├── c0_layer/
+│   ├── __init__.py
+│   ├── constants/
+│   │   ├── __init__.py
+│   │   ├── agent_constants.py
+│   │   ├── monitoring_constants.py
+│   │   ├── phase_constants.py
+│   │   ├── task_constants.py
+│   │   └── ticket_constants.py
+│   │
+│   ├── enums/
+│   │   ├── __init__.py
+│   │   ├── agent_enums.py
+│   │   ├── commit_enums.py
+│   │   ├── merge_enums.py
+│   │   ├── monitoring_enums.py
+│   │   ├── phase_enums.py
+│   │   └── task_enums.py
+│   │
+│   ├── exceptions/
+│   │   ├── __init__.py
+│   │   ├── agent_exceptions.py
+│   │   ├── auth_exceptions.py
+│   │   ├── database_exceptions.py
+│   │   ├── llm_exceptions.py
+│   │   ├── phase_exceptions.py
+│   │   ├── sdk_exceptions.py
+│   │   ├── task_exceptions.py
+│   │   ├── ticket_exceptions.py
+│   │   └── validation_exceptions.py
+│   │
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── agent_models.py
+│   │   ├── auth_models.py
+│   │   ├── mcp_request_models.py
+│   │   ├── mcp_response_models.py
+│   │   ├── memory_models.py
+│   │   ├── monitoring_models.py
+│   │   ├── phase_models.py
+│   │   ├── sdk_models.py
+│   │   ├── task_models.py
+│   │   ├── ticket_models.py
+│   │   ├── validation_models.py
+│   │   ├── worktree_models.py
+│   │   └── workflow_models.py
+│   │
+│   ├── prompts/
+│   │   ├── __init__.py
+│   │   ├── agent_prompts.py
+│   │   ├── guardian_prompts.py
+│   │   ├── validation_prompts.py
+│   │   └── validator_prompts.py
+│   │
+│   └── types/
+│       ├── __init__.py
+│       ├── agent_types.py
+│       ├── llm_types.py
+│       └── validation_types.py
+│
+├── c1_layer/
+│   ├── __init__.py
+│   ├── auth/
+│   │   ├── __init__.py
+│   │   ├── auth_config.py
+│   │   └── auth_utils.py
+│   │
+│   ├── config/
+│   │   ├── __init__.py
+│   │   ├── config_loader.py
+│   │   ├── llm_config.py
+│   │   ├── sdk_config.py
+│   │   └── simple_config.py
+│   │
+│   ├── database/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── models.py
+│   │   └── session.py
+│   │
+│   ├── embedding/
+│   │   ├── __init__.py
+│   │   ├── embedding_interface.py
+│   │   ├── lmstudio_provider.py
+│   │   └── openai_provider.py
+│   │
+│   ├── llm/
+│   │   ├── __init__.py
+│   │   ├── anthropic_provider.py
+│   │   ├── langchain_client.py
+│   │   ├── llm_interface.py
+│   │   ├── multi_provider_client.py
+│   │   ├── openai_provider.py
+│   │   └── openrouter_client.py
+│   │
+│   └── vector_store/
+│       ├── __init__.py
+│       ├── qdrant_client.py
+│       └── vector_store_interface.py
+│
+├── c2_layer/
+│   ├── __init__.py
+│   ├── agents/
+│   │   ├── __init__.py
+│   │   ├── agent_coordinator.py
+│   │   ├── agent_lifecycle.py
+│   │   └── agent_state_manager.py
+│   │
+│   ├── memory/
+│   │   ├── __init__.py
+│   │   ├── memory_manager.py
+│   │   └── rag_engine.py
+│   │
+│   ├── monitoring/
+│   │   ├── __init__.py
+│   │   ├── conductor.py
+│   │   ├── guardian.py
+│   │   ├── monitor_core.py
+│   │   ├── monitoring_loop.py
+│   │   ├── prompt_loader.py
+│   │   └── trajectory_context.py
+│   │
+│   ├── phases/
+│   │   ├── __init__.py
+│   │   ├── phase_execution.py
+│   │   ├── phase_loader.py
+│   │   └── phase_manager.py
+│   │
+│   ├── tasks/
+│   │   ├── __init__.py
+│   │   ├── task_blocking.py
+│   │   ├── task_logic.py
+│   │   └── task_similarity.py
+│   │
+│   ├── tickets/
+│   │   ├── __init__.py
+│   │   ├── ticket_business_logic.py
+│   │   ├── ticket_crud.py
+│   │   └── ticket_queries.py
+│   │
+│   ├── validation/
+│   │   ├── __init__.py
+│   │   ├── check_executors.py
+│   │   ├── result_prompt_builder.py
+│   │   ├── result_validator_logic.py
+│   │   ├── validation_helpers.py
+│   │   ├── validation_prompt_builder.py
+│   │   └── validator_logic.py
+│   │
+│   ├── workflow/
+│   │   ├── __init__.py
+│   │   ├── termination_handler.py
+│   │   └── workflow_logic.py
+│   │
+│   └── worktree/
+│       ├── __init__.py
+│       ├── conflict_resolver.py
+│       ├── git_operations.py
+│       └── worktree_manager.py
+│
+├── c3_layer/
+│   ├── __init__.py
+│   ├── agent_service/
+│   │   ├── __init__.py
+│   │   └── agent_manager_service.py
+│   │
+│   ├── embedding_service/
+│   │   ├── __init__.py
+│   │   └── embedding_service.py
+│   │
+│   ├── phase_service/
+│   │   ├── __init__.py
+│   │   └── phase_manager_service.py
+│   │
+│   ├── queue_service/
+│   │   ├── __init__.py
+│   │   └── queue_service.py
+│   │
+│   ├── result_service/
+│   │   ├── __init__.py
+│   │   ├── result_service.py
+│   │   ├── result_validation_helpers.py
+│   │   └── result_validator_service.py
+│   │
+│   ├── task_service/
+│   │   ├── __init__.py
+│   │   └── task_service.py
+│   │
+│   ├── ticket_service/
+│   │   ├── __init__.py
+│   │   ├── ticket_history_service.py
+│   │   ├── ticket_search_service.py
+│   │   └── ticket_service.py
+│   │
+│   └── workflow_service/
+│       ├── __init__.py
+│       └── workflow_result_service.py
+│
+└── c4_layer/
+    ├── __init__.py
+    ├── auth_api/
+    │   ├── __init__.py
+    │   ├── auth_api.py
+    │   └── auth_middleware.py
+    │
+    ├── cli/
+    │   ├── __init__.py
+    │   ├── cli_interface.py
+    │   └── process_manager.py
+    │
+    ├── frontend_api/
+    │   ├── __init__.py
+    │   ├── api.py
+    │   └── routes/
+    │       ├── __init__.py
+    │       ├── agent_routes.py
+    │       ├── monitoring_routes.py
+    │       ├── task_routes.py
+    │       ├── ticket_routes.py
+    │       ├── validation_routes.py
+    │       └── workflow_routes.py
+    │
+    ├── mcp_server/
+    │   ├── __init__.py
+    │   ├── app.py
+    │   └── routes/
+    │       ├── __init__.py
+    │       ├── agent_routes.py
+    │       ├── memory_routes.py
+    │       ├── task_routes.py
+    │       ├── ticket_routes.py
+    │       ├── validation_routes.py
+    │       ├── websocket_routes.py
+    │       └── worktree_routes.py
+    │
+    ├── sdk/
+    │   ├── __init__.py
+    │   └── sdk_client.py
+    │
+    └── tui/
+        ├── __init__.py
+        ├── app.py
+        ├── popups/
+        │   ├── __init__.py
+        │   ├── broadcast_popup.py
+        │   ├── confirm_popup.py
+        │   ├── create_task_popup.py
+        │   ├── info_popup.py
+        │   ├── log_viewer_popup.py
+        │   └── send_message_popup.py
+        │
+        ├── screens/
+        │   ├── __init__.py
+        │   ├── agents_screen.py
+        │   ├── dashboard_screen.py
+        │   ├── forge_main_screen.py
+        │   ├── memories_screen.py
+        │   ├── metrics_screen.py
+        │   ├── splash_screen.py
+        │   └── tasks_screen.py
+        │
+        └── widgets/
+            ├── __init__.py
+            ├── action_menu_widget.py
+            ├── animated_forge_art_widget.py
+            ├── animation_frames.py
+            ├── animation_utils.py
+            └── forge_art_widget.py
+```
+
+## Module Counts by Layer
+
+### c0_layer: Foundation (30 files)
+- constants/: 5 files
+- enums/: 7 files
+- exceptions/: 10 files
+- models/: 13 files
+- prompts/: 4 files
+- types/: 3 files
+- __init__.py: 1 file
+
+**Total: 30 files + 6 directory __init__.py = 36 files**
+
+### c1_layer: External Services (21 files)
+- auth/: 3 files
+- config/: 5 files
+- database/: 4 files
+- embedding/: 4 files
+- llm/: 7 files
+- vector_store/: 3 files
+- __init__.py: 1 file
+
+**Total: 21 files + 6 directory __init__.py = 27 files**
+
+### c2_layer: Business Logic (44 files)
+- agents/: 4 files
+- memory/: 3 files
+- monitoring/: 7 files
+- phases/: 4 files
+- tasks/: 4 files
+- tickets/: 4 files
+- validation/: 7 files
+- workflow/: 3 files
+- worktree/: 4 files
+- __init__.py: 1 file
+
+**Total: 44 files + 9 directory __init__.py = 53 files**
+
+### c3_layer: Service Coordination (18 files)
+- agent_service/: 2 files
+- embedding_service/: 2 files
+- phase_service/: 2 files
+- queue_service/: 2 files
+- result_service/: 4 files
+- task_service/: 2 files
+- ticket_service/: 4 files
+- workflow_service/: 2 files
+- __init__.py: 1 file
+
+**Total: 18 files + 8 directory __init__.py = 26 files**
+
+### c4_layer: Applications (40 files)
+- auth_api/: 3 files
+- cli/: 3 files
+- frontend_api/: 2 files (api.py) + 6 routes = 8 files
+- mcp_server/: 2 files (app.py) + 7 routes = 9 files
+- sdk/: 2 files
+- tui/: 1 file (app.py) + 7 popups + 7 screens + 5 widgets = 20 files
+- __init__.py: 1 file
+
+**Total: 40 files + 10 directory __init__.py = 50 files**
+
+## Grand Total
+
+- c0_layer: 36 files
+- c1_layer: 27 files
+- c2_layer: 53 files
+- c3_layer: 26 files
+- c4_layer: 50 files
+
+**Grand Total: 192 files**
+
+(Includes all __init__.py files for Python package structure)
+
+## Lexicographic Ordering Rules
+
+### Directory Names
+All directories are:
+- Lowercase
+- Hyphen-separated (kebab-case)
+- Alphabetically sorted within each layer
+- Prefixed with layer designation (c0, c1, c2, c3, c4)
+
+### File Names
+All files are:
+- Lowercase
+- Underscore-separated (snake_case)
+- Alphabetically sorted within each directory
+- Suffixed with purpose (_models, _service, _routes, etc.)
+
+### Import Path Examples
+
+```python
+# c0-layer imports
+from src.c0_layer.models.task_models import TaskRequest, TaskResponse
+from src.c0_layer.exceptions.task_exceptions import TaskNotFoundError
+from src.c0_layer.enums.task_enums import TaskStatus
+
+# c1-layer imports
+from src.c1_layer.database.models import Task, Agent, Memory
+from src.c1_layer.llm.openai_provider import OpenAIProvider
+from src.c1_layer.config.config_loader import get_config
+
+# c2-layer imports
+from src.c2_layer.tasks.task_logic import validate_task, transition_task_state
+from src.c2_layer.agents.agent_lifecycle import start_agent, stop_agent
+from src.c2_layer.validation.validator_logic import validate_result
+
+# c3-layer imports
+from src.c3_layer.task_service.task_service import TaskService
+from src.c3_layer.agent_service.agent_manager_service import AgentManagerService
+from src.c3_layer.ticket_service.ticket_service import TicketService
+
+# c4-layer imports
+from src.c4_layer.mcp_server.app import app
+from src.c4_layer.frontend_api.api import create_frontend_routes
+from src.c4_layer.cli.cli_interface import main
+```
+
+## Directory Structure Rationale
+
+### Why This Organization?
+
+1. **Layer Prefix in Directory Names:**
+   - Makes layer immediately visible in imports
+   - Prevents confusion about which layer a module belongs to
+   - Example: `c2_layer/tasks/` clearly shows c2-layer
+
+2. **Domain-Based Subdirectories:**
+   - Groups related functionality together
+   - Example: All task-related logic in `c2_layer/tasks/`
+   - Easier to find related code
+
+3. **Flat Structure Within Domains:**
+   - Most domain directories are flat (no deep nesting)
+   - Exception: c4_layer has routes/ subdirectories for organization
+   - Keeps imports simple
+
+4. **Consistent Naming Patterns:**
+   - Services end in `_service`
+   - Routes end in `_routes`
+   - Managers end in `_manager`
+   - Logic files end in `_logic`
+   - Makes purpose clear from filename
+
+5. **Lexicographic Sorting:**
+   - Easy to find files alphabetically
+   - IDE file trees show files in predictable order
+   - Example: agent_*, memory_*, task_*, ticket_* are alphabetical
+
+## Migration Path
+
+### Phase 1: Create Structure
+```bash
+mkdir -p src/c0_layer/{constants,enums,exceptions,models,prompts,types}
+mkdir -p src/c1_layer/{auth,config,database,embedding,llm,vector_store}
+mkdir -p src/c2_layer/{agents,memory,monitoring,phases,tasks,tickets,validation,workflow,worktree}
+mkdir -p src/c3_layer/{agent_service,embedding_service,phase_service,queue_service,result_service,task_service,ticket_service,workflow_service}
+mkdir -p src/c4_layer/{auth_api,cli,frontend_api,mcp_server,sdk,tui}
+mkdir -p src/c4_layer/frontend_api/routes
+mkdir -p src/c4_layer/mcp_server/routes
+mkdir -p src/c4_layer/tui/{popups,screens,widgets}
+```
+
+### Phase 2: Create __init__.py Files
+```bash
+find src/c*_layer -type d -exec touch {}/__init__.py \;
+```
+
+### Phase 3: Move/Split Files
+- Extract models from existing files → c0_layer/models/
+- Move database code → c1_layer/database/
+- Move business logic → c2_layer/
+- Move services → c3_layer/
+- Move applications → c4_layer/
+
+## Comparison: Old vs New
+
+### Old Structure
+```
+src/
+├── agents/ (2 files)
+├── auth/ (5 files)
+├── core/ (8 files)
+├── interfaces/ (6 files)
+├── mcp/ (3 files)
+├── memory/ (3 files)
+├── monitoring/ (7 files)
+├── phases/ (4 files)
+├── sdk/ (23 files)
+├── services/ (12 files)
+├── validation/ (6 files)
+└── workflow/ (2 files)
+
+Total: 93 files in 15 directories
+```
+
+### New Structure
+```
+src/
+├── c0_layer/ (36 files in 6 subdirectories)
+├── c1_layer/ (27 files in 6 subdirectories)
+├── c2_layer/ (53 files in 9 subdirectories)
+├── c3_layer/ (26 files in 8 subdirectories)
+└── c4_layer/ (50 files in 6 subdirectories + routes)
+
+Total: 192 files in 5 layer directories (35 total subdirectories)
+```
+
+**Increase:** 93 → 192 files (+99 files)
+
+**Reason for increase:**
+- Breaking down 6 large files: +24 files
+- Adding __init__.py for all directories: +40 files
+- Extracting models/exceptions from mixed files: +30 files
+- Better separation of concerns: +5 files
+
+## Benefits of This Layout
+
+1. **Clear Dependencies:** Layer prefix makes import direction obvious
+2. **Easy Navigation:** Alphabetical ordering, consistent naming
+3. **Scalability:** Easy to add new modules to appropriate layer
+4. **Testability:** Each layer can be tested independently
+5. **Maintainability:** Related code grouped together
+6. **Documentation:** Structure documents architecture
+
+## Validation Rules
+
+### Import Validation
+```python
+# Allowed
+from src.c0_layer.* import *           # Any layer can import c0
+from src.c1_layer.* import *           # c2, c3, c4 can import c1
+from src.c2_layer.* import *           # c3, c4 can import c2
+from src.c3_layer.* import *           # c4 can import c3
+
+# Forbidden
+# c0 cannot import c1, c2, c3, c4
+# c1 cannot import c2, c3, c4
+# c2 cannot import c3, c4
+# c3 cannot import c4
+```
+
+### Naming Validation
+```python
+# Layer directory format
+assert layer_dir.name.startswith('c') and layer_dir.name[1].isdigit()
+
+# File naming format
+assert file.name.islower() and '_' in file.name
+
+# No camelCase or PascalCase in file/directory names
+```
+
+## Next Steps
+
+1. Review and approve this layout
+2. Create Phase 2 implementation plan
+3. Begin with c0_layer extraction
+4. Iterate through remaining layers
+5. Update all imports
+6. Run tests after each phase
+
+This layout provides a clear, maintainable, and scalable architecture for Hephaestus.

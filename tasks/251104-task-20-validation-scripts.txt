@@ -1,0 +1,695 @@
+TASK-20: Validation Scripts and Testing Strategy
+=================================================
+
+Date: 2025-11-04
+Status: PLANNING
+Depends on: TASK-17, TASK-18, TASK-19
+
+## Overview
+
+This document provides validation scripts and testing strategies for the three-layer
+architecture refactoring.
+
+## Validation Scripts
+
+### 1. Layer Dependency Validator (validate_architecture.py)
+
+**Purpose**: Ensure layer dependencies follow rules (c3→c2→c1)
+
+**Location**: `scripts/validate_architecture.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Validate three-layer architecture dependencies.
+
+Rules:
+- c1 imports NOTHING from Hephaestus (only stdlib + external)
+- c2 imports from c1 only
+- c3 imports from c2 and c1 only
+"""
+
+import sys
+import ast
+from pathlib import Path
+from typing import List, Tuple
+
+class LayerValidator:
+    """Validate layer dependencies."""
+
+    def __init__(self, src_dir: Path):
+        self.src_dir = src_dir
+        self.errors: List[str] = []
+        self.warnings: List[str] = []
+
+    def validate(self) -> bool:
+        """Run all validations."""
+        print("=" * 70)
+        print("THREE-LAYER ARCHITECTURE VALIDATION")
+        print("=" * 70)
+        print()
+
+        self.check_layer_structure()
+        self.check_import_rules()
+        self.check_circular_dependencies()
+
+        print()
+        print("=" * 70)
+        if self.errors:
+            print(f"❌ VALIDATION FAILED: {len(self.errors)} errors")
+            for error in self.errors:
+                print(f"  ERROR: {error}")
+        elif self.warnings:
+            print(f"⚠️  VALIDATION PASSED WITH WARNINGS: {len(self.warnings)} warnings")
+            for warning in self.warnings:
+                print(f"  WARNING: {warning}")
+        else:
+            print("✅ VALIDATION PASSED: No errors or warnings")
+        print("=" * 70)
+
+        return len(self.errors) == 0
+
+    def check_layer_structure(self):
+        """Check that all packages follow naming convention."""
+        print("Checking layer structure...")
+
+        packages = [d for d in self.src_dir.iterdir() if d.is_dir() and not d.name.startswith('.')]
+
+        c1_packages = [p for p in packages if p.name.startswith('c1_')]
+        c2_packages = [p for p in packages if p.name.startswith('c2_')]
+        c3_packages = [p for p in packages if p.name.startswith('c3_')]
+        other_packages = [p for p in packages if not any(p.name.startswith(f'c{i}_') for i in [1,2,3])]
+
+        print(f"  c1 packages: {len(c1_packages)}")
+        print(f"  c2 packages: {len(c2_packages)}")
+        print(f"  c3 packages: {len(c3_packages)}")
+
+        if other_packages:
+            for pkg in other_packages:
+                # Ignore common non-layer packages
+                if pkg.name not in ['__pycache__', 'tests', 'scripts', '.git']:
+                    self.warnings.append(f"Non-layer package: {pkg.name}")
+
+    def check_import_rules(self):
+        """Check that imports follow layer rules."""
+        print("\nChecking import rules...")
+
+        for py_file in self.src_dir.rglob("*.py"):
+            if '__pycache__' in str(py_file):
+                continue
+            if py_file.name == '__init__.py':
+                continue
+
+            package_name = py_file.parent.name
+            if not any(package_name.startswith(f'c{i}_') for i in [1,2,3]):
+                continue
+
+            layer = package_name[:2]  # c1, c2, or c3
+            violations = self.check_file_imports(py_file, layer)
+            self.errors.extend(violations)
+
+        if not self.errors:
+            print("  ✓ All imports follow layer rules")
+
+    def check_file_imports(self, py_file: Path, layer: str) -> List[str]:
+        """Check imports in a single file."""
+        violations = []
+
+        try:
+            with open(py_file, 'r') as f:
+                tree = ast.parse(f.read(), filename=str(py_file))
+        except SyntaxError:
+            return [f"{py_file}: Syntax error in file"]
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module and node.module.startswith('src.'):
+                    imported_package = node.module.split('.')[1]
+                    imported_layer = imported_package[:2]
+
+                    # Check layer rules
+                    if layer == 'c1':
+                        if imported_layer in ['c1', 'c2', 'c3']:
+                            violations.append(
+                                f"{py_file}: c1 cannot import from {imported_layer} "
+                                f"({imported_package})"
+                            )
+
+                    elif layer == 'c2':
+                        if imported_layer == 'c3':
+                            violations.append(
+                                f"{py_file}: c2 cannot import from c3 "
+                                f"({imported_package})"
+                            )
+                        elif imported_layer == 'c2':
+                            # c2 can import from other c2 packages
+                            pass
+
+                    elif layer == 'c3':
+                        # c3 can import from c1, c2, c3
+                        pass
+
+        return violations
+
+    def check_circular_dependencies(self):
+        """Check for circular dependencies."""
+        print("\nChecking for circular dependencies...")
+
+        # Build dependency graph
+        graph = {}
+        for py_file in self.src_dir.rglob("*.py"):
+            if '__pycache__' in str(py_file):
+                continue
+            if py_file.name == '__init__.py':
+                continue
+
+            package = py_file.parent.name
+            if not any(package.startswith(f'c{i}_') for i in [1,2,3]):
+                continue
+
+            if package not in graph:
+                graph[package] = set()
+
+            imports = self.get_package_imports(py_file)
+            graph[package].update(imports)
+
+        # Detect cycles using DFS
+        visited = set()
+        rec_stack = set()
+
+        def has_cycle(node, path):
+            visited.add(node)
+            rec_stack.add(node)
+
+            for neighbor in graph.get(node, []):
+                if neighbor not in visited:
+                    if has_cycle(neighbor, path + [neighbor]):
+                        return True
+                elif neighbor in rec_stack:
+                    cycle = path[path.index(neighbor):] + [neighbor]
+                    self.errors.append(f"Circular dependency: {' → '.join(cycle)}")
+                    return True
+
+            rec_stack.remove(node)
+            return False
+
+        for package in graph:
+            if package not in visited:
+                has_cycle(package, [package])
+
+        if not self.errors:
+            print("  ✓ No circular dependencies found")
+
+    def get_package_imports(self, py_file: Path) -> set:
+        """Get packages imported by a file."""
+        imports = set()
+
+        try:
+            with open(py_file, 'r') as f:
+                tree = ast.parse(f.read())
+        except:
+            return imports
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module and node.module.startswith('src.'):
+                    package = node.module.split('.')[1]
+                    if any(package.startswith(f'c{i}_') for i in [1,2,3]):
+                        imports.add(package)
+
+        return imports
+
+def main():
+    src_dir = Path('src')
+    if not src_dir.exists():
+        print(f"Error: {src_dir} does not exist")
+        sys.exit(1)
+
+    validator = LayerValidator(src_dir)
+    success = validator.validate()
+
+    sys.exit(0 if success else 1)
+
+if __name__ == '__main__':
+    main()
+```
+
+**Usage**:
+```bash
+# Run validation
+python scripts/validate_architecture.py
+
+# In CI/CD
+python scripts/validate_architecture.py || exit 1
+```
+
+---
+
+### 2. Import Checker (check_imports.py)
+
+**Purpose**: Verify all imports are valid and resolvable
+
+**Location**: `scripts/check_imports.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Check that all imports in the codebase are valid and resolvable.
+"""
+
+import sys
+import ast
+from pathlib import Path
+import importlib.util
+
+class ImportChecker:
+    """Check imports throughout codebase."""
+
+    def __init__(self, src_dir: Path):
+        self.src_dir = src_dir
+        self.errors = []
+        self.warnings = []
+
+    def check_all_files(self):
+        """Check all Python files."""
+        print("Checking imports in all files...")
+
+        for py_file in self.src_dir.rglob("*.py"):
+            if '__pycache__' in str(py_file):
+                continue
+
+            self.check_file(py_file)
+
+        print(f"\nChecked {len(list(self.src_dir.rglob('*.py')))} files")
+
+        if self.errors:
+            print(f"❌ {len(self.errors)} import errors found:")
+            for error in self.errors:
+                print(f"  {error}")
+            return False
+
+        if self.warnings:
+            print(f"⚠️  {len(self.warnings)} warnings:")
+            for warning in self.warnings:
+                print(f"  {warning}")
+
+        print("✅ All imports valid")
+        return True
+
+    def check_file(self, py_file: Path):
+        """Check imports in a single file."""
+        try:
+            with open(py_file, 'r') as f:
+                content = f.read()
+                tree = ast.parse(content, filename=str(py_file))
+        except SyntaxError as e:
+            self.errors.append(f"{py_file}: Syntax error: {e}")
+            return
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    self.check_import_exists(alias.name, py_file)
+
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    self.check_import_exists(node.module, py_file)
+
+    def check_import_exists(self, module_name: str, py_file: Path):
+        """Check if an import can be resolved."""
+        # Skip built-in and external packages
+        if not module_name.startswith('src.'):
+            return
+
+        # Try to find the module
+        spec = importlib.util.find_spec(module_name)
+        if spec is None:
+            self.errors.append(f"{py_file}: Cannot find module '{module_name}'")
+
+def main():
+    src_dir = Path('src')
+    checker = ImportChecker(src_dir)
+    success = checker.check_all_files()
+    sys.exit(0 if success else 1)
+
+if __name__ == '__main__':
+    main()
+```
+
+---
+
+### 3. Test Coverage Report (test_coverage.py)
+
+**Purpose**: Ensure test coverage is maintained during refactoring
+
+**Location**: `scripts/test_coverage.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Generate test coverage report and compare to baseline.
+"""
+
+import subprocess
+import sys
+from pathlib import Path
+
+def run_coverage():
+    """Run pytest with coverage."""
+    print("Running tests with coverage...")
+
+    result = subprocess.run(
+        ['pytest', 'tests/', '--cov=src', '--cov-report=term', '--cov-report=json'],
+        capture_output=True,
+        text=True
+    )
+
+    print(result.stdout)
+
+    if result.returncode != 0:
+        print("❌ Tests failed")
+        print(result.stderr)
+        return False
+
+    return True
+
+def check_coverage_threshold(threshold=80):
+    """Check if coverage meets threshold."""
+    import json
+
+    with open('coverage.json', 'r') as f:
+        data = json.load(f)
+
+    total_coverage = data['totals']['percent_covered']
+
+    print(f"\nTotal coverage: {total_coverage:.1f}%")
+
+    if total_coverage < threshold:
+        print(f"❌ Coverage below threshold ({threshold}%)")
+        return False
+
+    print(f"✅ Coverage meets threshold ({threshold}%)")
+    return True
+
+def main():
+    if not run_coverage():
+        sys.exit(1)
+
+    if not check_coverage_threshold():
+        sys.exit(1)
+
+    sys.exit(0)
+
+if __name__ == '__main__':
+    main()
+```
+
+---
+
+## Testing Strategy
+
+### Test Levels
+
+#### 1. Unit Tests
+**When**: After each file split/move
+**What**: Test individual functions and classes
+**Command**: `pytest tests/unit/test_{module}.py -v`
+
+#### 2. Integration Tests
+**When**: After completing a substage (e.g., all c1 models migrated)
+**What**: Test interactions between components
+**Command**: `pytest tests/integration/ -v`
+
+#### 3. End-to-End Tests
+**When**: After completing a full stage (e.g., Stage 2 complete)
+**What**: Test full workflows
+**Command**: `pytest tests/e2e/ -v`
+
+#### 4. Regression Tests
+**When**: After every commit
+**What**: Ensure nothing broke
+**Command**: `pytest tests/ -v`
+
+### Test Execution Plan
+
+#### During File Splitting (Stage 1)
+```bash
+# After splitting each file
+pytest tests/ -k "test_{module_name}" -v
+
+# Full regression after each split
+pytest tests/ -v --tb=short
+```
+
+#### During Layer Migration (Stages 2-4)
+```bash
+# After migrating each package
+pytest tests/ -k "test_{package}" -v
+
+# Full regression after each substage
+pytest tests/ -v
+python scripts/validate_architecture.py
+python scripts/check_imports.py
+```
+
+#### After Each Stage Complete
+```bash
+# Full validation suite
+pytest tests/ -v --cov=src --cov-report=term
+python scripts/validate_architecture.py
+python scripts/check_imports.py
+python scripts/test_coverage.py
+
+# Performance benchmark
+python scripts/benchmark.py baseline compare
+```
+
+### Test Maintenance
+
+#### Updating Tests During Refactoring
+1. **Update imports**: Change `from src.old.path import X` to `from src.c1_package.file import X`
+2. **Update fixtures**: Adjust test fixtures to use new paths
+3. **Update mocks**: Update mock paths to new locations
+4. **Verify test isolation**: Ensure tests don't depend on old structure
+
+#### Test File Organization
+```
+tests/
+├── unit/
+│   ├── c1/
+│   │   ├── test_task_models.py
+│   │   ├── test_agent_models.py
+│   │   └── ...
+│   ├── c2/
+│   │   ├── test_task_service.py
+│   │   ├── test_agent_service.py
+│   │   └── ...
+│   └── c3/
+│       ├── test_task_routes.py
+│       ├── test_agent_routes.py
+│       └── ...
+├── integration/
+│   ├── test_task_workflow.py
+│   ├── test_agent_lifecycle.py
+│   └── ...
+├── e2e/
+│   ├── test_full_system.py
+│   ├── test_api_endpoints.py
+│   └── ...
+└── conftest.py
+```
+
+---
+
+## Continuous Integration
+
+### GitHub Actions Workflow
+
+**File**: `.github/workflows/refactoring.yml`
+
+```yaml
+name: Refactoring Validation
+
+on:
+  push:
+    branches:
+      - refactor/three-layer-architecture
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+
+    - name: Run layer validation
+      run: python scripts/validate_architecture.py
+
+    - name: Check imports
+      run: python scripts/check_imports.py
+
+    - name: Run tests with coverage
+      run: pytest tests/ --cov=src --cov-report=term --cov-report=xml
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: true
+```
+
+---
+
+## Pre-Commit Hook
+
+**File**: `.git/hooks/pre-commit`
+
+```bash
+#!/bin/bash
+
+echo "Running pre-commit checks..."
+
+# Run layer validation
+python scripts/validate_architecture.py
+if [ $? -ne 0 ]; then
+    echo "❌ Layer validation failed"
+    exit 1
+fi
+
+# Check imports
+python scripts/check_imports.py
+if [ $? -ne 0 ]; then
+    echo "❌ Import check failed"
+    exit 1
+fi
+
+# Run quick tests
+pytest tests/ -x --tb=short
+if [ $? -ne 0 ]; then
+    echo "❌ Tests failed"
+    exit 1
+fi
+
+echo "✅ All pre-commit checks passed"
+exit 0
+```
+
+---
+
+## Performance Benchmarking
+
+### Benchmark Script
+
+**File**: `scripts/benchmark.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Benchmark performance before and after refactoring.
+"""
+
+import time
+import json
+from pathlib import Path
+
+def benchmark_imports():
+    """Benchmark import times."""
+    start = time.time()
+
+    # Import key modules
+    from src.c1_task_models.task_models import Task
+    from src.c2_task_service.task_service import TaskService
+    from src.c3_mcp_server.app import app
+
+    end = time.time()
+    return end - start
+
+def benchmark_api_startup():
+    """Benchmark API startup time."""
+    start = time.time()
+
+    from src.c3_mcp_server.app import app
+    # Simulate startup
+
+    end = time.time()
+    return end - start
+
+def save_baseline(results):
+    """Save baseline results."""
+    with open('benchmark_baseline.json', 'w') as f:
+        json.dump(results, f, indent=2)
+
+def compare_to_baseline(results):
+    """Compare current results to baseline."""
+    baseline_file = Path('benchmark_baseline.json')
+    if not baseline_file.exists():
+        print("No baseline found, saving current as baseline")
+        save_baseline(results)
+        return
+
+    with open(baseline_file, 'r') as f:
+        baseline = json.load(f)
+
+    print("\nPerformance Comparison:")
+    for key in results:
+        current = results[key]
+        base = baseline[key]
+        diff = ((current - base) / base) * 100
+
+        symbol = "✅" if diff < 10 else "⚠️" if diff < 20 else "❌"
+        print(f"{symbol} {key}: {current:.3f}s (baseline: {base:.3f}s, diff: {diff:+.1f}%)")
+
+def main():
+    import sys
+
+    results = {
+        'import_time': benchmark_imports(),
+        'startup_time': benchmark_api_startup(),
+    }
+
+    if len(sys.argv) > 1 and sys.argv[1] == 'baseline':
+        save_baseline(results)
+        print("Baseline saved")
+    elif len(sys.argv) > 1 and sys.argv[1] == 'compare':
+        compare_to_baseline(results)
+    else:
+        print("Current performance:")
+        for key, value in results.items():
+            print(f"  {key}: {value:.3f}s")
+
+if __name__ == '__main__':
+    main()
+```
+
+**Usage**:
+```bash
+# Save baseline before refactoring
+python scripts/benchmark.py baseline
+
+# Compare after changes
+python scripts/benchmark.py compare
+```
+
+---
+
+## Next Steps
+
+1. Create scripts/ directory
+2. Implement all validation scripts
+3. Set up pre-commit hook
+4. Run baseline benchmark
+5. Begin Stage 1 refactoring with validation at each step

@@ -1,0 +1,897 @@
+TASK-15: Modular Monolith Architecture Analysis
+==============================================
+
+Date: 2025-11-04
+Status: PROPOSED
+
+## Overview
+
+This document analyzes the Hephaestus API structure and proposes a modular monolith architecture where each HTTP prefix (e.g., /health/, /tasks/, /agents/) represents an independent module registered to a central server.
+
+## Modular Monolith Pattern
+
+### What is a Modular Monolith?
+
+A modular monolith organizes code into independent modules within a single deployment:
+
+**Traditional Monolith:**
+```
+Single FastAPI app → All routes in one file → Tightly coupled
+```
+
+**Modular Monolith:**
+```
+Central FastAPI app → Module registry → Independent service modules
+                    ├─ TaskModule (handles /tasks/*)
+                    ├─ AgentModule (handles /agents/*)
+                    ├─ TicketModule (handles /tickets/*)
+                    └─ HealthModule (handles /health/*)
+```
+
+**Benefits:**
+- Independent development and testing of modules
+- Clear module boundaries (network-like API contracts)
+- Can extract modules to microservices later if needed
+- Simpler than distributed microservices (single deployment)
+- Better separation of concerns than traditional monolith
+
+## Current API Structure Analysis
+
+### Endpoints by Prefix
+
+After analyzing src/mcp/server.py and src/mcp/api.py, here are all current endpoints:
+
+**Root Level (MCP Protocol):**
+- GET / - Root endpoint
+- GET /tools - List available tools
+- POST /tools/execute - Execute tool
+- GET /resources - List resources
+- GET /resources/{resource_uri:path} - Get specific resource
+- GET /sse - Server-sent events stream
+- GET /health - Health check
+
+**Task Management:**
+- POST /create_task
+- POST /update_task_status
+- GET /tasks
+- GET /tasks/{task_id}
+- GET /tasks/{task_id}/full-details
+
+**Agent Management:**
+- GET /agent_status
+- GET /agents
+- GET /agents/{agent_id}/output
+- POST /api/terminate_agent
+
+**Memory Management:**
+- POST /save_memory
+- GET /memories
+
+**Workflow Management:**
+- GET /api/workflows
+- GET /workflows/{workflow_id}/results
+- GET /workflow
+- GET /phases
+- GET /phases/{phase_id}/yaml
+
+**Validation & Results:**
+- POST /report_results
+- POST /give_validation_review
+- POST /submit_result
+- POST /submit_result_validation
+- GET /results
+- GET /results/{result_id}/content
+- GET /results/{result_id}/validation
+- GET /results/{result_id}/download
+- GET /results/{result_id}/validation/download
+
+**Ticket Management (/api/tickets/*):**
+- POST /api/tickets/create
+- POST /api/tickets/update
+- POST /api/tickets/change-status
+- POST /api/tickets/comment
+- POST /api/tickets/search
+- POST /api/tickets/resolve
+- POST /api/tickets/link-commit
+- POST /api/tickets/request-clarification
+- GET /api/tickets/{ticket_id}
+- GET /api/tickets
+- GET /api/tickets/stats/{workflow_id}
+- GET /api/tickets/commit-diff/{commit_sha}
+
+**Monitoring & Analysis:**
+- GET /guardian-analyses/{agent_id}
+- GET /conductor-analyses
+- GET /conductor-analyses/latest
+- GET /steering-interventions
+- GET /system-overview
+
+**Queue Management:**
+- GET /api/queue_status
+- POST /api/bump_task_priority
+- POST /api/cancel_queued_task
+- POST /api/restart_task
+- GET /task_progress
+
+**Task Blocking:**
+- GET /blocked-tasks
+- GET /blocked-tasks/{task_id}/blockers
+- POST /sync-blocking-status
+
+**Communication:**
+- POST /api/broadcast_message
+- POST /api/send_message
+- WS /ws - WebSocket connection
+
+**Authentication (OAuth 2.0):**
+- GET /.well-known/oauth-authorization-server
+- GET /.well-known/openid-configuration
+- POST /oauth/register
+- GET /oauth/authorize
+- POST /oauth/authorize
+- POST /oauth/token
+- POST /oauth/revoke
+- GET /userinfo
+
+**Dashboard:**
+- GET /dashboard/stats
+- GET /graph
+
+**Total Endpoints:** ~70 endpoints
+
+## Proposed Modular Monolith Structure
+
+### Module Organization
+
+Based on API prefix and functional domain, we propose **15 independent modules**:
+
+```
+1. HealthModule        (/health/*)
+2. TaskModule          (/tasks/*)
+3. AgentModule         (/agents/*)
+4. MemoryModule        (/memories/*)
+5. WorkflowModule      (/workflows/*)
+6. PhaseModule         (/phases/*)
+7. ResultModule        (/results/*)
+8. ValidationModule    (/validation/*)
+9. TicketModule        (/tickets/*)
+10. MonitoringModule   (/monitoring/*)
+11. QueueModule        (/queue/*)
+12. BlockingModule     (/blocking/*)
+13. CommunicationModule (/communication/*)
+14. AuthModule         (/auth/* and /oauth/*)
+15. DashboardModule    (/dashboard/*)
+```
+
+Plus:
+```
+16. MCPProtocolModule  (/, /tools/*, /resources/*, /sse)
+17. WebSocketModule    (/ws)
+```
+
+**Total: 17 modules**
+
+## Detailed Module Breakdown
+
+### 1. HealthModule (/health/*)
+**Purpose:** Health checks and service status
+
+**Endpoints:**
+- GET /health - Basic health check
+- GET /health/live - Liveness probe
+- GET /health/ready - Readiness probe
+- GET /health/status - Detailed service status
+- POST /health/shutdown - Graceful shutdown
+- POST /health/shutdown/schedule - Schedule shutdown
+
+**Dependencies:**
+- c3_layer/health_service/
+- Checks: database, Qdrant, LLM providers, embeddings
+
+**Estimated Size:** ~200-300 lines
+
+---
+
+### 2. TaskModule (/tasks/*)
+**Purpose:** Task CRUD and lifecycle management
+
+**Endpoints:**
+- POST /tasks/create
+- GET /tasks
+- GET /tasks/{task_id}
+- GET /tasks/{task_id}/details
+- PUT /tasks/{task_id}/status
+- DELETE /tasks/{task_id}
+- GET /tasks/{task_id}/progress
+
+**Dependencies:**
+- c3_layer/task_service/
+- c2_layer/tasks/
+
+**Estimated Size:** ~400-500 lines
+
+---
+
+### 3. AgentModule (/agents/*)
+**Purpose:** Agent lifecycle and status management
+
+**Endpoints:**
+- GET /agents
+- GET /agents/{agent_id}
+- GET /agents/{agent_id}/status
+- GET /agents/{agent_id}/output
+- POST /agents/{agent_id}/terminate
+- POST /agents/create
+- PUT /agents/{agent_id}/config
+
+**Dependencies:**
+- c3_layer/agent_service/
+- c2_layer/agents/
+
+**Estimated Size:** ~400-500 lines
+
+---
+
+### 4. MemoryModule (/memories/*)
+**Purpose:** Memory storage and retrieval
+
+**Endpoints:**
+- POST /memories/save
+- GET /memories
+- GET /memories/{memory_id}
+- POST /memories/search
+- DELETE /memories/{memory_id}
+
+**Dependencies:**
+- c3_layer/memory_service/ (NEW)
+- c2_layer/memory/
+- c1_layer/vector_store/
+
+**Estimated Size:** ~300-400 lines
+
+---
+
+### 5. WorkflowModule (/workflows/*)
+**Purpose:** Workflow orchestration and results
+
+**Endpoints:**
+- GET /workflows
+- GET /workflows/{workflow_id}
+- GET /workflows/{workflow_id}/results
+- GET /workflows/{workflow_id}/status
+- POST /workflows/create
+- PUT /workflows/{workflow_id}/status
+
+**Dependencies:**
+- c3_layer/workflow_service/
+- c3_layer/phase_service/
+
+**Estimated Size:** ~300-400 lines
+
+---
+
+### 6. PhaseModule (/phases/*)
+**Purpose:** Phase management and configuration
+
+**Endpoints:**
+- GET /phases
+- GET /phases/{phase_id}
+- GET /phases/{phase_id}/yaml
+- GET /phases/{phase_id}/status
+- POST /phases/reload
+
+**Dependencies:**
+- c3_layer/phase_service/
+- c2_layer/phases/
+
+**Estimated Size:** ~200-300 lines
+
+---
+
+### 7. ResultModule (/results/*)
+**Purpose:** Result storage and retrieval
+
+**Endpoints:**
+- GET /results
+- GET /results/{result_id}
+- GET /results/{result_id}/content
+- GET /results/{result_id}/download
+- POST /results/submit
+
+**Dependencies:**
+- c3_layer/result_service/
+
+**Estimated Size:** ~300-400 lines
+
+---
+
+### 8. ValidationModule (/validation/*)
+**Purpose:** Result validation and review
+
+**Endpoints:**
+- POST /validation/review
+- POST /validation/submit
+- GET /validation/{result_id}
+- GET /validation/{result_id}/download
+- GET /validation/{result_id}/history
+
+**Dependencies:**
+- c3_layer/result_validator_service/
+- c2_layer/validation/
+
+**Estimated Size:** ~300-400 lines
+
+---
+
+### 9. TicketModule (/tickets/*)
+**Purpose:** Ticket tracking and management
+
+**Endpoints:**
+- POST /tickets/create
+- GET /tickets
+- GET /tickets/{ticket_id}
+- PUT /tickets/{ticket_id}/update
+- PUT /tickets/{ticket_id}/status
+- POST /tickets/{ticket_id}/comment
+- POST /tickets/search
+- POST /tickets/{ticket_id}/resolve
+- POST /tickets/{ticket_id}/link-commit
+- POST /tickets/{ticket_id}/request-clarification
+- GET /tickets/stats/{workflow_id}
+- GET /tickets/commit-diff/{commit_sha}
+
+**Dependencies:**
+- c3_layer/ticket_service/
+- c3_layer/ticket_search_service/
+- c3_layer/ticket_history_service/
+
+**Estimated Size:** ~600-700 lines
+
+---
+
+### 10. MonitoringModule (/monitoring/*)
+**Purpose:** System monitoring and analysis
+
+**Endpoints:**
+- GET /monitoring/overview
+- GET /monitoring/guardian/{agent_id}
+- GET /monitoring/conductor
+- GET /monitoring/conductor/latest
+- GET /monitoring/interventions
+- GET /monitoring/metrics
+
+**Dependencies:**
+- c2_layer/monitoring/
+
+**Estimated Size:** ~400-500 lines
+
+---
+
+### 11. QueueModule (/queue/*)
+**Purpose:** Task queue management
+
+**Endpoints:**
+- GET /queue/status
+- POST /queue/bump-priority
+- POST /queue/cancel
+- POST /queue/restart
+- GET /queue/tasks
+
+**Dependencies:**
+- c3_layer/queue_service/
+
+**Estimated Size:** ~300-400 lines
+
+---
+
+### 12. BlockingModule (/blocking/*)
+**Purpose:** Task dependency and blocking management
+
+**Endpoints:**
+- GET /blocking/tasks
+- GET /blocking/tasks/{task_id}/blockers
+- POST /blocking/sync
+
+**Dependencies:**
+- c2_layer/tasks/task_blocking.py
+
+**Estimated Size:** ~200-300 lines
+
+---
+
+### 13. CommunicationModule (/communication/*)
+**Purpose:** Inter-agent and broadcast messaging
+
+**Endpoints:**
+- POST /communication/broadcast
+- POST /communication/send
+
+**Dependencies:**
+- c3_layer/communication_service/ (NEW)
+
+**Estimated Size:** ~200-300 lines
+
+---
+
+### 14. AuthModule (/auth/* and /oauth/*)
+**Purpose:** Authentication and authorization (OAuth 2.0)
+
+**Endpoints:**
+- GET /.well-known/oauth-authorization-server
+- GET /.well-known/openid-configuration
+- POST /oauth/register
+- GET /oauth/authorize
+- POST /oauth/authorize
+- POST /oauth/token
+- POST /oauth/revoke
+- GET /userinfo
+
+**Dependencies:**
+- c1_layer/auth/
+
+**Estimated Size:** ~500-600 lines
+
+---
+
+### 15. DashboardModule (/dashboard/*)
+**Purpose:** Dashboard statistics and visualization
+
+**Endpoints:**
+- GET /dashboard/stats
+- GET /dashboard/graph
+
+**Dependencies:**
+- c3_layer/dashboard_service/ (NEW)
+- Aggregates data from multiple services
+
+**Estimated Size:** ~300-400 lines
+
+---
+
+### 16. MCPProtocolModule (/, /tools/*, /resources/*, /sse)
+**Purpose:** Model Context Protocol (MCP) implementation
+
+**Endpoints:**
+- GET / - Root endpoint
+- GET /tools - List available tools
+- POST /tools/execute - Execute tool
+- GET /resources - List resources
+- GET /resources/{resource_uri:path} - Get specific resource
+- GET /sse - Server-sent events stream
+
+**Dependencies:**
+- MCP protocol implementation
+- Tool registry
+- Resource registry
+
+**Estimated Size:** ~400-500 lines
+
+---
+
+### 17. WebSocketModule (/ws)
+**Purpose:** Real-time bidirectional communication
+
+**Endpoints:**
+- WS /ws - WebSocket connection
+
+**Dependencies:**
+- WebSocket connection manager
+- Message routing
+
+**Estimated Size:** ~200-300 lines
+
+---
+
+## Module Implementation Pattern
+
+### Base Module Interface
+
+```python
+from abc import ABC, abstractmethod
+from fastapi import APIRouter
+
+class BaseModule(ABC):
+    """Base class for all service modules."""
+
+    def __init__(self):
+        self.router = APIRouter()
+        self.register_routes()
+
+    @abstractmethod
+    def register_routes(self):
+        """Register all routes for this module."""
+        pass
+
+    @abstractmethod
+    def get_prefix(self) -> str:
+        """Return the URL prefix for this module (e.g., '/tasks')."""
+        pass
+
+    @abstractmethod
+    def get_tags(self) -> list[str]:
+        """Return OpenAPI tags for this module."""
+        pass
+
+    @abstractmethod
+    async def startup(self):
+        """Initialize module resources on startup."""
+        pass
+
+    @abstractmethod
+    async def shutdown(self):
+        """Cleanup module resources on shutdown."""
+        pass
+
+    def get_router(self) -> APIRouter:
+        """Return the FastAPI router for this module."""
+        return self.router
+```
+
+### Example Module Implementation
+
+```python
+# c4_layer/modules/task_module.py
+
+from fastapi import APIRouter, Depends, HTTPException
+from src.c0_layer.models.task_models import TaskRequest, TaskResponse
+from src.c3_layer.task_service.task_service import TaskService
+from .base_module import BaseModule
+
+class TaskModule(BaseModule):
+    """Task management module."""
+
+    def __init__(self, task_service: TaskService):
+        self.task_service = task_service
+        super().__init__()
+
+    def get_prefix(self) -> str:
+        return "/tasks"
+
+    def get_tags(self) -> list[str]:
+        return ["tasks"]
+
+    def register_routes(self):
+        """Register all task-related routes."""
+
+        @self.router.post("/create", response_model=TaskResponse)
+        async def create_task(request: TaskRequest):
+            return await self.task_service.create_task(request)
+
+        @self.router.get("/", response_model=list[TaskResponse])
+        async def list_tasks():
+            return await self.task_service.list_tasks()
+
+        @self.router.get("/{task_id}", response_model=TaskResponse)
+        async def get_task(task_id: str):
+            task = await self.task_service.get_task(task_id)
+            if not task:
+                raise HTTPException(status_code=404, detail="Task not found")
+            return task
+
+    async def startup(self):
+        """Initialize task service resources."""
+        await self.task_service.initialize()
+
+    async def shutdown(self):
+        """Cleanup task service resources."""
+        await self.task_service.cleanup()
+```
+
+### Central Server with Module Registry
+
+```python
+# c4_layer/mcp_server/app.py
+
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from .module_registry import ModuleRegistry
+from ..modules.task_module import TaskModule
+from ..modules.agent_module import AgentModule
+from ..modules.ticket_module import TicketModule
+# ... import all modules
+
+# Initialize services
+task_service = TaskService()
+agent_service = AgentService()
+ticket_service = TicketService()
+# ... initialize all services
+
+# Create module registry
+module_registry = ModuleRegistry()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager."""
+    # Startup: Initialize all modules
+    await module_registry.startup_all()
+    yield
+    # Shutdown: Cleanup all modules
+    await module_registry.shutdown_all()
+
+# Create FastAPI app
+app = FastAPI(
+    title="Hephaestus MCP Server",
+    description="Modular monolith for AI agent orchestration",
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
+# Register all modules
+module_registry.register(TaskModule(task_service))
+module_registry.register(AgentModule(agent_service))
+module_registry.register(TicketModule(ticket_service))
+module_registry.register(HealthModule())
+module_registry.register(MemoryModule())
+# ... register all modules
+
+# Mount all module routers
+for module in module_registry.get_all_modules():
+    app.include_router(
+        module.get_router(),
+        prefix=module.get_prefix(),
+        tags=module.get_tags()
+    )
+```
+
+### Module Registry Implementation
+
+```python
+# c4_layer/mcp_server/module_registry.py
+
+from typing import Dict, List
+from ..modules.base_module import BaseModule
+
+class ModuleRegistry:
+    """Registry for managing service modules."""
+
+    def __init__(self):
+        self._modules: Dict[str, BaseModule] = {}
+
+    def register(self, module: BaseModule):
+        """Register a module with the registry."""
+        prefix = module.get_prefix()
+        if prefix in self._modules:
+            raise ValueError(f"Module with prefix '{prefix}' already registered")
+        self._modules[prefix] = module
+
+    def get_module(self, prefix: str) -> BaseModule:
+        """Get a module by its prefix."""
+        return self._modules.get(prefix)
+
+    def get_all_modules(self) -> List[BaseModule]:
+        """Get all registered modules."""
+        return list(self._modules.values())
+
+    async def startup_all(self):
+        """Initialize all registered modules."""
+        for module in self._modules.values():
+            await module.startup()
+
+    async def shutdown_all(self):
+        """Cleanup all registered modules."""
+        for module in self._modules.values():
+            await module.shutdown()
+```
+
+## Directory Structure for Modular Monolith
+
+```
+src/
+├── c4_layer/
+│   ├── mcp_server/
+│   │   ├── __init__.py
+│   │   ├── app.py                    # Central FastAPI app + lifespan
+│   │   └── module_registry.py        # Module registry
+│   │
+│   └── modules/                       # All service modules
+│       ├── __init__.py
+│       ├── base_module.py             # Abstract base class
+│       │
+│       ├── agent_module.py            # /agents/*
+│       ├── auth_module.py             # /auth/* and /oauth/*
+│       ├── blocking_module.py         # /blocking/*
+│       ├── communication_module.py    # /communication/*
+│       ├── dashboard_module.py        # /dashboard/*
+│       ├── health_module.py           # /health/*
+│       ├── mcp_protocol_module.py     # /, /tools/*, /resources/*, /sse
+│       ├── memory_module.py           # /memories/*
+│       ├── monitoring_module.py       # /monitoring/*
+│       ├── phase_module.py            # /phases/*
+│       ├── queue_module.py            # /queue/*
+│       ├── result_module.py           # /results/*
+│       ├── task_module.py             # /tasks/*
+│       ├── ticket_module.py           # /tickets/*
+│       ├── validation_module.py       # /validation/*
+│       ├── websocket_module.py        # /ws
+│       └── workflow_module.py         # /workflows/*
+```
+
+## Integration with Layered Architecture
+
+### How Modules Fit Into Layers
+
+**Modules are in c4_layer (Application Layer):**
+- Each module is an application entry point
+- Modules coordinate c3 services
+- Modules depend on c0-c3 layers
+
+**Layer dependencies per module:**
+
+```
+TaskModule (c4)
+  → TaskService (c3)
+    → TaskLogic (c2)
+      → Database (c1)
+        → TaskModels (c0)
+```
+
+**Full stack:**
+```
+c4_layer/modules/task_module.py          # HTTP API endpoints
+  ↓
+c3_layer/task_service/task_service.py    # Business logic coordination
+  ↓
+c2_layer/tasks/task_logic.py             # Core business rules
+  ↓
+c1_layer/database/session.py             # Database access
+  ↓
+c0_layer/models/task_models.py           # Data models
+```
+
+## Module Size Estimates
+
+| Module | Endpoints | Dependencies | Lines of Code |
+|--------|-----------|--------------|---------------|
+| 1. HealthModule | 6 | health_service | 200-300 |
+| 2. TaskModule | 7 | task_service | 400-500 |
+| 3. AgentModule | 7 | agent_service | 400-500 |
+| 4. MemoryModule | 5 | memory_service | 300-400 |
+| 5. WorkflowModule | 6 | workflow_service | 300-400 |
+| 6. PhaseModule | 5 | phase_service | 200-300 |
+| 7. ResultModule | 5 | result_service | 300-400 |
+| 8. ValidationModule | 5 | validation_service | 300-400 |
+| 9. TicketModule | 12 | ticket_service | 600-700 |
+| 10. MonitoringModule | 6 | monitoring (c2) | 400-500 |
+| 11. QueueModule | 5 | queue_service | 300-400 |
+| 12. BlockingModule | 3 | task_blocking (c2) | 200-300 |
+| 13. CommunicationModule | 2 | communication_service | 200-300 |
+| 14. AuthModule | 8 | auth (c1) | 500-600 |
+| 15. DashboardModule | 2 | dashboard_service | 300-400 |
+| 16. MCPProtocolModule | 6 | MCP protocol | 400-500 |
+| 17. WebSocketModule | 1 | WebSocket manager | 200-300 |
+
+**Total: 17 modules, ~70 endpoints, 5,500-7,000 lines**
+
+## Migration Strategy
+
+### Phase 1: Create Module Structure (2-3 hours)
+1. Create c4_layer/modules/ directory
+2. Create base_module.py abstract class
+3. Create module_registry.py
+4. Update c4_layer/mcp_server/app.py skeleton
+
+### Phase 2: Extract One Module (Proof of Concept) (3-4 hours)
+1. Start with HealthModule (smallest, independent)
+2. Create health_module.py
+3. Extract /health endpoints from server.py
+4. Register with module registry
+5. Test module works independently
+
+### Phase 3: Extract Remaining Modules (15-20 hours)
+1. Extract modules in order of independence:
+   - TaskModule
+   - AgentModule
+   - MemoryModule
+   - WorkflowModule
+   - PhaseModule
+   - ResultModule
+   - ValidationModule
+   - TicketModule
+   - MonitoringModule
+   - QueueModule
+   - BlockingModule
+   - CommunicationModule
+   - AuthModule
+   - DashboardModule
+   - MCPProtocolModule
+   - WebSocketModule
+
+2. For each module:
+   - Create module file
+   - Extract endpoints from server.py/api.py
+   - Implement startup/shutdown
+   - Register with registry
+   - Test module
+
+### Phase 4: Remove Old Structure (2-3 hours)
+1. Delete old server.py routes
+2. Remove old api.py routes
+3. Clean up imports
+4. Final testing
+
+**Total Effort: 22-30 hours**
+
+## Benefits of Modular Monolith
+
+1. **Independent Development:**
+   - Each module can be developed and tested independently
+   - Clear API contracts between modules
+
+2. **Easier Testing:**
+   - Test modules in isolation
+   - Mock dependencies easily
+
+3. **Better Organization:**
+   - Code organized by functional domain
+   - Clear boundaries between modules
+
+4. **Scalability:**
+   - Easy to extract modules to microservices later
+   - Can scale specific modules if needed
+
+5. **Maintainability:**
+   - Changes to one module don't affect others
+   - Clear ownership per module
+
+6. **Deployment:**
+   - Still a single deployment (simpler than microservices)
+   - No network overhead between modules
+
+## Comparison: Before vs After
+
+### Before (Current)
+```
+src/mcp/server.py (4,216 lines)
+  - All routes mixed together
+  - Hard to test individual endpoints
+  - Unclear dependencies
+  - Single file responsibility
+
+src/mcp/api.py (1,595 lines)
+  - Frontend routes
+  - Also large and mixed
+```
+
+**Total: 5,811 lines in 2 files**
+
+### After (Modular Monolith)
+```
+src/c4_layer/modules/ (17 module files)
+  - Each module 200-700 lines
+  - Clear responsibilities
+  - Independent testing
+  - Explicit dependencies
+
+src/c4_layer/mcp_server/
+  - app.py (main application ~100 lines)
+  - module_registry.py (~100 lines)
+```
+
+**Total: ~6,000 lines in 19 files (200-700 lines per file)**
+
+## Success Criteria
+
+1. ✅ All endpoints organized into 17 modules
+2. ✅ Each module < 700 lines
+3. ✅ Each module independently testable
+4. ✅ Clear module boundaries and contracts
+5. ✅ All tests passing (449 tests)
+6. ✅ Module registry working
+7. ✅ Startup/shutdown lifecycle per module
+
+## Next Steps
+
+1. Review and approve modular monolith design
+2. Create Phase 2 implementation plan
+3. Start with HealthModule (proof of concept)
+4. Iterate through remaining modules
+5. Test after each module extraction
+6. Remove old server.py structure
+
+## Related Tasks
+
+- Task-14: Layered architecture (complements modular monolith)
+- Task-09: Graceful shutdown (integrate with module lifecycle)
+- Task-12: Deprecation warnings (already uses lifespan pattern)
+
+This modular monolith architecture provides clear separation of concerns while maintaining the simplicity of a single deployment.

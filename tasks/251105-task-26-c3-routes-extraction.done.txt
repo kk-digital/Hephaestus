@@ -1,0 +1,72 @@
+TASK-26: C3 Routes and API Endpoints Extraction
+================================================
+
+Date: 2025-11-05
+Status: ACTIVE
+Layer: C3 (Application Layer - Routes and API Endpoints)
+Dependencies: Task-25 (C2 services extraction) - COMPLETE
+
+## Goal
+
+Extract all FastAPI routes and API endpoints from monolithic files into c3 layer packages following the three-layer architecture pattern.
+
+## Background
+
+Task-25 completed c2 services extraction (11 services, 11,889 lines migrated).
+Now we need to extract the c3 application layer (routes, API endpoints, MCP server handlers).
+
+## Three-Layer Architecture Recap
+
+- **c1**: Foundation (models, enums, database session) ✅ COMPLETE (15 modules)
+- **c2**: Services (business logic, external integrations) ✅ COMPLETE (11 modules)
+- **c3**: Applications (routes, API endpoints, handlers) ⏳ THIS TASK
+
+## Pattern to Follow
+
+Same strangler fig pattern as Task-25:
+1. Extract routes to c3_*_routes/ packages
+2. Create backward compatibility shim at old location
+3. Test imports and endpoints
+4. Commit incrementally
+
+## Target Files to Analyze
+
+Primary targets:
+- src/mcp/server.py (FastAPI routes, MCP handlers)
+- src/api/*.py (if API files exist)
+- src/routes/*.py (if routes exist)
+
+## Phase 1: Discovery and Planning
+
+1. Identify all route definitions (FastAPI @app.get, @app.post, etc.)
+2. Group routes by functional domain (similar to service grouping)
+3. Map routes to c3 packages
+4. Estimate lines of code per package
+5. Create extraction plan with phases (quick/moderate/complex)
+
+## Naming Convention
+
+Pattern: c3_{noun}_routes
+
+Examples:
+- c3_task_routes (task creation, listing, update, deletion)
+- c3_ticket_routes (ticket CRUD operations)
+- c3_agent_routes (agent management, status)
+- c3_workflow_routes (workflow execution, results)
+- c3_monitoring_routes (monitoring, health checks)
+
+## Success Criteria
+
+✓ All routes extracted to c3 layer packages
+✓ Backward compatibility maintained (shims if needed)
+✓ All endpoints still accessible at same URLs
+✓ No test regressions
+✓ Clean separation between c2 (services) and c3 (routes)
+
+## Next Steps
+
+1. Read src/mcp/server.py to identify all routes
+2. Create route inventory and grouping plan
+3. Begin extraction in phases (quick wins → moderate → complex)
+4. Test after each extraction
+5. Update todo.txt with progress
