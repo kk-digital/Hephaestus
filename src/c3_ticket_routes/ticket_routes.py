@@ -312,8 +312,8 @@ def create_ticket_router(server_state):
                 ticket_id=request.ticket_id,
                 agent_id=agent_id,
                 new_status=request.new_status,
-                status_change_comment=request.status_change_comment,
-                resolution_notes=request.resolution_notes,
+                comment=request.status_change_comment or "",
+                commit_sha=None,
             )
 
             # Broadcast update

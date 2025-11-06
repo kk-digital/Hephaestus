@@ -233,7 +233,10 @@ class TestMCPTicketEndpoints:
             pytest.skip("Ticket may already be resolved")
 
         data = response.json()
-        assert data["success"] is True
+        # UpdateTicketResponse has: ticket_id, fields_updated, message (no success field)
+        assert "ticket_id" in data
+        assert "fields_updated" in data
+        assert data["ticket_id"] == TestMCPTicketEndpoints.ticket_id_1
         print(f"✅ Updated ticket fields: {data.get('fields_updated', [])}")
 
     def test_06_change_status(self, client, headers):
@@ -253,7 +256,10 @@ class TestMCPTicketEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["success"] is True
+        # ChangeTicketStatusResponse has: ticket_id, old_status, new_status, message (no success field)
+        assert "ticket_id" in data
+        assert "old_status" in data
+        assert "new_status" in data
         assert data["new_status"] == "todo"
         print(f"✅ Changed status: {data['old_status']} → {data['new_status']}")
 
