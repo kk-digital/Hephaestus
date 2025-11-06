@@ -1,0 +1,271 @@
+FILE I/O AUDIT RESULTS
+======================
+
+Date: 2025-11-07
+Purpose: Document all file I/O operations in Hephaestus codebase for SafeFileIO migration
+
+SUMMARY
+-------
+Total file I/O operations found: ~67
+- open() calls: 32
+- Path read/write methods: 10
+- JSON operations: 25
+
+AUDIT STATUS: ALL PHASES COMPLETE (Phase 5 complete - all operations reviewed)
+- SafePath wrapper created (src/core/safe_path.py)
+- SafeFileIO wrapper created (src/core/safe_file_io.py)
+- Test fixtures added (tests/conftest.py)
+- Folder structure created (build/, data/, data/test/, data/logs/, data/tmp/)
+- Database configuration updated to use data/hephaestus.db
+- Database files migrated from repo root to data/
+- Repo root cleaned of database pollution
+- Result services migrated to SafeFileIO
+- Validation helpers enforce SafePath policies
+- Results must be in allowed directories (data/, reports/)
+
+FILES WITH FILE I/O OPERATIONS
+-------------------------------
+
+Files with open() calls (17 files):
+1. src/c2_agent_service/agent_manager.py
+2. src/c2_monitoring_guardian/monitor.py
+3. src/c2_monitoring_guardian/prompt_loader.py
+4. src/c2_result_service/result_service.py
+5. src/c2_validation_service/result_validation_helpers.py
+6. src/c2_workflow_result_service/result_service.py
+7. src/c2_worktree_service/worktree_manager.py
+8. src/core/llm_config.py
+9. src/core/simple_config.py
+10. src/interfaces/cli_interface.py
+11. src/interfaces/langchain_llm_client.py
+12. src/mcp/api.py
+13. src/memory/rag.py
+14. src/monitoring/prompt_loader.py
+15. src/phases/phase_loader.py
+16. src/sdk/client.py
+17. src/sdk/process_manager.py
+18. src/sdk/tui/popups/log_viewer.py
+
+CRITICAL FILE I/O OPERATIONS
+-----------------------------
+
+1. DATABASE PATHS (HIGH PRIORITY) ✓ COMPLETED
+   Location: src/core/config.py:54-57
+   Previous: database_path = Path("./hephaestus.db")
+   Current: database_path = Path("data/hephaestus.db")
+   Action Taken: Updated config, moved database to data/
+   Status: MIGRATION COMPLETE
+
+2. TEST DATABASE PATHS (HIGH PRIORITY) ✓ COMPLETED
+   Location: Various test files
+   Previous: test.db created in repo root
+   Current: Tests use data/test/ via SafePath TEST_MODE
+   Action Taken: Removed empty test.db, added test fixture
+   Status: MIGRATION COMPLETE
+
+3. PROMPT LOADERS (MEDIUM PRIORITY) - REVIEWED, NO MIGRATION NEEDED
+   Locations:
+   - src/c2_monitoring_guardian/prompt_loader.py (reads from repo prompts/)
+   - src/monitoring/prompt_loader.py (reads from repo prompts/)
+   - src/phases/phase_loader.py (reads/writes workflow phase YAML files)
+   Purpose: Load prompt templates and workflow definitions
+   Analysis:
+   - Monitoring prompt loaders: Read-only from repo, no security risk
+   - Phase loader: Reads/writes user workflow definitions (legitimate use case)
+   - Phase paths come from database (workflow.phases_folder_path)
+   Decision: NO MIGRATION - Legitimate read-only and workflow file operations
+   Note: prompts/ directory doesn't currently exist (unused code or external setup)
+   Status: REVIEWED - NO ACTION REQUIRED
+
+4. RESULT SERVICES (MEDIUM PRIORITY) ✓ COMPLETED
+   Locations:
+   - src/c2_result_service/result_service.py
+   - src/c2_workflow_result_service/result_service.py
+   - src/c2_validation_service/validation_helpers.py
+   Purpose: Read result files submitted by agents
+   Previous: Used raw open() and os.path.exists()
+   Current: Uses SafeFileIO for all file operations
+   Action Taken: Migrated to SafeFileIO, enforced path policies
+   Status: MIGRATION COMPLETE
+
+5. WORKTREE MANAGER (LOW PRIORITY) ✓ REVIEWED
+   Location: src/c2_worktree_service/worktree_manager.py
+   Purpose: Git worktree operations
+   Analysis: No direct file I/O - uses GitPython library only
+   Decision: NO MIGRATION - Git operations handled by library
+   Status: REVIEWED - NO ACTION REQUIRED
+
+6. LOG VIEWER (LOW PRIORITY) ✓ REVIEWED
+   Location: src/sdk/tui/popups/log_viewer.py:87
+   Purpose: Read log files for display in TUI
+   Analysis: Read-only access to SDK-managed log directory
+   Decision: NO MIGRATION - Read-only log viewing
+   Status: REVIEWED - NO ACTION REQUIRED
+
+7. AGENT MANAGER (LOW PRIORITY) ✓ REVIEWED
+   Location: src/c2_agent_service/agent_manager.py:219
+   Purpose: Write debug prompts for troubleshooting
+   Analysis: Writes to /tmp/hephaestus_debug_prompt_{agent_id}.txt
+   Decision: NO MIGRATION - Temporary debug files in /tmp
+   Status: REVIEWED - NO ACTION REQUIRED
+
+8. WORKTREE MANAGER (LOW PRIORITY) ✓ REVIEWED
+   Location: src/c2_worktree_service/worktree_manager.py
+   Purpose: Git worktree operations
+   Analysis: No direct file I/O (uses GitPython library only)
+   Decision: NO MIGRATION - Git operations only
+   Status: REVIEWED - NO ACTION REQUIRED
+
+9. CONFIG LOADERS (LOW PRIORITY) ✓ REVIEWED
+   Locations:
+   - src/core/llm_config.py:69 (reads hephaestus_config.yaml)
+   - src/core/simple_config.py:28 (reads YAML config)
+   Purpose: Load application configuration
+   Analysis: Read-only config loading from repo root
+   Decision: NO MIGRATION - Legitimate config loading
+   Status: REVIEWED - NO ACTION REQUIRED
+
+10. CLI INTERFACE (LOW PRIORITY) ✓ REVIEWED
+    Locations:
+    - src/interfaces/cli_interface.py:111 (ClaudeCodeAgent)
+    - src/interfaces/cli_interface.py:204 (OpenCodeAgent)
+    Purpose: Write temporary prompt files for CLI tools
+    Analysis: Writes to /tmp/hep_prompt_{task_id}.txt and /tmp/opencode_prompt_{task_id}.txt
+    Decision: NO MIGRATION - Temporary files in /tmp
+    Status: REVIEWED - NO ACTION REQUIRED
+
+11. TEMPLATE LOADERS (LOW PRIORITY) ✓ REVIEWED
+    Locations:
+    - src/interfaces/langchain_llm_client.py:581 (reads templates)
+    - src/mcp/api.py:621 (reads YAML)
+    - src/memory/rag.py:322 (reads files)
+    Purpose: Read template and data files
+    Analysis: Read-only access to templates and data
+    Decision: NO MIGRATION - Read-only file access
+    Status: REVIEWED - NO ACTION REQUIRED
+
+12. SDK FILES (LOW PRIORITY) ✓ REVIEWED
+    Locations:
+    - src/sdk/client.py:165 (reads YAML)
+    - src/sdk/client.py:210,224 (writes phase YAML to temp_dir)
+    - src/sdk/process_manager.py:64,96 (writes log files)
+    Purpose: SDK workflow generation and process logging
+    Analysis: SDK-managed temp directories and log directories
+    Decision: NO MIGRATION - SDK-managed directories
+    Status: REVIEWED - NO ACTION REQUIRED
+
+MIGRATION STRATEGY
+------------------
+
+PHASE 1: CRITICAL PATHS (COMPLETED)
+[✓] Create SafePath wrapper
+[✓] Create SafeFileIO wrapper
+[✓] Add test fixtures
+[✓] Create folder structure
+
+PHASE 2: DATABASE MIGRATION (COMPLETED)
+[✓] Update DatabaseConfig default path to data/hephaestus.db
+[✓] Move existing hephaestus.db to data/
+[✓] Remove empty test.db from repo root
+[✓] Database path now properly configured in data/
+[✓] Repo root cleaned of database pollution
+
+PHASE 3: RESULT SERVICES (COMPLETED)
+[✓] Update result services to use SafeFileIO
+[✓] Ensure results must be in allowed directories (reports/, data/)
+[✓] Update validation helpers to use SafePath and SafeFileIO
+[✓] Enforce path policies in result submission
+
+PHASE 4: PROMPT LOADERS (COMPLETED - NO MIGRATION)
+[✓] Review prompt loader paths
+[✓] Analyze security implications
+[✓] Document exemptions and rationale
+Decision: No migration needed - read-only repo access and legitimate workflow files
+
+PHASE 5: OTHER FILE I/O (COMPLETED - NO MIGRATION)
+[✓] Review remaining file I/O operations (11 files)
+[✓] Analyze each operation for security implications
+[✓] Document exemptions and rationale
+Decision: No migration needed - all operations are legitimate
+
+EXEMPTIONS AND SPECIAL CASES
+-----------------------------
+
+Phase 5 reviewed all remaining file I/O operations. The following categories
+were exempted from SafeFileIO migration due to legitimate use cases:
+
+1. CONFIGURATION LOADING
+   - Files: llm_config.py, simple_config.py
+   - Reason: Reading application configuration from repo root
+   - Security: Read-only, no user input, config files part of codebase
+   - Risk: LOW - Config files are trusted source
+
+2. READ-ONLY TEMPLATE/DATA ACCESS
+   - Files: monitor.py, langchain_llm_client.py, mcp/api.py, memory/rag.py
+   - Reason: Reading prompt templates and data files from repo
+   - Security: Read-only access, no writing, templates part of codebase
+   - Risk: LOW - Read-only repo access
+
+3. TEMPORARY FILE OPERATIONS (/tmp)
+   - Files: agent_manager.py, cli_interface.py
+   - Reason: Writing temporary files for debugging and CLI tool communication
+   - Security: System temp directory, process-isolated filenames
+   - Risk: LOW - Standard temporary file usage
+
+4. SDK-MANAGED DIRECTORIES
+   - Files: client.py, process_manager.py
+   - Reason: SDK workflow generation and process logging
+   - Security: SDK manages directories, controlled by SDK configuration
+   - Risk: LOW - SDK-controlled paths
+
+5. GIT OPERATIONS (GitPython)
+   - Files: worktree_manager.py
+   - Reason: Git worktree management via GitPython library
+   - Security: No direct file I/O, library handles git operations
+   - Risk: NONE - No file I/O operations
+
+6. READ-ONLY LOG VIEWING
+   - Files: log_viewer.py
+   - Reason: TUI display of SDK-managed log files
+   - Security: Read-only access to logs
+   - Risk: LOW - Read-only viewing
+
+7. WORKFLOW PHASE FILES
+   - Files: phases/phase_loader.py
+   - Reason: Reads/writes workflow phase definitions from database-provided paths
+   - Security: Legitimate workflow file operations, user-defined workflows
+   - Risk: LOW - User workflow management (reviewed in Phase 4)
+
+DATABASE FILES FOUND
+--------------------
+
+Files currently polluting repo root:
+1. ./hephaestus.db (main database, 0 bytes initially)
+2. ./test.db (test database, created by tests)
+
+Action Required:
+1. Move hephaestus.db to data/hephaestus.db
+2. Delete test.db (will be recreated in data/test/ automatically)
+3. Update config.py to use data/hephaestus.db as default
+4. Update test fixtures to use data/test/ for test databases
+
+VERIFICATION CHECKLIST
+----------------------
+
+After migration:
+[ ] All tests pass
+[ ] No .db files in repo root
+[ ] No test artifacts outside data/test/
+[ ] Database operations work with new paths
+[ ] Results written to reports/ or data/
+[ ] Prompts loaded successfully
+[ ] git status shows no polluted files
+
+NEXT STEPS
+----------
+
+1. Update src/core/config.py database path
+2. Move existing databases to data/
+3. Run test suite to verify
+4. Document any issues found
+5. Proceed with result services migration

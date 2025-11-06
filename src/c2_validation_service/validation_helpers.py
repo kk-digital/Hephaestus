@@ -2,36 +2,34 @@
 
 import os
 from pathlib import Path
+from src.core.safe_path import SafePath
+from src.core.safe_file_io import SafeFileIO
 
 
 def validate_file_path(file_path: str) -> None:
     """
     Validate file path to prevent directory traversal attacks.
 
+    Now enforces SafePath policy - files must be in allowed directories
+    (data/, reports/, build/).
+
     Args:
         file_path: Path to validate
 
     Raises:
-        ValueError: If path is invalid or contains traversal attempts
+        ValueError: If path is invalid, contains traversal attempts,
+                   or is outside allowed directories
     """
-    # Convert to Path object for safe handling
-    path = Path(file_path).resolve()
-
     # Check for path traversal attempts
     if ".." in str(file_path):
         raise ValueError(f"Invalid file path - directory traversal detected: {file_path}")
 
-    # Ensure path is absolute and normalized
-    if not path.is_absolute():
-        # Allow relative paths but validate them
-        path = Path.cwd() / path
-
-    # Additional safety check
+    # Use SafePath to validate path is in allowed directories
+    # This will raise ValueError if path is outside allowed directories
     try:
-        # This will raise if path doesn't exist or is invalid
-        path_str = str(path)
-    except Exception as e:
-        raise ValueError(f"Invalid file path: {file_path}") from e
+        safe_path = SafePath(file_path)
+    except ValueError as e:
+        raise ValueError(f"File path not in allowed directories: {file_path}") from e
 
 
 def validate_file_size(file_path: str, max_size_kb: int = 100) -> None:
@@ -43,9 +41,11 @@ def validate_file_size(file_path: str, max_size_kb: int = 100) -> None:
         max_size_kb: Maximum allowed size in KB
 
     Raises:
-        ValueError: If file is too large
+        ValueError: If file is too large or path is invalid
     """
-    file_size = os.path.getsize(file_path)
+    # Use SafePath to ensure file is in allowed directory
+    safe_path = SafePath(file_path)
+    file_size = safe_path.path.stat().st_size
     max_size_bytes = max_size_kb * 1024
 
     if file_size > max_size_bytes:

@@ -21,6 +21,21 @@ wheels/
 *.egg
 MANIFEST
 
+# Build and Data folders (keep structure with .gitkeep)
+build/*
+!build/.gitkeep
+data/*
+!data/.gitkeep
+!data/test/
+data/test/*
+!data/test/.gitkeep
+!data/logs/
+data/logs/*
+!data/logs/.gitkeep
+!data/tmp/
+data/tmp/*
+!data/tmp/.gitkeep
+
 # Virtual Environment
 venv/
 ENV/

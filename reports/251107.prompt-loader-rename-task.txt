@@ -1,0 +1,79 @@
+TASK: Rename Vague "prompt_loader" Files
+==========================================
+
+Date: 2025-11-07
+Priority: Medium (Code Quality)
+Category: Refactoring
+
+PROBLEM
+-------
+Multiple files named "prompt_loader.py" with no specific domain meaning.
+Generic names make code hard to understand and audit.
+
+CURRENT FILES (VAGUE NAMES)
+---------------------------
+1. src/c2_monitoring_guardian/prompt_loader.py
+2. src/monitoring/prompt_loader.py
+3. src/phases/phase_loader.py
+
+ISSUES WITH CURRENT NAMES
+-------------------------
+- Too generic: "loader" is a pattern, not a domain concept
+- Context-dependent: Must know directory to understand purpose
+- Non-discoverable: Can't search for domain concepts
+- Hard to audit: Unclear what security boundaries apply
+- Code smell: Reveals lack of domain modeling
+
+PROPOSED RENAMES
+----------------
+Need to inspect each file to determine appropriate names:
+
+Option 1 - Descriptive Function Names:
+- monitoring_guardian_prompt_templates.py
+- system_monitoring_prompts.py
+- workflow_phase_templates.py
+
+Option 2 - Domain-Specific Names:
+- guardian_system_prompts.py
+- monitoring_prompt_repository.py
+- phase_definition_loader.py
+
+STEPS TO COMPLETE
+-----------------
+[ ] Read src/c2_monitoring_guardian/prompt_loader.py to understand purpose
+[ ] Read src/monitoring/prompt_loader.py to understand purpose
+[ ] Read src/phases/phase_loader.py to understand purpose
+[ ] Determine specific, domain-meaningful names for each
+[ ] Update all import statements across codebase
+[ ] Rename files using git mv to preserve history
+[ ] Update documentation/comments referencing old names
+[ ] Run tests to verify no breakage
+
+IMPACT ANALYSIS
+---------------
+- Files to update: All files importing these modules
+- Test impact: Import paths will change
+- Documentation impact: Any references to these modules
+- Git history: Preserved via git mv
+
+RELATED TO
+----------
+- File I/O safety audit (where this issue was discovered)
+- General code quality improvements
+- Domain-driven design principles
+
+RATIONALE
+---------
+Specific names improve:
+- Code readability and maintainability
+- Security auditing clarity
+- Developer onboarding
+- IDE navigation and search
+- Understanding of system architecture
+
+ESTIMATED EFFORT
+---------------
+- Investigation: 15-20 minutes
+- Renaming + updates: 20-30 minutes
+- Testing: 10-15 minutes
+- Total: ~45-65 minutes

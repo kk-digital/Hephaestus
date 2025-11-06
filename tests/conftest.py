@@ -303,3 +303,58 @@ def tmux_session(tmux_server):
         session.kill()
     except Exception:
         pass  # Session may have already been killed
+
+# ============================================================================
+# FILE I/O SAFETY FIXTURES
+# ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def enable_safe_path_test_mode():
+    """
+    Automatically enable SafePath TEST_MODE for all tests.
+
+    This restricts file I/O to data/test/ only, preventing test pollution.
+    Runs automatically for every test (autouse=True).
+
+    The fixture:
+    - Enables SafePath.TEST_MODE before each test
+    - Disables SafePath.TEST_MODE after each test
+    - Ensures tests cannot accidentally write outside data/test/
+
+    Usage:
+        Tests automatically get sandboxed file I/O - no action needed.
+        All file operations through SafeFileIO will be restricted to data/test/
+    """
+    from src.core.safe_path import SafePath
+
+    SafePath.enable_test_mode()
+    yield
+    SafePath.disable_test_mode()
+
+
+@pytest.fixture
+def test_data_dir(tmp_path):
+    """
+    Provide safe test data directory for test output.
+
+    Returns SafePath pointing to data/test/{unique_test_id}/ directory.
+    Parent directories are automatically created.
+
+    Usage:
+        def test_something(test_data_dir):
+            # test_data_dir is a SafePath to data/test/{unique}/
+            from src.core.safe_file_io import SafeFileIO
+            SafeFileIO.write_text(test_data_dir.path / "output.txt", "data")
+
+    Args:
+        tmp_path: Pytest tmp_path fixture (provides unique path for test)
+
+    Returns:
+        SafePath: Validated path to test-specific directory in data/test/
+    """
+    from src.core.safe_path import SafePath
+
+    # Create unique test directory: data/test/{test_unique_id}/
+    test_dir = SafePath(f"data/test/{tmp_path.name}", allow_create=True)
+    return test_dir

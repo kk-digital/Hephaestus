@@ -1,4 +1,4 @@
-"""Agent-related models for Hephaestus."""
+"""CodeAgent-related models for Hephaestus (managed AI coding agent instances)."""
 
 from datetime import datetime
 from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, CheckConstraint, Boolean, JSON
@@ -7,10 +7,10 @@ from sqlalchemy.orm import relationship
 from src.c1_database_session.base import Base
 
 
-class Agent(Base):
-    """Agent model representing an AI agent instance."""
+class CodeAgent(Base):
+    """CodeAgent model representing a managed AI coding agent instance."""
 
-    __tablename__ = "agents"
+    __tablename__ = "code_agents"
 
     id = Column(String, primary_key=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -40,25 +40,25 @@ class Agent(Base):
 
     # Relationships
     created_tasks = relationship(
-        "Task", back_populates="created_by_agent", foreign_keys="Task.created_by_agent_id"
+        "Task", back_populates="created_by_code_agent", foreign_keys="Task.created_by_agent_id"
     )
     assigned_tasks = relationship("Task", foreign_keys="Task.assigned_agent_id")
-    memories = relationship("Memory", back_populates="agent")
-    logs = relationship("AgentLog", back_populates="agent")
+    memories = relationship("Memory", back_populates="code_agent")
+    logs = relationship("CodeAgentLog", back_populates="code_agent")
 
 
-class AgentLog(Base):
-    """Log entries for agent activities and interventions."""
+class CodeAgentLog(Base):
+    """Log entries for code agent activities and interventions."""
 
-    __tablename__ = "agent_logs"
+    __tablename__ = "code_agent_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_at = Column(
         DateTime, default=datetime.utcnow, nullable=False
     )  # Added for compatibility
-    agent_id = Column(
-        String, ForeignKey("agents.id"), nullable=True
+    code_agent_id = Column(
+        String, ForeignKey("code_agents.id"), nullable=True
     )  # Made nullable for conductor logs
     log_type = Column(
         String,
@@ -68,18 +68,18 @@ class AgentLog(Base):
     details = Column(JSON)  # Additional structured data
 
     # Relationships
-    agent = relationship("Agent", back_populates="logs")
+    code_agent = relationship("CodeAgent", back_populates="logs")
 
 
-class AgentWorktree(Base):
-    """Track git worktree isolation for agents."""
+class CodeAgentWorktree(Base):
+    """Track git worktree isolation for code agents."""
 
-    __tablename__ = "agent_worktrees"
+    __tablename__ = "code_agent_worktrees"
 
-    agent_id = Column(String, ForeignKey("agents.id"), primary_key=True)
+    code_agent_id = Column(String, ForeignKey("code_agents.id"), primary_key=True)
     worktree_path = Column(Text, nullable=False)
     branch_name = Column(String, unique=True, nullable=False)
-    parent_agent_id = Column(String, ForeignKey("agents.id"))
+    parent_code_agent_id = Column(String, ForeignKey("code_agents.id"))
     parent_commit_sha = Column(String, nullable=False)
     base_commit_sha = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -94,29 +94,29 @@ class AgentWorktree(Base):
     disk_usage_mb = Column(Integer)
 
     # Relationships
-    agent = relationship("Agent", foreign_keys=[agent_id], backref="worktree")
-    parent_agent = relationship("Agent", foreign_keys=[parent_agent_id])
+    code_agent = relationship("CodeAgent", foreign_keys=[code_agent_id], backref="worktree")
+    parent_code_agent = relationship("CodeAgent", foreign_keys=[parent_code_agent_id])
     commits = relationship(
         "WorktreeCommit",
         back_populates="worktree",
-        foreign_keys="WorktreeCommit.agent_id",
-        primaryjoin="AgentWorktree.agent_id==WorktreeCommit.agent_id",
+        foreign_keys="WorktreeCommit.code_agent_id",
+        primaryjoin="CodeAgentWorktree.code_agent_id==WorktreeCommit.code_agent_id",
     )
     conflict_resolutions = relationship(
         "MergeConflictResolution",
         back_populates="worktree",
-        foreign_keys="MergeConflictResolution.agent_id",
-        primaryjoin="AgentWorktree.agent_id==MergeConflictResolution.agent_id",
+        foreign_keys="MergeConflictResolution.code_agent_id",
+        primaryjoin="CodeAgentWorktree.code_agent_id==MergeConflictResolution.code_agent_id",
     )
 
 
 class WorktreeCommit(Base):
-    """Track commits within agent worktrees for traceability."""
+    """Track commits within code agent worktrees for traceability."""
 
     __tablename__ = "worktree_commits"
 
     id = Column(String, primary_key=True)
-    agent_id = Column(String, ForeignKey("agents.id"), nullable=False)
+    code_agent_id = Column(String, ForeignKey("code_agents.id"), nullable=False)
     commit_sha = Column(String, unique=True, nullable=False)
     commit_type = Column(
         String,
@@ -132,23 +132,23 @@ class WorktreeCommit(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
-    agent = relationship("Agent", backref="worktree_commits", overlaps="commits")
+    code_agent = relationship("CodeAgent", backref="worktree_commits", overlaps="commits")
     worktree = relationship(
-        "AgentWorktree",
+        "CodeAgentWorktree",
         back_populates="commits",
-        foreign_keys=[agent_id],
-        primaryjoin="WorktreeCommit.agent_id==AgentWorktree.agent_id",
-        overlaps="agent,worktree_commits",
+        foreign_keys=[code_agent_id],
+        primaryjoin="WorktreeCommit.code_agent_id==CodeAgentWorktree.code_agent_id",
+        overlaps="code_agent,worktree_commits",
     )
 
 
-class AgentResult(Base):
-    """Store formal results reported by agents for their completed tasks."""
+class CodeAgentResult(Base):
+    """Store formal results reported by code agents for their completed tasks."""
 
-    __tablename__ = "agent_results"
+    __tablename__ = "code_agent_results"
 
     id = Column(String, primary_key=True)
-    agent_id = Column(String, ForeignKey("agents.id"), nullable=False)
+    code_agent_id = Column(String, ForeignKey("code_agents.id"), nullable=False)
     task_id = Column(String, ForeignKey("tasks.id"), nullable=False)
     markdown_content = Column(Text, nullable=False)
     markdown_file_path = Column(Text, nullable=False)
@@ -171,6 +171,6 @@ class AgentResult(Base):
     verified_by_validation_id = Column(String, ForeignKey("validation_reviews.id"))
 
     # Relationships
-    agent = relationship("Agent", backref="results")
+    code_agent = relationship("CodeAgent", backref="results")
     task = relationship("Task", back_populates="results")
     validation_review = relationship("ValidationReview", backref="verified_results")

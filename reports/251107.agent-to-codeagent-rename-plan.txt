@@ -1,0 +1,305 @@
+AGENT → CODEAGENT RENAME PLAN
+=================================
+
+Date: 2025-11-07
+Purpose: Systematic rename of "Agent" to "CodeAgent" throughout Hephaestus codebase
+Rationale: "Agent" is vague - CodeAgent explicitly describes managed AI coding agent instances
+
+NAMING DECISION
+---------------
+Selected Name: CodeAgent
+Rationale:
+- Clear and descriptive (describes AI coding agent function)
+- Distinguishes from Hephaestus orchestrator, Guardian monitor, Conductor coordinator
+- Simple and memorable
+- Follows existing naming patterns (CodeAssistant, AICodeAgent)
+- Accurately describes what it IS: An AI agent that writes code
+
+Related Classes:
+- Agent → CodeAgent
+- AgentLog → CodeAgentLog
+- AgentWorktree → CodeAgentWorktree
+- WorktreeCommit → (unchanged - describes worktree commits, not agent-specific)
+- AgentResult → CodeAgentResult
+- AgentManager → CodeAgentManager
+
+Database Tables:
+- agents → code_agents
+- agent_logs → code_agent_logs
+- agent_worktrees → code_agent_worktrees
+- worktree_commits → (unchanged)
+- agent_results → code_agent_results
+
+SCOPE ANALYSIS
+--------------
+Based on grep analysis:
+- 10 files with "class Agent" definitions/imports
+- 42+ files with AgentManager references
+- 33+ files with AgentLog references
+- Multiple test files
+- API routes
+- Documentation
+
+EXECUTION ORDER (Critical - dependencies matter)
+-------------------------------------------------
+
+PHASE 1: DATABASE MODELS (Foundation)
+Task 1: Rename Agent model class in agent.py
+Task 2: Rename AgentLog model class in agent.py
+Task 3: Rename AgentWorktree model class in agent.py
+Task 4: Rename AgentResult model class in agent.py
+Task 5: Update database.py compatibility shim imports
+Task 6: Create database migration for table renames
+
+PHASE 2: SERVICE CLASSES
+Task 7: Rename AgentManager class and file
+Task 8: Update AgentManager internal references
+Task 9: Rename c2_agent_service folder to c2_code_agent_service
+
+PHASE 3: ROUTES
+Task 10: Rename agent_routes.py to code_agent_routes.py
+Task 11: Update route endpoints (/api/terminate_agent → /api/terminate_code_agent)
+Task 12: Update c3_agent_routes folder to c3_code_agent_routes
+
+PHASE 4: IMPORTS (Ripple effects)
+Task 13: Update imports in monitoring services (Guardian, Conductor)
+Task 14: Update imports in workflow services
+Task 15: Update imports in MCP server
+Task 16: Update imports in validation services
+Task 17: Update imports in all remaining service files
+
+PHASE 5: TESTS
+Task 18: Update test files with Agent references
+Task 19: Update test files with AgentManager references
+Task 20: Update test files with AgentLog references
+Task 21: Run full test suite and fix any failures
+
+PHASE 6: DOCUMENTATION
+Task 22: Update agent terminology report with new naming
+Task 23: Update todo.txt task list
+Task 24: Update CLAUDE.md architecture documentation
+Task 25: Update docstrings and comments
+
+PHASE 7: VERIFICATION
+Task 26: Verify all imports work
+Task 27: Verify API endpoints respond correctly
+Task 28: Verify database operations work
+Task 29: Run integration tests
+Task 30: Final smoke test
+
+DETAILED TASK BREAKDOWN
+========================
+
+TASK 1: Rename Agent model class
+---------------------------------
+File: src/c1_agent_models/agent.py
+Changes:
+- class Agent(Base): → class CodeAgent(Base):
+- __tablename__ = "agents" → __tablename__ = "code_agents"
+- Update all docstrings mentioning "Agent" → "CodeAgent"
+- Update relationship back_populates if needed
+Verification: python3 -c "from src.c1_agent_models.agent import CodeAgent; print('Success')"
+
+TASK 2: Rename AgentLog model class
+------------------------------------
+File: src/c1_agent_models/agent.py
+Changes:
+- class AgentLog(Base): → class CodeAgentLog(Base):
+- __tablename__ = "agent_logs" → __tablename__ = "code_agent_logs"
+- agent_id foreign key reference update
+- Update docstrings
+Verification: python3 -c "from src.c1_agent_models.agent import CodeAgentLog; print('Success')"
+
+TASK 3: Rename AgentWorktree model class
+-----------------------------------------
+File: src/c1_agent_models/agent.py
+Changes:
+- class AgentWorktree(Base): → class CodeAgentWorktree(Base):
+- __tablename__ = "agent_worktrees" → __tablename__ = "code_agent_worktrees"
+- agent_id foreign key reference update
+- parent_agent_id reference update
+- Update docstrings
+Verification: python3 -c "from src.c1_agent_models.agent import CodeAgentWorktree; print('Success')"
+
+TASK 4: Rename AgentResult model class
+---------------------------------------
+File: src/c1_agent_models/agent.py
+Changes:
+- class AgentResult(Base): → class CodeAgentResult(Base):
+- __tablename__ = "agent_results" → __tablename__ = "code_agent_results"
+- agent_id foreign key reference update
+- Update docstrings
+Verification: python3 -c "from src.c1_agent_models.agent import CodeAgentResult; print('Success')"
+
+TASK 5: Update database.py compatibility shim
+----------------------------------------------
+File: src/core/database.py
+Changes:
+- from src.c1_agent_models.agent import Agent, AgentLog, AgentWorktree, WorktreeCommit, AgentResult
+  → from src.c1_agent_models.agent import CodeAgent, CodeAgentLog, CodeAgentWorktree, WorktreeCommit, CodeAgentResult
+- Update __all__ export list
+Verification: python3 -c "from src.core.database import CodeAgent, CodeAgentLog; print('Success')"
+
+TASK 6: Create database migration
+----------------------------------
+Create: src/migrations/rename_agent_to_code_agent.sql
+Changes:
+- ALTER TABLE agents RENAME TO code_agents;
+- ALTER TABLE agent_logs RENAME TO code_agent_logs;
+- ALTER TABLE agent_worktrees RENAME TO code_agent_worktrees;
+- ALTER TABLE agent_results RENAME TO code_agent_results;
+- Update foreign key constraints
+- Update indexes
+Notes: May need to handle differently depending on database (PostgreSQL/SQLite)
+
+TASK 7: Rename AgentManager class
+----------------------------------
+File: src/c2_agent_service/agent_manager.py
+Changes:
+- class AgentManager: → class CodeAgentManager:
+- Update all docstrings
+- Update internal method references
+- Update return type hints (-> Agent becomes -> CodeAgent)
+Verification: python3 -c "from src.c2_agent_service.agent_manager import CodeAgentManager; print('Success')"
+
+TASK 8: Update AgentManager internal references
+------------------------------------------------
+File: src/c2_agent_service/agent_manager.py
+Changes:
+- Update all imports: from src.c1_agent_models.agent import Agent → CodeAgent
+- Update all type hints: def create_agent(...) -> Agent: → -> CodeAgent:
+- Update all instantiations: agent = Agent() → agent = CodeAgent()
+- Update variable names if "agent" is ambiguous (case-by-case decision)
+
+TASK 9: Rename c2_agent_service folder
+---------------------------------------
+Command: git mv src/c2_agent_service src/c2_code_agent_service
+Files affected: agent_manager.py, __init__.py
+Update imports in all files that import from c2_agent_service
+
+TASK 10: Rename agent_routes.py
+--------------------------------
+Command: git mv src/c3_agent_routes/agent_routes.py src/c3_agent_routes/code_agent_routes.py
+Changes:
+- Update imports in file
+- Update function names if they reference "agent"
+
+TASK 11: Update route endpoints
+--------------------------------
+File: src/c3_agent_routes/code_agent_routes.py
+Changes:
+- /api/terminate_agent → /api/terminate_code_agent
+- agent_id parameter names → code_agent_id (if clearer, or keep as agent_id for compatibility)
+- Update docstrings and response models
+- Update router tags: tags=["agents"] → tags=["code_agents"]
+
+TASK 12: Rename c3_agent_routes folder
+---------------------------------------
+Command: git mv src/c3_agent_routes src/c3_code_agent_routes
+Update imports in all files that import from c3_agent_routes
+
+TASK 13-17: Update imports (42+ files)
+---------------------------------------
+Files to update (found via grep):
+- src/c2_monitoring_guardian/guardian.py
+- src/c2_monitoring_guardian/conductor.py
+- src/c2_monitoring_guardian/trajectory_context.py
+- src/c2_workflow_service/workflow_manager.py
+- src/c2_validation_service/validation_manager.py
+- src/c2_task_service/task_manager.py
+- src/mcp_server/server.py
+- src/app.py
+- src/config.py
+- tests/* (all test files)
+
+For each file:
+- Update: from src.c1_agent_models.agent import Agent → CodeAgent
+- Update: from src.c2_agent_service.agent_manager import AgentManager → from src.c2_code_agent_service.code_agent_manager import CodeAgentManager
+- Update type hints
+- Update instantiations
+
+TASK 18-20: Update test files
+------------------------------
+Test files to update:
+- tests/test_agent_output_integration.py
+- tests/test_agent_output_capture.py
+- tests/test_diagnostic_agent.py
+- tests/test_monitoring_integration.py
+- tests/test_agent_manager.py
+- tests/test_trajectory_context.py
+- tests/conftest.py (fixtures)
+
+Changes:
+- Update imports
+- Update fixture names (agent → code_agent)
+- Update assertions
+- Update mock objects
+
+TASK 21: Run full test suite
+-----------------------------
+Command: pytest -xvs
+Fix any import errors, assertion failures, or broken tests
+
+TASK 22-25: Update documentation
+---------------------------------
+Files to update:
+- reports/251107.agent-terminology-analysis.txt (add note about rename)
+- todo.txt (mark rename task complete, update references)
+- .claude/CLAUDE.md (update architecture examples)
+- README.md (if exists)
+- All docstrings in modified files
+
+TASK 26-30: Verification
+-------------------------
+- Verify imports: python3 -c "from src.core.database import CodeAgent; print('OK')"
+- Verify API: curl http://localhost:8000/api/code_agent_status (if server running)
+- Verify database: Check tables exist with new names
+- Run integration tests
+- Manual smoke test of agent creation workflow
+
+ROLLBACK PLAN
+-------------
+If critical issues encountered:
+1. git reset --hard to last known good commit
+2. Review what went wrong
+3. Adjust plan
+4. Try again with smaller incremental changes
+
+COMMIT STRATEGY
+---------------
+Commit after each phase (not each task, phases are logical units):
+- Commit 1: Phase 1 complete (database models renamed)
+- Commit 2: Phase 2 complete (service classes renamed)
+- Commit 3: Phase 3 complete (routes renamed)
+- Commit 4: Phase 4 complete (imports updated)
+- Commit 5: Phase 5 complete (tests updated)
+- Commit 6: Phase 6 complete (documentation updated)
+- Commit 7: Phase 7 complete (verification passed)
+
+Commit messages:
+- "Rename Agent model to CodeAgent"
+- "Rename AgentManager to CodeAgentManager"
+- "Update agent routes to code_agent routes"
+- "Update all imports for CodeAgent rename"
+- "Update tests for CodeAgent rename"
+- "Update documentation for CodeAgent rename"
+- "Complete Agent→CodeAgent rename verification"
+
+ESTIMATED EFFORT
+----------------
+- Phase 1: 30 minutes (5 model renames + migration)
+- Phase 2: 20 minutes (manager class + folder)
+- Phase 3: 15 minutes (routes + folder)
+- Phase 4: 60 minutes (42+ files with imports)
+- Phase 5: 45 minutes (test updates + fixes)
+- Phase 6: 30 minutes (documentation)
+- Phase 7: 30 minutes (verification)
+Total: ~3.5 hours
+
+NOTES
+-----
+- WorktreeCommit model stays unchanged (describes commits, not agent-specific)
+- Database migration may require manual execution
+- Consider backward compatibility for external API consumers
+- May need to update frontend/UI if it references agent endpoints
+- Environment variables or config files may reference "agent"

@@ -8,8 +8,8 @@ to appropriate c1 layer packages during three-layer architecture refactoring.
 # Import Base from new c1 layer (shared base for all models)
 from src.c1_database_session.base import Base, logger
 
-# Import Agent models from new c1 layer (strangler fig pattern)
-from src.c1_agent_models.agent import Agent, AgentLog, AgentWorktree, WorktreeCommit, AgentResult  # noqa: E402
+# Import CodeAgent models from new c1 layer (strangler fig pattern)
+from src.c1_agent_models.agent import CodeAgent, CodeAgentLog, CodeAgentWorktree, WorktreeCommit, CodeAgentResult  # noqa: E402
 
 # Import Task model from new c1 layer
 from src.c1_task_models.task import Task  # noqa: E402
@@ -49,12 +49,12 @@ __all__ = [
     # Base
     "Base",
     "logger",
-    # Agent models
-    "Agent",
-    "AgentLog",
-    "AgentWorktree",
+    # CodeAgent models
+    "CodeAgent",
+    "CodeAgentLog",
+    "CodeAgentWorktree",
     "WorktreeCommit",
-    "AgentResult",
+    "CodeAgentResult",
     # Task model
     "Task",
     # Memory model

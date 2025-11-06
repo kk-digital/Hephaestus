@@ -52,7 +52,7 @@ class DatabaseConfig(BaseSettings):
     """Database configuration."""
 
     database_path: Path = Field(
-        default=Path("./hephaestus.db"),
+        default=Path("data/hephaestus.db"),
         description="Path to SQLite database",
     )
     qdrant_url: str = Field(

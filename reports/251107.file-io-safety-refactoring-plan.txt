@@ -1,0 +1,374 @@
+FILE I/O SAFETY REFACTORING PLAN
+================================
+
+Date: 2025-11-07
+Purpose: Enforce strict file I/O controls to prevent test pollution and ensure all file operations go through safe wrappers
+
+CURRENT STATE
+-------------
+
+Database files found in repo root:
+- ./hephaestus.db (main database)
+- ./test.db (test database)
+
+Folder structure created:
+- /build/ (with .gitkeep)
+- /data/ (with .gitkeep)
+  - /data/test/ (for test outputs)
+  - /data/logs/ (for log files)
+  - /data/tmp/ (for temporary files)
+
+Updated .gitignore:
+- Ignores build/* and data/* contents
+- Preserves .gitkeep files for folder structure
+
+PROBLEMS IDENTIFIED
+-------------------
+
+1. **Database Pollution**: Databases created directly in repo root
+   - hephaestus.db should be in /data/
+   - test.db should be in /data/test/
+
+2. **No File I/O Enforcement**: Tests can write anywhere
+   - Risk of polluting repo with test artifacts
+   - No centralized control over file operations
+
+3. **Path Handling**: Paths handled as strings
+   - No type safety
+   - Easy to make mistakes
+   - Hard to enforce policies
+
+4. **No Sandboxing**: Tests not restricted to /data/test/
+   - Can accidentally modify production data
+   - Can create files in repo root
+
+SOLUTION DESIGN
+----------------
+
+### 1. Safe Path Wrapper (src/core/safe_path.py)
+
+```python
+"""Safe path wrapper with policy enforcement."""
+
+from pathlib import Path
+from typing import Optional, Union
+import os
+
+class SafePath:
+    """
+    Type-safe path wrapper that enforces file I/O policies.
+
+    All paths must go through this wrapper to be validated.
+    """
+
+    # Allowed base directories
+    ALLOWED_BASES = {
+        "data",
+        "data/test",
+        "data/logs",
+        "data/tmp",
+        "build",
+        "reports",  # For analysis reports
+    }
+
+    # Test mode: restrict to data/test only
+    TEST_MODE = False
+
+    def __init__(self, path: Union[str, Path], allow_create: bool = False):
+        """
+        Create safe path with validation.
+
+        Args:
+            path: File or directory path
+            allow_create: Whether to create parent directories
+
+        Raises:
+            ValueError: If path is outside allowed directories
+        """
+        self._path = Path(path).resolve()
+        self._validate()
+
+        if allow_create:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _validate(self):
+        """Validate path is in allowed directory."""
+        repo_root = Path(__file__).parent.parent.parent  # Get repo root
+
+        try:
+            relative = self._path.relative_to(repo_root)
+        except ValueError:
+            raise ValueError(f"Path outside repo: {self._path}")
+
+        # Check if path starts with allowed base
+        allowed = False
+        for base in self.ALLOWED_BASES:
+            if str(relative).startswith(base):
+                allowed = True
+                break
+
+        if not allowed:
+            raise ValueError(
+                f"Path not in allowed directories: {relative}\n"
+                f"Allowed: {self.ALLOWED_BASES}"
+            )
+
+        # In test mode, only allow data/test
+        if SafePath.TEST_MODE and not str(relative).startswith("data/test"):
+            raise ValueError(
+                f"Test mode: only data/test/ allowed, got: {relative}"
+            )
+
+    @property
+    def path(self) -> Path:
+        """Get underlying Path object."""
+        return self._path
+
+    def __str__(self) -> str:
+        return str(self._path)
+
+    def __repr__(self) -> str:
+        return f"SafePath({self._path})"
+
+    @classmethod
+    def enable_test_mode(cls):
+        """Enable test mode (restrict to data/test only)."""
+        cls.TEST_MODE = True
+
+    @classmethod
+    def disable_test_mode(cls):
+        """Disable test mode."""
+        cls.TEST_MODE = False
+```
+
+### 2. Safe File I/O Wrapper (src/core/safe_file_io.py)
+
+```python
+"""Safe file I/O wrapper that enforces path policies."""
+
+from pathlib import Path
+from typing import Union, Optional, Any
+import json
+from .safe_path import SafePath
+
+class SafeFileIO:
+    """
+    File I/O wrapper that ENFORCES SafePath usage.
+
+    All file operations must go through this class.
+    """
+
+    @staticmethod
+    def read_text(path: Union[SafePath, str]) -> str:
+        """
+        Read text file.
+
+        Args:
+            path: SafePath or string path
+
+        Returns:
+            File contents as string
+
+        Raises:
+            ValueError: If path is not SafePath
+        """
+        if isinstance(path, str):
+            path = SafePath(path)
+
+        return path.path.read_text()
+
+    @staticmethod
+    def write_text(path: Union[SafePath, str], content: str, allow_create: bool = True):
+        """
+        Write text file.
+
+        Args:
+            path: SafePath or string path
+            content: Text to write
+            allow_create: Create parent directories
+
+        Raises:
+            ValueError: If path is not SafePath
+        """
+        if isinstance(path, str):
+            path = SafePath(path, allow_create=allow_create)
+
+        path.path.write_text(content)
+
+    @staticmethod
+    def read_json(path: Union[SafePath, str]) -> Any:
+        """Read JSON file."""
+        if isinstance(path, str):
+            path = SafePath(path)
+
+        with open(path.path, 'r') as f:
+            return json.load(f)
+
+    @staticmethod
+    def write_json(path: Union[SafePath, str], data: Any, allow_create: bool = True):
+        """Write JSON file."""
+        if isinstance(path, str):
+            path = SafePath(path, allow_create=allow_create)
+
+        with open(path.path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+    @staticmethod
+    def exists(path: Union[SafePath, str]) -> bool:
+        """Check if file exists."""
+        if isinstance(path, str):
+            path = SafePath(path)
+
+        return path.path.exists()
+
+    @staticmethod
+    def delete(path: Union[SafePath, str]):
+        """Delete file."""
+        if isinstance(path, str):
+            path = SafePath(path)
+
+        if path.path.exists():
+            path.path.unlink()
+```
+
+### 3. Test Fixture (tests/conftest.py additions)
+
+```python
+"""Test fixtures for safe file I/O."""
+
+import pytest
+from src.core.safe_path import SafePath
+
+@pytest.fixture(autouse=True)
+def enable_test_mode():
+    """
+    Automatically enable test mode for all tests.
+
+    This restricts file I/O to data/test/ only.
+    """
+    SafePath.enable_test_mode()
+    yield
+    SafePath.disable_test_mode()
+
+@pytest.fixture
+def test_data_dir(tmp_path):
+    """
+    Provide safe test data directory.
+
+    Returns SafePath pointing to data/test/{test_name}/
+    """
+    test_dir = SafePath(f"data/test/{tmp_path.name}", allow_create=True)
+    return test_dir
+```
+
+### 4. Database Path Configuration
+
+Update src/config.py:
+
+```python
+# OLD (insecure)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./hephaestus.db")
+
+# NEW (safe)
+from src.core.safe_path import SafePath
+
+def get_database_path() -> SafePath:
+    """Get database path based on environment."""
+    if os.getenv("TESTING"):
+        return SafePath("data/test/test.db", allow_create=True)
+    else:
+        return SafePath("data/hephaestus.db", allow_create=True)
+
+DATABASE_URL = f"sqlite:///{get_database_path()}"
+```
+
+IMPLEMENTATION TASKS
+--------------------
+
+PHASE 1: Create wrappers
+[ ] Create src/core/safe_path.py with SafePath class
+[ ] Create src/core/safe_file_io.py with SafeFileIO class
+[ ] Add test fixtures to tests/conftest.py
+[ ] Write unit tests for wrappers
+
+PHASE 2: Audit existing file I/O
+[ ] Find all file operations in codebase
+    - open() calls
+    - Path() usage
+    - File.write_text/read_text
+    - JSON file operations
+    - Database file creation
+[ ] Document each usage and category
+
+PHASE 3: Migrate to safe wrappers
+[ ] Update config.py database paths
+[ ] Update all file I/O to use SafeFileIO
+[ ] Update all path handling to use SafePath
+[ ] Update tests to use test_data_dir fixture
+
+PHASE 4: Clean up
+[ ] Move hephaestus.db to data/
+[ ] Delete test.db (will be recreated in data/test/)
+[ ] Run full test suite
+[ ] Verify no files created outside allowed dirs
+
+PHASE 5: Enforcement
+[ ] Add pre-commit hook to check for unsafe file I/O
+    - Grep for "open(" outside SafeFileIO
+    - Grep for "Path(" outside SafePath
+    - Grep for ".db" paths as strings
+[ ] Update documentation
+[ ] Add CI checks
+
+VERIFICATION CHECKLIST
+----------------------
+
+After implementation:
+- [ ] All tests pass
+- [ ] No .db files in repo root
+- [ ] No test artifacts outside data/test/
+- [ ] Tests cannot write to data/ (only data/test/)
+- [ ] Production cannot write to data/test/
+- [ ] All paths validated before file operations
+- [ ] Type safety: paths are SafePath objects, not strings
+- [ ] git status shows no polluted files
+
+ROLLOUT STRATEGY
+----------------
+
+1. **Week 1**: Create wrappers, add tests
+2. **Week 2**: Audit existing code, document usage
+3. **Week 3**: Migrate critical paths (database, logs)
+4. **Week 4**: Migrate all remaining file I/O
+5. **Week 5**: Clean up, enforce, document
+
+BENEFITS
+--------
+
+1. **Safety**: Impossible to accidentally write outside allowed dirs
+2. **Type Safety**: Paths are SafePath objects, not strings
+3. **Test Isolation**: Tests can only write to data/test/
+4. **Clean Repo**: No database or log pollution
+5. **Auditable**: All file I/O goes through one place
+6. **Enforceable**: Pre-commit hooks catch violations
+
+RISKS
+-----
+
+1. **Breaking Changes**: Existing code using raw paths will break
+   - Mitigation: Gradual migration, compatibility layer
+
+2. **Performance**: Extra validation overhead
+   - Mitigation: Validate once at SafePath creation, cache result
+
+3. **Complexity**: New abstraction to learn
+   - Mitigation: Clear documentation, examples
+
+NEXT STEPS
+----------
+
+1. Review this plan with team
+2. Get approval for breaking changes
+3. Start with Phase 1 (create wrappers)
+4. Run pilot on one module
+5. Roll out incrementally

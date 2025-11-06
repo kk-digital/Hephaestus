@@ -7,6 +7,7 @@ from typing import List, Optional, Dict, Any
 from pathlib import Path
 
 from src.core.database import get_db, AgentResult, Task, Agent
+from src.core.safe_file_io import SafeFileIO
 from src.services.validation_helpers import (
     validate_file_path,
     validate_file_size,
@@ -43,11 +44,11 @@ class ResultService:
             ValueError: If validation fails
             FileNotFoundError: If markdown file doesn't exist
         """
-        # Validate file path (prevent directory traversal)
+        # Validate file path (prevent directory traversal and enforce allowed directories)
         validate_file_path(markdown_file_path)
 
-        # Check file exists
-        if not os.path.exists(markdown_file_path):
+        # Check file exists (using SafeFileIO)
+        if not SafeFileIO.exists(markdown_file_path):
             raise FileNotFoundError(f"Markdown file not found: {markdown_file_path}")
 
         # Validate file size (100KB limit)
@@ -56,9 +57,8 @@ class ResultService:
         # Validate markdown format
         validate_markdown_format(markdown_file_path)
 
-        # Read markdown content
-        with open(markdown_file_path, 'r', encoding='utf-8') as f:
-            markdown_content = f.read()
+        # Read markdown content (using SafeFileIO)
+        markdown_content = SafeFileIO.read_text(markdown_file_path)
 
         with get_db() as db:
             # Validate task ownership
