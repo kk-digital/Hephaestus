@@ -179,6 +179,8 @@ def monitoring_loop(temp_db, mock_agent_manager, mock_llm_provider, mock_rag_sys
         rag_system=mock_rag_system,
         phase_manager=mock_phase_manager,
     )
+    # Enable diagnostic agent feature for integration tests
+    loop.config.diagnostic_agent_enabled = True
     return loop
 
 
