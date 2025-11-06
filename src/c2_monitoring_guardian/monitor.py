@@ -2,11 +2,11 @@
 
 import asyncio
 import logging
+from enum import Enum
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import json
 
-from src.c1_monitoring_enums import AgentState, MonitoringDecision
 from src.core.simple_config import get_config
 from src.core.database import DatabaseManager, Agent, Task, AgentLog, GuardianAnalysis, ConductorAnalysis, DetectedDuplicate, SteeringIntervention
 from src.agents.manager import AgentManager
@@ -18,6 +18,24 @@ from src.c2_monitoring_guardian.conductor import Conductor, SystemDecision
 from src.monitoring.trajectory_context import TrajectoryContext
 
 logger = logging.getLogger(__name__)
+
+
+class AgentState(Enum):
+    """Agent state enumeration."""
+    HEALTHY = "healthy"
+    STUCK_WAITING = "stuck_waiting"
+    STUCK_ERROR = "stuck_error"
+    STUCK_CONFUSED = "stuck_confused"
+    UNRECOVERABLE = "unrecoverable"
+
+
+class MonitoringDecision(Enum):
+    """Monitoring decision enumeration."""
+    CONTINUE = "continue"
+    NUDGE = "nudge"
+    ANSWER = "answer"
+    RESTART = "restart"
+    RECREATE = "recreate"
 
 
 class IntelligentMonitor:
