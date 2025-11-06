@@ -377,8 +377,8 @@ async def test_send_initial_prompt_with_chunking_large_message(
     """Test that large messages are sent in chunks without verification."""
     agent_id = "test-agent-123"
     task_id = "test-task-456"
-    # Create a message larger than 1500 chars (chunk size)
-    large_message = "X" * 2000 + "\nTask ID: test-task-456"
+    # Create a message larger than 2500 chars (current chunk size)
+    large_message = "X" * 4000 + "\nTask ID: test-task-456"
 
     # Should not raise an exception
     await agent_manager._send_initial_prompt_with_retry(
@@ -392,15 +392,15 @@ async def test_send_initial_prompt_with_chunking_large_message(
         verify_delivery=False  # No verification, just testing chunking
     )
 
-    # With 2000 chars and chunk_size=1500, we expect:
-    # Chunk 1: chars 0-1500 (1500 chars)
-    # Chunk 2: chars 1500-end (~527 chars)
+    # With 4027 chars and chunk_size=2500, we expect:
+    # Chunk 1: chars 0-2500 (2500 chars)
+    # Chunk 2: chars 2500-end (~1527 chars)
     # Total: 2 chunks + 1 Enter = 3 send_keys calls
     assert mock_pane.send_keys.call_count == 3
 
-    # Verify the first call was the first chunk (1500 chars)
+    # Verify the first call was the first chunk (2500 chars)
     first_call_arg = mock_pane.send_keys.call_args_list[0][0][0]
-    assert len(first_call_arg) == 1500
+    assert len(first_call_arg) == 2500
 
     # Verify the last call was just Enter
     last_call = mock_pane.send_keys.call_args_list[-1]
