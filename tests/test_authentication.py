@@ -272,7 +272,7 @@ class TestAuthenticationAPI:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 400  # Application logic error
         assert "Email already registered" in response.json()["detail"]
 
     def test_register_weak_password(self, test_client):
@@ -286,9 +286,10 @@ class TestAuthenticationAPI:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422  # Pydantic validation error
         error = response.json()["detail"]
-        assert "Password" in str(error)
+        # Pydantic v2 returns list of error dicts
+        assert "password" in str(error).lower()
 
     def test_login_success(self, test_client, test_db):
         """Test successful login."""
