@@ -8,6 +8,51 @@ from typing import Any, Dict, List, Optional
 import hashlib
 
 
+class MockEmbeddings:
+    """Mock embeddings API that mimics OpenAI client.embeddings interface."""
+
+    def __init__(self, parent):
+        """Initialize mock embeddings API.
+
+        Args:
+            parent: Parent MockLLMProvider instance
+        """
+        self.parent = parent
+
+    def create(
+        self,
+        input: str,
+        model: str = "mock-embedding-model",
+        encoding_format: str = "float",
+        **kwargs
+    ):
+        """Create embedding using OpenAI-compatible interface.
+
+        Args:
+            input: Text to embed
+            model: Model name (ignored in mock)
+            encoding_format: Encoding format (ignored in mock)
+            **kwargs: Additional parameters (ignored in mock)
+
+        Returns:
+            Mock response object with data attribute containing embeddings
+        """
+        # Use parent's generate_embedding method
+        response_dict = self.parent.generate_embedding(input, model, **kwargs)
+
+        # Create mock response object that can be accessed with dot notation
+        class MockResponse:
+            def __init__(self, response_dict):
+                self.data = [type('obj', (object,), {
+                    'embedding': response_dict['data'][0]['embedding'],
+                    'index': response_dict['data'][0]['index']
+                })]
+                self.model = response_dict['model']
+                self.usage = type('obj', (object,), response_dict['usage'])
+
+        return MockResponse(response_dict)
+
+
 class MockLLMProvider:
     """Mock LLM provider that returns predictable responses without API calls.
 
@@ -33,6 +78,7 @@ class MockLLMProvider:
         self.call_count = 0
         self.last_request = None
         self.responses = []  # History of all responses
+        self.embeddings = MockEmbeddings(self)  # OpenAI-compatible embeddings API
 
     def generate_completion(
         self,
