@@ -297,7 +297,7 @@ class TestGuardian:
 
         # Should return default analysis
         assert result['agent_id'] == "test-agent-7"
-        assert result['summary'] == "GPT-5 analysis unavailable - using default"
+        assert result['trajectory_summary'] == "LLM analysis unavailable - using default"
 
     @pytest.mark.asyncio
     async def test_llm_failure_handling(self, guardian, mock_llm_provider):
@@ -317,7 +317,7 @@ class TestGuardian:
                 )
 
         # Should return default analysis
-        assert result['summary'] == "GPT-5 analysis unavailable - using default"
+        assert result['trajectory_summary'] == "LLM analysis unavailable - using default"
         assert result['trajectory_aligned'] is True  # Safe default
 
     def test_clear_agent_cache(self, guardian):
