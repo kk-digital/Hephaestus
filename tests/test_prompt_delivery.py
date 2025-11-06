@@ -125,6 +125,7 @@ async def test_send_initial_prompt_without_verification(
     await agent_manager._send_initial_prompt_with_retry(
         pane=mock_pane,
         cli_agent=mock_cli_agent,
+        cli_type="claude-code",
         initial_message=initial_message,
         agent_id=agent_id,
         task_id=task_id,
@@ -153,6 +154,7 @@ async def test_send_initial_prompt_with_retry_success_first_attempt(
     await agent_manager._send_initial_prompt_with_retry(
         pane=mock_pane,
         cli_agent=mock_cli_agent,
+        cli_type="claude-code",
         initial_message=initial_message,
         agent_id=agent_id,
         task_id=task_id,
@@ -184,6 +186,7 @@ async def test_send_initial_prompt_with_retry_success_second_attempt(
     await agent_manager._send_initial_prompt_with_retry(
         pane=mock_pane,
         cli_agent=mock_cli_agent,
+        cli_type="claude-code",
         initial_message=initial_message,
         agent_id=agent_id,
         task_id=task_id,
@@ -215,6 +218,7 @@ async def test_send_initial_prompt_with_retry_success_third_attempt(
     await agent_manager._send_initial_prompt_with_retry(
         pane=mock_pane,
         cli_agent=mock_cli_agent,
+        cli_type="claude-code",
         initial_message=initial_message,
         agent_id=agent_id,
         task_id=task_id,
@@ -247,6 +251,7 @@ async def test_send_initial_prompt_with_retry_all_retries_fail(
         await agent_manager._send_initial_prompt_with_retry(
             pane=mock_pane,
             cli_agent=mock_cli_agent,
+            cli_type="claude-code",
             initial_message=initial_message,
             agent_id=agent_id,
             task_id=task_id,
@@ -284,6 +289,7 @@ async def test_send_initial_prompt_with_retry_custom_max_retries(
         await agent_manager._send_initial_prompt_with_retry(
             pane=mock_pane,
             cli_agent=mock_cli_agent,
+            cli_type="claude-code",
             initial_message=initial_message,
             agent_id=agent_id,
             task_id=task_id,
@@ -378,6 +384,7 @@ async def test_send_initial_prompt_with_chunking_large_message(
     await agent_manager._send_initial_prompt_with_retry(
         pane=mock_pane,
         cli_agent=mock_cli_agent,
+        cli_type="claude-code",
         initial_message=large_message,
         agent_id=agent_id,
         task_id=task_id,

@@ -250,21 +250,21 @@ class Conductor:
             logger.info(f"Terminating duplicate agent {agent_id}: {reason}")
 
             # Log the termination
-            # session = self.db_manager.get_session()
-            # try:
-            #     log_entry = AgentLog(
-            #         agent_id=agent_id,
-            #         log_type="termination",
-            #         message=f"Terminated by Conductor: {reason}",
-            #         details=decision,
-            #     )
-            #     session.add(log_entry)
-            #     session.commit()
-            # finally:
-            #     session.close()
-            #
-            # # Terminate the agent
-            # await self.agent_manager.terminate_agent(agent_id)
+            session = self.db_manager.get_session()
+            try:
+                log_entry = AgentLog(
+                    agent_id=agent_id,
+                    log_type="termination",
+                    message=f"Terminated by Conductor: {reason}",
+                    details=decision,
+                )
+                session.add(log_entry)
+                session.commit()
+            finally:
+                session.close()
+
+            # Terminate the agent
+            await self.agent_manager.terminate_agent(agent_id)
 
         elif decision_type == SystemDecision.COORDINATE_RESOURCES.value:
             # Send coordination messages to agents

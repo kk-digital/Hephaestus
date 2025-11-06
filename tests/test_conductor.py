@@ -44,6 +44,7 @@ class TestConductor:
         # Mock LLM provider - patch where it's used, not where it's defined
         with patch('src.interfaces.get_llm_provider') as mock_get_llm:
             mock_llm = AsyncMock()
+            mock_llm.get_model_for_component = Mock(return_value="gpt-5")  # Non-async mock
             mock_llm.analyze_system_coherence = AsyncMock(return_value={
                 "coherence_score": 0.5,
                 "duplicates": [
@@ -104,6 +105,7 @@ class TestConductor:
         """Test Conductor handles low system coherence."""
         with patch('src.interfaces.get_llm_provider') as mock_get_llm:
             mock_llm = AsyncMock()
+            mock_llm.get_model_for_component = Mock(return_value="gpt-5")  # Non-async mock
             mock_llm.analyze_system_coherence = AsyncMock(return_value={
                 "coherence_score": 0.3,  # Very low coherence
                 "duplicates": [],
@@ -132,6 +134,7 @@ class TestConductor:
         """Test Conductor identifies resource coordination needs."""
         with patch('src.interfaces.get_llm_provider') as mock_get_llm:
             mock_llm = AsyncMock()
+            mock_llm.get_model_for_component = Mock(return_value="gpt-5")  # Non-async mock
             mock_llm.analyze_system_coherence = AsyncMock(return_value={
                 "coherence_score": 0.7,
                 "duplicates": [],
@@ -216,7 +219,7 @@ class TestConductor:
             "details": ["Multiple issues detected"]
         }
 
-        with patch('src.monitoring.conductor.logger') as mock_logger:
+        with patch('src.c2_monitoring_guardian.conductor.logger') as mock_logger:
             await conductor.execute_decisions([decision])
 
             # Verify critical logging
@@ -293,13 +296,13 @@ class TestConductor:
         report = await conductor.generate_detailed_report(analysis)
 
         # Verify report contains key sections
-        assert "CONDUCTOR GPT-5 SYSTEM ANALYSIS REPORT" in report
+        assert "CONDUCTOR LLM SYSTEM ANALYSIS REPORT" in report
         assert "Active Agents: 3" in report
         assert "SYSTEM COHERENCE" in report
         assert "Score: 0.80" in report
         assert "DUPLICATE WORK DETECTED" in report
         assert "CONDUCTOR DECISIONS" in report
-        assert "GPT-5 TERMINATION RECOMMENDATIONS" in report
+        assert "LLM TERMINATION RECOMMENDATIONS" in report
 
     @pytest.mark.asyncio
     async def test_execution_failure_handling(self, conductor, mock_agent_manager):
