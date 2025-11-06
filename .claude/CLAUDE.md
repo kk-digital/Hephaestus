@@ -84,12 +84,35 @@ git push gogs dev-haltingstate-00  # Backup to Gogs
 - origin: GitHub (kk-digital/Hephaestus)
 - gogs: http://localhost:3000/kk-digital/Hephaestus (HTTP auth with API token)
 
+## Architecture Principles
+
+**CRITICAL - Module Consolidation:**
+
+- NO separate enum modules - enums belong in the modules that use them
+- NO separate model modules - models belong with their services
+- NO separate routes modules - routes belong in the service modules
+- NO generic modules (config_loaders, etc) - config classes go in same module as the class using them
+- Each service should be ONE module containing: models, enums, service logic, routes
+
+**Database Models:**
+
+- ONE TABLE PER FILE - never define multiple tables in a single file
+- Core infrastructure models (Agent, Task, User, etc.) → src/core/database/
+- Service-specific models → respective service module (e.g., workflow models in workflow service)
+- File naming: lowercase with underscores matching table name (agent_log.py for AgentLog table)
+
+**Module Organization:**
+
+- Each service is ONE module containing all related code
+- Example: c2_monitoring_guardian/ contains monitoring models, enums, service logic
+- Avoid proliferation of small single-purpose modules
+
 ## Project Structure
 
 ```
 Hephaestus/
 ├── src/              # Source code
-│   ├── core/        # Core functionality
+│   ├── core/        # Core functionality & infrastructure models
 │   ├── agents/      # Agent implementations
 │   ├── interfaces/  # External interfaces
 │   └── mcp/         # MCP server
