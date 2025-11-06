@@ -198,7 +198,7 @@ class TestPromptLoader:
     ):
         """Test that long agent output is truncated."""
         template = "Output: {agent_output}"
-        long_output = "x" * 5000  # Very long output
+        long_output = "x" * 50000  # Very long output (exceeds 40000 char limit)
 
         with patch.object(prompt_loader, 'load_prompt', return_value=template):
             formatted = prompt_loader.format_guardian_prompt(
@@ -208,9 +208,9 @@ class TestPromptLoader:
                 agent_output=long_output
             )
 
-        # Should be truncated to last 3000 characters
-        assert len(formatted) < 3100  # Account for "Output: " prefix
-        assert "x" * 2999 in formatted  # Most of the x's should be there
+        # Should be truncated to last 40000 characters
+        assert len(formatted) < 40100  # Account for "Output: " prefix
+        assert "x" * 39999 in formatted  # Most of the x's should be there
 
     def test_format_conductor_prompt(
         self,
