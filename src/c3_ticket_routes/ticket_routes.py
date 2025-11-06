@@ -328,12 +328,14 @@ def create_ticket_router(server_state):
         logger.info(f"Agent {agent_id} requesting ticket {ticket_id}")
 
         try:
-            ticket = await TicketService.get_ticket(ticket_id)
+            ticket_data = await TicketService.get_ticket(ticket_id)
 
-            if not ticket:
+            if not ticket_data:
                 raise HTTPException(status_code=404, detail=f"Ticket {ticket_id} not found")
 
-            return ticket
+            # Service returns {ticket: {...}, comments: [], history: [], commits: []}
+            # For this endpoint, return the full structure including related data
+            return ticket_data
 
         except HTTPException:
             raise

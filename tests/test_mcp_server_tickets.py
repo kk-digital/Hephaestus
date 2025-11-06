@@ -172,11 +172,14 @@ class TestMCPTicketEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["ticket_id"] == TestMCPTicketEndpoints.ticket_id_1
-        assert data["title"] == "MCP Test Ticket 1"
-        assert data["ticket_type"] == "feature"
-        assert data["priority"] == "high"
-        print(f"✅ Retrieved ticket details: {data['title']}")
+        # Service returns {ticket: {...}, comments: [], history: [], commits: []}
+        assert "ticket" in data
+        ticket = data["ticket"]
+        assert ticket["ticket_id"] == TestMCPTicketEndpoints.ticket_id_1
+        assert ticket["title"] == "MCP Test Ticket 1"
+        assert ticket["ticket_type"] == "feature"
+        assert ticket["priority"] == "high"
+        print(f"✅ Retrieved ticket details: {ticket['title']}")
 
     def test_03_get_tickets_list(self, client, headers):
         """Test GET /tickets/get - Get tickets by workflow."""
