@@ -14,8 +14,8 @@ from src.c1_agent_models.agent import Agent, AgentLog, AgentWorktree, WorktreeCo
 # Import Task model from new c1 layer
 from src.c1_task_models.task import Task  # noqa: E402
 
-# Import Memory model from new c1 layer
-from src.c1_memory_models.memory import Memory  # noqa: E402
+# Import Memory model from memory service
+from src.memory.memory import Memory  # noqa: E402
 
 # Import Workflow models from new c1 layer
 from src.c1_workflow_models.workflow import (  # noqa: E402

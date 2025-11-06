@@ -1,0 +1,266 @@
+AGENT TERMINOLOGY ANALYSIS - HEPHAESTUS PROJECT
+=================================================
+
+Date: 2025-11-07
+Purpose: Clarify the vague "Agent" terminology used throughout the Hephaestus codebase
+
+SUMMARY
+-------
+The term "Agent" in Hephaestus refers to MANAGED AI CLI INSTANCES (like Claude Code or Claude API), NOT the Hephaestus system itself. Each Agent represents one running AI coding assistant that executes tasks.
+
+CRITICAL DISTINCTION
+--------------------
+Hephaestus is a MULTI-AGENT ORCHESTRATION SYSTEM.
+Each "Agent" is a CONTROLLED AI INSTANCE running in a managed tmux session.
+Hephaestus CREATES, MONITORS, and COORDINATES multiple parallel Agent instances.
+
+WHAT IS AN AGENT?
+-----------------
+
+An Agent is a database-tracked instance representing:
+- One running AI CLI tool (Claude Code, Claude API, OpenAI Codex, etc.)
+- Running in an isolated tmux session
+- Working in an isolated git worktree
+- Assigned to exactly one Task at a time
+- Monitored by Guardian system
+- Coordinated by Conductor system
+
+DATABASE MODEL STRUCTURE
+------------------------
+
+Location: src/c1_agent_models/agent.py
+
+Table: agents
+- id: Unique agent UUID
+- created_at: Agent creation timestamp
+- system_prompt: Prompt given to the AI agent instance
+- status: idle, working, stuck, terminated
+- cli_type: Which AI CLI tool (claude, codex, etc.)
+- tmux_session_name: Unique tmux session identifier
+- current_task_id: Foreign key to tasks table
+- last_activity: Last detected activity timestamp
+- health_check_failures: Count of failed health checks
+- agent_type: phase, validator, result_validator, monitor, diagnostic
+- kept_alive_for_validation: Boolean flag for validation workflow
+
+AGENT TYPES (agent_type field)
+------------------------------
+
+1. phase
+   - Normal task execution agents
+   - Work on implementation, analysis, fixes, etc.
+   - Create commits in isolated worktrees
+   - Most common agent type
+
+2. validator
+   - Pre-merge validation agents
+   - Review phase agent results before merging
+   - Run in read-only worktree at specific commit
+   - Provide approval/rejection feedback
+
+3. result_validator
+   - Post-merge result verification agents
+   - Verify merged results are correct
+   - Quality assurance role
+
+4. monitor
+   - Guardian monitoring agents
+   - Observe other agents' trajectories
+   - Detect stuck/drifting behavior
+   - Not currently used (Guardian runs as service)
+
+5. diagnostic
+   - Special diagnostic agents for debugging
+   - Investigate system issues
+   - Troubleshooting role
+
+AGENT LIFECYCLE MANAGEMENT
+---------------------------
+
+Location: src/c2_agent_service/agent_manager.py (AgentManager class)
+
+Creation:
+- AgentManager.create_agent_for_task() creates new agent instances
+- Assigns unique UUID, creates tmux session, creates git worktree
+- Launches CLI tool with system prompt and task context
+- Records agent in database
+
+Monitoring:
+- Guardian system analyzes agent output via tmux capture
+- Tracks trajectory, detects stuck states
+- Can send steering messages to agents
+
+Termination:
+- AgentManager.terminate_agent() stops agent instances
+- Closes tmux session, marks status as terminated
+- Optionally cleans up worktree
+
+SUPPORTING MODELS
+-----------------
+
+Table: agent_logs (AgentLog model)
+- Tracks all agent activities, interventions, steering messages
+- Links to agent via agent_id foreign key
+- Stores log_type (steering, termination, health_check, etc.)
+- JSON details field for structured data
+
+Table: agent_worktrees (AgentWorktree model)
+- Git worktree isolation for each agent
+- Unique branch per agent (agent-{uuid})
+- Tracks merge status (active, merged, abandoned, cleaned)
+- Parent-child agent relationships for worktree inheritance
+
+Table: worktree_commits (WorktreeCommit model)
+- Tracks commits made by agents
+- Commit types: parent_checkpoint, validation_ready, final, auto_save, conflict_resolution
+- Links commits to specific agents
+
+Table: agent_results (AgentResult model)
+- Formal results reported by agents
+- Markdown content with task completion summary
+- Result types: implementation, analysis, fix, design, test, documentation
+- Verification status: unverified, verified, disputed
+
+API ROUTES
+----------
+
+Location: src/c3_agent_routes/agent_routes.py
+
+Endpoints:
+1. POST /api/terminate_agent
+   - Manually terminate running agent from UI
+   - Marks agent as terminated, fails associated task
+   - Triggers queue processing for next task
+
+2. GET /agent_status
+   - Get current agent status via X-Agent-ID header
+   - Returns agent state, current task, workflow context
+   - Used by MCP client to check agent progress
+
+3. GET /task_progress
+   - Get progress for agent's tasks
+   - Can query specific task or all tasks for agent
+   - Returns task status, timing, validation info
+
+CLI INTERFACE ABSTRACTION
+--------------------------
+
+Location: src/interfaces/cli_interface.py (CLIAgentInterface class)
+
+Purpose: Abstract interface for different AI CLI tools
+
+Methods:
+- get_launch_command(): Generate CLI tool launch command
+- get_health_check_pattern(): Pattern to check if agent is healthy
+- format_message(): Format messages for specific CLI tool
+- get_stuck_patterns(): Patterns indicating agent is stuck
+- parse_output(): Parse CLI tool output
+
+Implementations:
+- Claude Code CLI
+- Claude API client
+- OpenAI Codex
+- Other AI coding assistants
+
+RELATIONSHIP TO GUARDIAN/CONDUCTOR
+-----------------------------------
+
+Guardian:
+- Monitors individual agent instances
+- Analyzes agent output via tmux capture-pane
+- Builds trajectory context from agent session
+- Detects when agent is stuck, drifting, or violating constraints
+- Sends steering messages to agents via tmux send-keys
+- Does NOT control agents directly - provides guidance
+
+Conductor:
+- System-level orchestration across ALL agents
+- Detects duplicate work between agents
+- Makes termination decisions for redundant agents
+- Coordinates resource access across agents
+- Ensures system coherence
+
+Relationship:
+- Guardian: Agent-level monitoring (1:1 with each agent)
+- Conductor: System-level coordination (1:all agents)
+- Both systems OBSERVE and GUIDE agents, not replace them
+
+KEY FILES REFERENCE
+-------------------
+
+Database models:
+- src/c1_agent_models/agent.py (Agent, AgentLog, AgentWorktree, WorktreeCommit, AgentResult)
+
+Services:
+- src/c2_agent_service/agent_manager.py (AgentManager - lifecycle management)
+- src/c2_monitoring_guardian/guardian.py (Guardian - individual agent monitoring)
+- src/c2_monitoring_guardian/conductor.py (Conductor - system-wide coordination)
+- src/c2_worktree_service/worktree_manager.py (WorktreeManager - git isolation)
+
+Routes:
+- src/c3_agent_routes/agent_routes.py (Agent API endpoints)
+
+Interfaces:
+- src/interfaces/cli_interface.py (CLIAgentInterface - AI CLI tool abstraction)
+
+Tests:
+- tests/test_agent_output_integration.py
+- tests/test_agent_output_capture.py
+- tests/test_diagnostic_agent.py
+
+TERMINOLOGY ISSUES IDENTIFIED
+------------------------------
+
+1. VAGUE: "agent" without context
+   - BETTER: "Agent instance", "managed AI agent", "CLI agent"
+
+2. CONFUSING: "Is Hephaestus the agent?"
+   - CLARIFICATION: Hephaestus MANAGES agents, it is NOT itself an agent
+   - Hephaestus is the ORCHESTRATION PLATFORM
+
+3. AMBIGUOUS: "agent monitoring"
+   - CLARIFICATION: Guardian monitors agent OUTPUT and TRAJECTORY
+   - NOT monitoring Hephaestus system health (that's system monitoring)
+
+4. UNCLEAR: "agent task"
+   - BETTER: "Task assigned to agent", "agent's current task"
+
+5. VAGUE: "create agent"
+   - BETTER: "Launch managed AI CLI instance for task"
+
+RECOMMENDATIONS
+---------------
+
+1. Documentation updates:
+   - Add glossary defining "Agent" vs "Hephaestus" vs "Guardian" vs "Conductor"
+   - Add architecture diagram showing agent relationships
+
+2. Code comments:
+   - Add module-level docstring to agent.py explaining Agent concept
+   - Add comments to AgentManager explaining what it manages
+
+3. Naming improvements:
+   - Consider "ManagedAgentInstance" or "AIAgentInstance" for clarity
+   - Rename "agent_manager" to "ai_agent_manager" or "cli_agent_manager"
+
+4. UI/Frontend:
+   - Show clear distinction between Hephaestus system and managed agent instances
+   - Label agent list as "Managed AI Agents" not just "Agents"
+
+CONCLUSION
+----------
+
+"Agent" in Hephaestus = ONE RUNNING AI CLI TOOL INSTANCE
+- NOT the Hephaestus system itself
+- NOT Guardian (monitoring service)
+- NOT Conductor (coordination service)
+- NOT a generic concept
+
+An Agent is a CONCRETE DATABASE ENTITY representing:
+- One tmux session running Claude Code (or similar AI CLI)
+- One git worktree with isolated branch
+- One assigned task
+- One monitored trajectory
+- One lifecycle from creation to termination
+
+Hephaestus creates, manages, monitors, and coordinates MULTIPLE parallel Agent instances to accomplish work.

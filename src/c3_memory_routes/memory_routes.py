@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field
 
-from src.c1_memory_models.memory import Memory
+from src.memory.memory import Memory
 from src.c1_task_models.task import Task
 from src.c1_workflow_models.workflow import Workflow, Phase
 from src.c1_agent_models.agent import Agent, AgentResult
