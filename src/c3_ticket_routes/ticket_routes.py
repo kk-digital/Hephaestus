@@ -32,10 +32,10 @@ class CreateTicketRequest(BaseModel):
 
 class CreateTicketResponse(BaseModel):
     ticket_id: str
-    ticket_number: int
     workflow_id: str
     status: str
     message: str
+    ticket_number: Optional[int] = None  # Optional for backward compatibility
 
 
 class UpdateTicketRequest(BaseModel):

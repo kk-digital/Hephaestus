@@ -117,10 +117,11 @@ def setup_test_database():
         os.remove(db_path)
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def client(setup_test_database):
-    """Create FastAPI test client."""
-    return TestClient(app)
+    """Create FastAPI test client with startup/shutdown events."""
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 @pytest.fixture

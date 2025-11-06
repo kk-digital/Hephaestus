@@ -1,0 +1,292 @@
+TASK-142: Improve Test Failure Messages for FAILING Tests
+======================================================================
+Date Created: 2025-11-06
+Status: PENDING
+Priority: CRITICAL
+Category: Test Quality, Diagnostics, Developer Experience
+
+OBJECTIVE:
+==========
+
+Review the 104 failing tests and ensure each provides SPECIFIC and INFORMATIVE
+failure messages. Currently, most show "Test failed (no error message captured)"
+which makes diagnosis impossible.
+
+This task focuses exclusively on failing tests to enable efficient fixing.
+Improving passing tests is handled separately in task-143 (lower priority).
+
+PROBLEM STATEMENT:
+==================
+
+Current situation:
+- 104 tests failing (23% of suite)
+- Most show generic "Test failed (no error message captured)"
+- No context about what assertions failed
+- No information about expected vs actual values
+- Difficult to diagnose root causes without running each test individually
+
+Desired outcome:
+- Every failing test assertion includes descriptive failure message
+- Expected vs actual values clearly shown
+- Context about what is being tested
+- Specific error information captured and displayed
+- Test failures are self-documenting
+- Can diagnose issues directly from test suite output
+
+SCOPE:
+======
+
+1. FAILING TEST REVIEW (104 tests - task-37 through task-140)
+   - Review each of the 104 failing tests
+   - Identify assertions without descriptive messages
+   - Identify missing diagnostic output
+   - Document improvement opportunities
+   - Focus exclusively on failing tests for maximum efficiency
+
+2. MESSAGE IMPROVEMENT PATTERNS
+   - Add descriptive messages to all assertions
+   - Include expected vs actual values in messages
+   - Add context about what is being tested
+   - Capture and display relevant state information
+   - Use pytest's built-in message features effectively
+
+3. IMPLEMENTATION
+   - Update test assertions to include messages
+   - Add diagnostic prints for test setup/teardown
+   - Ensure exception messages are captured
+   - Add contextual information to test failures
+   - Follow consistent message formatting
+
+4. VERIFICATION
+   - Re-run all 104 tests with improvements
+   - Verify failure messages are now specific and informative
+   - Update task failure summaries with new error details
+   - Confirm messages enable efficient diagnosis
+
+IMPROVEMENT PATTERNS:
+=====================
+
+Pattern 1: Basic assertion messages
+BEFORE:
+    assert result == expected
+
+AFTER:
+    assert result == expected, (
+        f"Test failed: expected {expected}, got {result}. "
+        f"Context: {additional_context}"
+    )
+
+Pattern 2: Boolean assertions
+BEFORE:
+    assert condition
+
+AFTER:
+    assert condition, (
+        f"Condition failed: {condition_description}. "
+        f"State: {relevant_state}"
+    )
+
+Pattern 3: Collection assertions
+BEFORE:
+    assert len(items) == 5
+
+AFTER:
+    assert len(items) == 5, (
+        f"Expected 5 items, got {len(items)}. "
+        f"Items: {items}"
+    )
+
+Pattern 4: Exception testing
+BEFORE:
+    with pytest.raises(ValueError):
+        function()
+
+AFTER:
+    with pytest.raises(ValueError) as exc_info:
+        function()
+    assert "expected error message" in str(exc_info.value), (
+        f"Expected specific error message, got: {exc_info.value}"
+    )
+
+Pattern 5: Mock call verification
+BEFORE:
+    mock.assert_called_once()
+
+AFTER:
+    assert mock.call_count == 1, (
+        f"Expected mock called once, got {mock.call_count} calls. "
+        f"Calls: {mock.call_args_list}"
+    )
+
+Pattern 6: Setup/teardown diagnostics
+Add diagnostic output at key points:
+    print(f"[TEST SETUP] Agent created with ID: {agent.id}")
+    print(f"[TEST ACTION] Calling function with params: {params}")
+    print(f"[TEST VERIFY] Result: {result}, Expected: {expected}")
+    print(f"[TEST TEARDOWN] Cleanup completed")
+
+METHODOLOGY:
+============
+
+Phase 1: Quick Analysis (1-2 hours)
+- Run sample of failing tests with -vv (very verbose)
+- Identify common patterns of missing diagnostics
+- Create improvement templates for common cases
+
+Phase 2: Test File Categorization (2 hours)
+- Group 104 tests by test file
+- Identify systematic improvements per file
+- Prioritize files with most failures
+
+Phase 3: Implementation (10-15 hours)
+- Update tests file by file
+- Apply improvement patterns consistently
+- Test each file after updates
+- Document remaining issues
+
+Phase 4: Verification (2-3 hours)
+- Re-run full test suite with improvements
+- Capture new, specific error messages
+- Update task-37 through task-140 with better error details
+- Generate updated failure summary
+
+Phase 5: Documentation (1-2 hours)
+- Document improvement patterns used
+- Create guidelines for future test writing
+- Update test documentation with best practices
+
+DELIVERABLES:
+=============
+
+[ ] Analysis of current test diagnostic gaps
+[ ] Improvement patterns documented
+[ ] All 104 failing tests updated with better messages
+[ ] Test suite re-run with captured specific errors
+[ ] Updated failure summaries for task-37 through task-140
+[ ] Test diagnostic guidelines document
+[ ] Comprehensive report generated
+
+REPORT REQUIREMENTS:
+====================
+
+Create report: reports/test-failure-message-improvements.txt
+
+Report sections:
+1. Executive Summary
+   - Tests reviewed: 104
+   - Common diagnostic gaps identified
+   - Improvements implemented
+
+2. Before/After Examples
+   - Show 5-10 examples of improved messages
+   - Demonstrate diagnostic value added
+
+3. Implementation Summary
+   - Tests updated by file
+   - Patterns applied
+   - Remaining issues
+
+4. Updated Failure Details
+   - New specific error messages for all 104 tests
+   - Organized by category
+   - Actionable diagnostic information
+
+5. Guidelines for Future
+   - Best practices for test assertion messages
+   - Diagnostic output recommendations
+   - Examples and templates
+
+ACCEPTANCE CRITERIA:
+====================
+
+- All 104 failing tests have been reviewed
+- Every assertion includes descriptive failure message
+- Test failures are self-documenting with context
+- Re-run test suite captures specific error details
+- Updated error messages enable efficient diagnosis
+- Guidelines documented for future test writing
+
+ESTIMATED EFFORT:
+=================
+
+- Phase 1 (Analysis): 1-2 hours
+- Phase 2 (Categorization): 2 hours
+- Phase 3 (Implementation): 10-15 hours
+- Phase 4 (Verification): 2-3 hours
+- Phase 5 (Documentation): 1-2 hours
+
+Total: 16-24 hours
+
+DEPENDENCIES:
+=============
+
+- Access to all test files
+- Ability to run tests
+- Understanding of pytest assertion messages
+- Knowledge of tested functionality
+
+INTEGRATION:
+============
+
+This task should be executed BEFORE or IN PARALLEL with:
+- task-141: Review test deletions (may inform which tests to improve)
+- task-37 through task-140: Individual test fixes (benefits from better diagnostics)
+- task-36: Master coordination (updated with better failure details)
+
+Findings from this task will:
+- Enable more efficient diagnosis of root causes
+- Reduce time needed for individual test fixes
+- Improve overall test suite quality
+- Establish better testing practices going forward
+
+PRIORITY RATIONALE:
+===================
+
+This is CRITICAL priority because:
+1. Can't efficiently fix tests without knowing why they fail
+2. Generic error messages waste time running tests individually
+3. Improves all 104 test fix tasks simultaneously
+4. Benefits entire test suite, not just current failures
+5. Establishes better practices for future test development
+
+Better diagnostic messages will 10x the efficiency of fixing actual issues.
+
+FILE-BY-FILE BREAKDOWN:
+========================
+
+Test files with multiple failures (prioritize these):
+- tests/test_conductor.py: 7 failures
+- tests/test_monitoring_integration.py: 8 failures
+- tests/test_diagnostic_integration.py: 6 failures
+- tests/test_prompt_delivery.py: 7 failures
+- tests/test_worktree_manager.py: 7 failures
+- tests/test_guardian.py: 2 failures
+- tests/test_structured_analysis.py: 3 failures
+- tests/test_mcp_server_tickets.py: 5 failures
+- tests/test_steering_fix.py: 3 failures
+- tests/test_ticket_system.py: Multiple failures
+
+Address these files first as they contain clusters of failures that likely
+share common diagnostic needs.
+
+NOTES:
+======
+
+This task is foundational for efficient execution of all other test fix tasks.
+Without specific error messages, each test fix requires:
+1. Running test individually
+2. Adding debug output manually
+3. Re-running to see actual failure
+4. Diagnosing from better output
+5. Implementing fix
+
+With specific error messages from the start, we skip steps 1-3 and can diagnose
+directly from test suite output.
+
+Time investment: 16-24 hours
+Time saved: 50-100+ hours across all test fixes
+ROI: 3-5x efficiency gain
+
+[USER APPROVAL NEEDED]
+If test message improvements reveal systematic issues (e.g., all failures due
+to common cause), recommend adjusting fix strategy accordingly.

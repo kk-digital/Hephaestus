@@ -1,0 +1,197 @@
+TASK-141: Review Test Deletions and Modifications Since Refactoring
+======================================================================
+Date Created: 2025-11-06
+Status: PENDING
+Priority: CRITICAL
+Category: Investigation, Quality Assurance, Code Review
+
+OBJECTIVE:
+==========
+
+Review all commits since refactoring began to identify test modifications and
+deletions. Determine if tests were inappropriately removed (deleted instead of
+fixed) versus legitimately removed (obsolete, redundant, or replaced).
+
+This investigation may reveal root causes for current test failures and identify
+tests that should be restored or refactored rather than remaining deleted.
+
+SCOPE:
+======
+
+1. COMMIT HISTORY REVIEW
+   - Identify refactoring start date/commit
+   - Review all commits from refactoring start to present
+   - Focus on changes to tests/ directory
+   - Track test file deletions, modifications, and moves
+
+2. TEST DELETION ANALYSIS
+   - Identify all test files deleted
+   - Identify all test functions removed from existing files
+   - For each deletion, determine:
+     * Was test redundant/obsolete? (LEGITIMATE)
+     * Was test replaced by better test? (LEGITIMATE)
+     * Was test removed to silence failure? (INAPPROPRIATE)
+     * Was test removed due to refactored code? (NEEDS RESTORATION)
+
+3. TEST MODIFICATION ANALYSIS
+   - Identify tests with significant modifications
+   - Determine if modifications were:
+     * Updates to match refactored code (LEGITIMATE)
+     * Weakening of assertions to pass (INAPPROPRIATE)
+     * Commenting out of failing assertions (INAPPROPRIATE)
+     * Proper refactoring of test logic (LEGITIMATE)
+
+4. CORRELATION WITH CURRENT FAILURES
+   - Cross-reference deleted/modified tests with current 104 failures
+   - Identify if any current failures are in areas where tests were removed
+   - Determine if restoration of deleted tests would improve coverage
+
+INVESTIGATION METHODOLOGY:
+==========================
+
+1. Find refactoring start point:
+   - git log --all --oneline --grep="refactor"
+   - Review commit messages for refactoring initiation
+   - Identify baseline commit before refactoring
+
+2. Generate test change report:
+   - git log --since="<refactor-start-date>" --name-status -- tests/
+   - Filter for D (deleted) and M (modified) files
+   - Create comprehensive list of all test changes
+
+3. For each deleted test file:
+   - Extract test file content from pre-deletion commit
+   - Review what functionality was tested
+   - Check if functionality still exists in codebase
+   - Determine if test should be restored/refactored
+
+4. For each modified test file:
+   - git diff <baseline-commit> HEAD -- <test-file>
+   - Review assertion changes, removed test functions
+   - Identify weakened or removed assertions
+   - Flag suspicious modifications
+
+5. For each test function removal within file:
+   - Identify commit where function was removed
+   - Review commit message and context
+   - Determine appropriateness of removal
+
+DELIVERABLES:
+=============
+
+[ ] Refactoring baseline commit identified
+[ ] Complete list of deleted test files with analysis
+[ ] Complete list of modified test files with change summary
+[ ] List of test functions removed from existing files
+[ ] Categorization: LEGITIMATE vs INAPPROPRIATE vs NEEDS_RESTORATION
+[ ] Correlation report with current 104 test failures
+[ ] Recommendations for test restoration/refactoring
+[ ] Detailed report generated
+
+REPORT REQUIREMENTS:
+====================
+
+Create report: reports/test-deletion-review-since-refactor.txt
+
+Report sections:
+1. Executive Summary
+   - Total commits reviewed
+   - Refactoring baseline identified
+   - Summary of findings
+
+2. Test Files Deleted
+   - List of deleted test files with commit references
+   - Categorization and justification analysis
+   - Recommendations for restoration
+
+3. Test Files Modified
+   - Significant modifications to existing test files
+   - Analysis of assertion changes
+   - Flagged suspicious weakening of tests
+
+4. Test Functions Removed
+   - Functions removed from existing test files
+   - Analysis of removal appropriateness
+   - Recommendations for restoration
+
+5. Correlation with Current Failures
+   - How deletions/modifications relate to 104 current failures
+   - Potential coverage gaps introduced
+
+6. Recommendations
+   - Tests to restore immediately
+   - Tests to refactor and re-enable
+   - Systemic issues identified
+   - Process improvements to prevent inappropriate test deletion
+
+ACCEPTANCE CRITERIA:
+====================
+
+- All commits since refactoring reviewed
+- Every test deletion analyzed and categorized
+- Every significant modification documented
+- Clear recommendations for each deleted/modified test
+- Correlation with current failures established
+- Report is comprehensive and actionable
+
+ESTIMATED EFFORT:
+=================
+
+- Commit history review: 2-3 hours
+- Test deletion analysis: 4-6 hours
+- Test modification analysis: 3-4 hours
+- Correlation and recommendations: 2-3 hours
+- Report writing: 2 hours
+
+Total: 13-18 hours
+
+DEPENDENCIES:
+=============
+
+- Git repository access
+- Ability to checkout historical commits
+- Understanding of codebase structure pre/post refactor
+- Knowledge of what functionality should be tested
+
+RELATED TASKS:
+==============
+
+- task-34: Review refactor test changes (broader review)
+- task-35: Analyze test failures (current failure analysis)
+- task-36: Master test fix coordination (overall coordination)
+- task-37 through task-140: Individual test failure fixes
+
+INTEGRATION:
+============
+
+Findings from this task may:
+- Identify systemic issues affecting multiple test failures
+- Reduce number of individual fixes needed (if tests should be restored)
+- Inform prioritization of test fix tasks
+- Reveal patterns in refactoring that led to test failures
+
+USER APPROVAL ITEMS:
+====================
+
+[USER APPROVAL NEEDED]
+If analysis reveals that many tests were inappropriately deleted (removed to
+silence failures rather than properly fixed), recommend:
+1. Halt individual test fix tasks temporarily
+2. Focus on systematic restoration of deleted tests
+3. Review refactoring process to prevent future inappropriate deletions
+4. Establish test deletion review policy
+
+Will flag for user approval if systematic inappropriate deletions discovered.
+
+NOTES:
+======
+
+This task is CRITICAL priority because findings may fundamentally change
+approach to fixing the 104 current test failures. Should be executed before
+or in parallel with individual test fix tasks.
+
+Potential outcomes:
+- Discover many "failures" are actually missing tests that should be restored
+- Identify patterns that allow bulk fixes rather than individual fixes
+- Reveal process issues in refactoring approach
+- Inform future refactoring best practices

@@ -1,0 +1,228 @@
+TASK-33: Fix and Confirm .env Documentation Accuracy
+======================================================
+Date Created: 2025-11-06
+Status: ACTIVE
+Priority: HIGH
+Category: Documentation, Configuration
+
+PROBLEM IDENTIFIED:
+===================
+
+The .env file documentation does NOT match the actual configuration used by Hephaestus.
+
+CONFIGURATION MISMATCH:
+-----------------------
+
+1. INFERENCE/MAIN LLM (PART 1):
+   - DOCUMENTED: Only Anthropic subscription, Zai subscription, or Anthropic API
+   - CONFIGURED: OpenRouter (hephaestus_config.yaml: default_provider: "openrouter")
+   - MISSING: OpenRouter option not documented, LM Studio option not documented
+   - ISSUE: Users cannot configure OpenRouter or LM Studio for inference based on docs
+
+2. EMBEDDINGS (PART 2):
+   - DOCUMENTED: OpenAI or LM Studio ✓ CORRECT
+   - CONFIGURED: OpenAI (EMBEDDING_PROVIDER=openai) ✓ MATCHES
+
+3. CODE REVIEW (PART 3):
+   - DOCUMENTED: LM Studio (gptoss120/gpt20) or Groq ✓ CORRECT
+   - CONFIGURED: LM Studio (CODE_REVIEW_PROVIDER=lmstudio) ✓ MATCHES
+
+ACTUAL HEPHAESTUS ARCHITECTURE:
+================================
+
+1. INFERENCE/MAIN LLM OPTIONS:
+   a) Claude Code (with existing account) - PRIMARY OPTION
+      - Uses existing Claude Code authentication
+      - No API key needed in .env
+      - Configured in Claude Code settings, not Hephaestus
+
+   b) OpenRouter (API key required)
+      - Cloud-based, pay-per-use
+      - Multiple model options
+      - OPENROUTER_API_KEY needed
+
+   c) LM Studio (local, free)
+      - Local inference server
+      - Requires local GPU/CPU
+      - No API key needed
+
+   d) Anthropic API (API key required)
+      - Direct Anthropic API
+      - Pay-per-token
+      - ANTHROPIC_API_KEY needed
+
+2. EMBEDDINGS OPTIONS:
+   a) OpenAI (API key required)
+      - Model: text-embedding-3-large
+      - High quality, fast, reliable
+      - OPENAI_API_KEY needed
+
+   b) LM Studio (local, free)
+      - Model: nomic-embed-text-v1.5
+      - Free, private, no internet
+      - No API key needed
+
+3. CODE REVIEW OPTIONS:
+   a) LM Studio (local, free)
+      - Models: gptoss120 or gpt20
+      - Used ONLY for code review
+
+   b) Groq (API key required)
+      - Fast cloud inference
+      - GROQ_API_KEY needed
+
+REQUIRED CHANGES TO .env FILE:
+===============================
+
+PART 1: Update to include ALL inference options
+------------------------------------------------
+
+Add Option D: Claude Code (Existing Account) - RECOMMENDED DEFAULT
+# - Use existing Claude Code subscription/authentication
+# - No API key configuration needed in .env
+# - Authentication handled by Claude Code itself
+# - This is the PRIMARY option for most users
+INFERENCE_PROVIDER=claude-code
+# No API key needed - Claude Code handles authentication
+
+Add Option E: OpenRouter (API Key)
+# - Cloud-based multi-model access
+# - Pay-per-use pricing
+# - Multiple model options available
+INFERENCE_PROVIDER=openrouter
+OPENROUTER_API_KEY=sk-or-your-key-here
+OPENROUTER_MODEL=openai/gpt-oss-120b
+
+Add Option F: LM Studio (Local)
+# - Local inference server
+# - Free, private, no API costs
+# - Requires local GPU/CPU
+INFERENCE_PROVIDER=lmstudio
+LMSTUDIO_INFERENCE_URL=http://localhost:1234/v1
+LMSTUDIO_INFERENCE_MODEL=gptoss120
+
+Keep existing Anthropic options as documented
+
+VERIFICATION CHECKLIST:
+=======================
+
+[ ] Review hephaestus_config.yaml for actual default configuration
+[ ] Check all provider options used in codebase
+[ ] Verify environment variable names match code expectations
+[ ] Document all required vs optional API keys
+[ ] Add example configurations for each provider combination
+[ ] Test each documented configuration option
+[ ] Update README.md if it references provider options
+[ ] Update INSTALLATION.txt if it references configuration
+
+TESTING REQUIREMENTS:
+=====================
+
+For each inference provider option:
+1. Verify configuration loads correctly
+2. Test actual connection/authentication
+3. Verify error messages are clear when misconfigured
+4. Document expected behavior for each option
+
+FILES TO UPDATE:
+================
+
+1. .env (PRIMARY)
+   - Add missing provider options to PART 1
+   - Clarify which options require API keys
+   - Add Claude Code option as recommended default
+
+2. .env.example (if different from .env)
+   - Ensure it matches .env structure
+   - Include all provider options
+
+3. hephaestus_config.yaml documentation
+   - Verify default_provider options are documented
+   - Cross-reference with .env options
+
+4. README.md (if applicable)
+   - Update provider configuration section
+   - Clarify setup steps for each option
+
+5. INSTALLATION.txt (if applicable)
+   - Update installation steps
+   - Clarify provider requirements
+
+CURRENT STATUS OF API KEYS:
+============================
+
+CONFIGURED IN .env:
+- OPENAI_API_KEY: sk-proj-iQ6ASKj... (QUOTA EXCEEDED - no credits)
+- OPENROUTER_API_KEY: NOT CONFIGURED
+- GROQ_API_KEY: NOT CONFIGURED
+- ANTHROPIC_API_KEY: NOT CONFIGURED
+- LM Studio: NOT RUNNING
+
+RECOMMENDATIONS:
+- Primary: Use Claude Code with existing account (no .env config needed)
+- Embeddings: Switch to LM Studio (free) OR add OpenAI credits
+- Code Review: Start LM Studio with gptoss120 model
+
+IMPLEMENTATION STEPS:
+=====================
+
+1. Document current configuration
+   - Read hephaestus_config.yaml
+   - Read .env current settings
+   - Document actual behavior
+
+2. Update .env PART 1 documentation
+   - Add Claude Code option (recommended)
+   - Add OpenRouter option
+   - Add LM Studio inference option
+   - Clarify Anthropic options
+
+3. Add configuration examples
+   - Example 1: Claude Code + LM Studio embeddings + LM Studio review (ALL FREE)
+   - Example 2: Claude Code + OpenAI embeddings + LM Studio review (DEFAULT)
+   - Example 3: OpenRouter + OpenAI embeddings + Groq review (ALL CLOUD)
+   - Example 4: LM Studio only (ALL LOCAL, ALL FREE)
+
+4. Verify documentation matches code
+   - Check provider loading logic
+   - Verify environment variable names
+   - Test each configuration option
+
+5. Create validation script
+   - Script to verify .env configuration
+   - Check for required API keys
+   - Verify service connectivity
+   - Report configuration status
+
+DELIVERABLES:
+=============
+
+[ ] Updated .env file with complete documentation
+[ ] Updated .env.example (if separate)
+[ ] Configuration validation script
+[ ] Test results for each provider option
+[ ] README/INSTALLATION updates (if needed)
+[ ] Task completion report
+
+DEPENDENCIES:
+=============
+
+- Access to hephaestus_config.yaml
+- Understanding of actual provider implementation in codebase
+- Test environment to verify each configuration
+
+ESTIMATED EFFORT:
+=================
+
+Documentation updates: 30 minutes
+Testing configurations: 60 minutes
+Validation script: 30 minutes
+Total: 2 hours
+
+NOTES:
+======
+
+- User has existing Claude Code account - should be PRIMARY option
+- OpenAI key has no credits - not usable without adding billing
+- LM Studio not currently running - needs setup if using local options
+- OpenRouter configured in hephaestus_config.yaml but not in .env docs

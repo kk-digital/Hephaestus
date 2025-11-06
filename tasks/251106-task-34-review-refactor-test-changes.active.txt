@@ -1,0 +1,272 @@
+TASK-34: Comprehensive Review of Test Changes Since Refactor
+===============================================================
+Date Created: 2025-11-06
+Status: ACTIVE
+Priority: CRITICAL
+Category: Quality Assurance, Testing, Code Review
+
+OBJECTIVE:
+==========
+
+Perform comprehensive review of all commits since the refactoring began to:
+1. Identify ALL tests that were modified
+2. Identify ALL tests that were deleted
+3. Determine WHY each test was deleted or modified
+4. Assess whether deleted/modified tests need to be restored
+5. Document test coverage gaps created by deletions
+
+SCOPE:
+======
+
+Review Period: From start of three-layer architecture refactoring to present
+- Start: Commit where refactor/three-layer-architecture branch was created
+- End: Current HEAD on main branch
+
+Files to Review:
+- All files in tests/ directory
+- All test-related configuration (pytest.ini, conftest.py, etc.)
+- All commits that modified or deleted test files
+
+METHODOLOGY:
+============
+
+PHASE 1: Commit History Analysis
+---------------------------------
+
+1. Identify refactor start point
+   - Find first commit of refactoring effort
+   - Document baseline test count and structure
+   - Baseline command: git log --all --oneline --graph --grep="refactor"
+
+2. Generate complete commit log for tests
+   - Command: git log --all --oneline --follow -- tests/
+   - Save to: commit-log-tests.txt
+   - Include: Commit hash, date, author, message
+
+3. Identify all commits that modified tests
+   - Command: git log --all --stat --follow -- tests/ > test-modifications.txt
+   - Filter commits that changed test files
+   - Categorize by: added, modified, deleted
+
+4. Identify all commits that deleted tests
+   - Command: git log --all --diff-filter=D --summary -- tests/ > test-deletions.txt
+   - List all deleted test files
+   - Record commit where each deletion occurred
+
+PHASE 2: Test File Inventory
+-----------------------------
+
+1. Baseline test inventory (before refactor)
+   - Checkout refactor start commit
+   - Count all test files: find tests/ -name "test_*.py" | wc -l
+   - List all test functions: pytest --collect-only
+   - Save baseline inventory
+
+2. Current test inventory
+   - Checkout main branch HEAD
+   - Count current test files
+   - List current test functions
+   - Save current inventory
+
+3. Generate diff report
+   - Compare baseline vs current
+   - Identify: Missing test files
+   - Identify: Missing test functions within existing files
+   - Identify: New test files added
+   - Identify: New test functions added
+
+PHASE 3: Per-File Analysis
+---------------------------
+
+For EACH deleted test file:
+
+1. Retrieve original test file content
+   - Command: git show <commit-before-deletion>:<file-path> > deleted-tests/<filename>
+   - Save original test code
+
+2. Analyze deletion reason
+   - Read commit message for deletion
+   - Check associated PR/issue if available
+   - Classify reason:
+     * Duplicate test (covered elsewhere)
+     * Obsolete code (feature removed)
+     * Refactored (moved to different location)
+     * Improper deletion (no valid reason)
+     * Broken test (deleted instead of fixed)
+
+3. Assess test value
+   - What functionality did test cover?
+   - Is functionality still present in codebase?
+   - Is functionality covered by other tests?
+   - Risk level if not tested: LOW/MEDIUM/HIGH/CRITICAL
+
+4. Restoration decision
+   - RESTORE: Test needed, functionality exists, not covered elsewhere
+   - NO ACTION: Test properly removed (duplicate/obsolete)
+   - REWRITE: Test needs updating for new architecture
+   - INVESTIGATE: Unclear if test needed
+
+For EACH modified test file:
+
+1. Generate diff
+   - Command: git diff <refactor-start> HEAD -- <file-path>
+   - Review all changes to test file
+
+2. Analyze modifications
+   - Were assertions weakened? (less strict checks)
+   - Were test cases removed?
+   - Were mocks changed? (hiding real behavior)
+   - Were tests skipped/marked xfail?
+
+3. Assess modification appropriateness
+   - APPROPRIATE: Necessary update for new architecture
+   - QUESTIONABLE: Changes may reduce test effectiveness
+   - IMPROPER: Changes weaken test coverage without justification
+
+PHASE 4: Test Coverage Analysis
+--------------------------------
+
+1. Run current test suite with coverage
+   - Command: pytest --cov=src --cov-report=html --cov-report=term
+   - Generate coverage report
+   - Identify uncovered code
+
+2. Compare coverage before/after refactor
+   - Check out refactor start commit
+   - Run pytest --cov to get baseline coverage
+   - Compare: baseline coverage % vs current coverage %
+   - Identify modules with decreased coverage
+
+3. Map deleted tests to uncovered code
+   - For each deleted test, identify what code it covered
+   - Check if that code is now uncovered
+   - Priority: Code that was covered but is now uncovered
+
+DELIVERABLES:
+=============
+
+1. Executive Summary Report
+   - Total test files: before vs after
+   - Total test functions: before vs after
+   - Test coverage %: before vs after
+   - Critical findings summary
+   - High-priority restoration recommendations
+
+2. Detailed Deletion Analysis Report
+   Format per deleted test:
+   ---
+   File: tests/test_example.py
+   Deleted in: commit abc123 (date)
+   Reason stated: "removing obsolete test"
+   Reason analysis: [IMPROPER - functionality still exists]
+   Functionality covered: User authentication flow
+   Current coverage: NOT COVERED by other tests
+   Risk level: CRITICAL
+   Recommendation: RESTORE and update for new architecture
+   ---
+
+3. Detailed Modification Analysis Report
+   Format per modified test:
+   ---
+   File: tests/test_auth.py
+   Modified in: commit def456 (date)
+   Changes: Removed 3 test cases, weakened 2 assertions
+   Reason stated: "update for new auth module"
+   Analysis: [QUESTIONABLE - removed edge case tests]
+   Justification: Not clear why edge cases removed
+   Recommendation: INVESTIGATE - restore edge case tests if still valid
+   ---
+
+4. Test Restoration Priority List
+   Priority 1 (CRITICAL): Tests for critical functionality, no other coverage
+   Priority 2 (HIGH): Tests for important functionality, partial coverage
+   Priority 3 (MEDIUM): Tests for standard functionality, good coverage elsewhere
+   Priority 4 (LOW): Tests for minor functionality, redundant coverage
+
+5. Coverage Gap Report
+   - Modules with decreased coverage
+   - Functionality now untested
+   - Risk assessment per gap
+
+6. Recommendations Document
+   - Which tests to restore immediately
+   - Which tests to rewrite
+   - Which deletions/modifications were appropriate
+   - Process improvements to prevent improper test deletion
+
+REQUIRED TOOLS/SCRIPTS:
+=======================
+
+1. test-inventory-script.sh
+   - Generate complete test inventory
+   - Count files, functions, assertions
+   - Output: CSV or JSON format
+
+2. test-diff-analyzer.py
+   - Compare two test inventories
+   - Generate detailed diff report
+   - Highlight: added, removed, modified
+
+3. test-coverage-comparator.py
+   - Compare coverage reports
+   - Identify coverage regressions
+   - Map deleted tests to coverage gaps
+
+4. commit-test-analyzer.py
+   - Parse git log for test changes
+   - Categorize changes by type
+   - Generate change summary
+
+TIMELINE:
+=========
+
+Day 1:
+- Phase 1: Commit history analysis (4 hours)
+- Phase 2: Test file inventory (2 hours)
+
+Day 2:
+- Phase 3: Per-file analysis (6 hours)
+
+Day 3:
+- Phase 4: Coverage analysis (4 hours)
+- Generate all deliverables (2 hours)
+
+Total Estimated Effort: 18 hours (2.5 days)
+
+SUCCESS CRITERIA:
+=================
+
+[ ] Complete inventory of test changes identified
+[ ] Every deleted test analyzed with reason and recommendation
+[ ] Every modified test reviewed for appropriateness
+[ ] Coverage gaps documented and prioritized
+[ ] Restoration priority list created
+[ ] Executive summary completed
+[ ] All deliverables generated
+
+RISKS:
+======
+
+- Large number of commits may make analysis time-consuming
+- Commit messages may not provide clear rationale for changes
+- Original test authors may not be available for clarification
+- Some test deletions may have been intentional but undocumented
+
+DEPENDENCIES:
+=============
+
+- Access to full git history
+- Ability to checkout and run tests at different commits
+- pytest and coverage tools installed
+- Sufficient time to review all changes thoroughly
+
+NOTES:
+======
+
+This is a CRITICAL quality assurance task. Improper test deletion or modification can:
+- Hide bugs in production
+- Reduce confidence in refactoring
+- Create technical debt
+- Risk system stability
+
+Prioritize this task highly and allocate sufficient time for thorough analysis.

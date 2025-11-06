@@ -1,0 +1,338 @@
+TASK-35: Analyze All Test Failures and Generate Root Cause Report
+====================================================================
+Date Created: 2025-11-06
+Status: ACTIVE
+Priority: CRITICAL
+Category: Quality Assurance, Testing, Debugging
+
+OBJECTIVE:
+==========
+
+1. Run complete test suite and capture ALL test failures
+2. Analyze each failure to determine root cause
+3. Categorize failures by type and severity
+4. Generate comprehensive failure report with recommendations
+5. Create prioritized fix plan
+
+SCOPE:
+======
+
+Test Execution:
+- Run full test suite: pytest tests/
+- Run with verbose output: pytest -v
+- Run with detailed error info: pytest -vv --tb=long
+- Capture all output to log files
+
+Analysis Coverage:
+- Unit tests
+- Integration tests
+- End-to-end tests
+- API tests
+- Database tests
+- Mock/fixture failures
+
+METHODOLOGY:
+============
+
+PHASE 1: Test Execution and Data Collection
+--------------------------------------------
+
+1. Prepare test environment
+   - Activate virtual environment
+   - Verify all dependencies installed
+   - Check test database/services available
+   - Document environment state
+
+2. Run tests with maximum verbosity
+   Commands:
+   a) pytest -v --tb=long tests/ 2>&1 | tee test-run-full.log
+   b) pytest --collect-only tests/ > test-collection.txt
+   c) pytest -v --tb=short tests/ --json-report --json-report-file=test-results.json
+   d) pytest --lf --tb=line tests/ > test-failures-last.txt (last failed)
+
+3. Collect test execution data
+   - Total tests: passed, failed, skipped, errors
+   - Execution time per test
+   - Failure tracebacks
+   - Error messages
+   - Warning messages
+
+4. Generate test result summary
+   - pytest --tb=no tests/ > test-summary.txt
+   - Save: pass/fail counts, percentage, duration
+
+PHASE 2: Failure Categorization
+--------------------------------
+
+For EACH failed test, categorize by:
+
+1. FAILURE TYPE
+   - AssertionError: Test assertion failed
+   - ImportError: Module import failed
+   - AttributeError: Missing attribute/method
+   - TypeError: Type mismatch
+   - ValueError: Invalid value
+   - KeyError: Missing dictionary key
+   - FileNotFoundError: Missing file/resource
+   - ConnectionError: Network/service connection failed
+   - TimeoutError: Operation timed out
+   - FixtureError: pytest fixture failed
+   - Other: (specify)
+
+2. ROOT CAUSE CATEGORY
+   - Missing Dependency: Required package not installed
+   - Configuration Error: Incorrect configuration
+   - Mock/Fixture Issue: Test setup problem
+   - Code Bug: Actual bug in application code
+   - Test Bug: Bug in test code itself
+   - Breaking Change: API/interface changed
+   - Environment Issue: Service not available
+   - Timing Issue: Race condition or timeout
+   - Data Issue: Test data invalid/missing
+   - Refactor Artifact: Test not updated after refactor
+
+3. SEVERITY LEVEL
+   - CRITICAL: Core functionality broken
+   - HIGH: Important feature broken
+   - MEDIUM: Minor feature or edge case
+   - LOW: Non-critical or cosmetic issue
+
+4. SCOPE
+   - Single Test: Only one test affected
+   - Test File: Multiple tests in one file affected
+   - Test Module: Entire test module affected
+   - Widespread: Many tests across multiple modules
+
+PHASE 3: Per-Failure Analysis
+------------------------------
+
+For EACH failed test, document:
+
+1. Test Identification
+   - Test file: tests/path/to/test_file.py
+   - Test function: test_example_function
+   - Test class: (if applicable)
+   - Line number: Where failure occurred
+
+2. Failure Details
+   - Error type: AssertionError, etc.
+   - Error message: Full error message
+   - Traceback: Complete stack trace
+   - Expected vs Actual: What was expected vs what happened
+
+3. Root Cause Analysis
+   - Immediate cause: What directly caused failure
+   - Underlying cause: Why did immediate cause occur
+   - Contributing factors: Other factors involved
+   - First occurrence: When did this test start failing
+
+4. Code Context
+   - What functionality is being tested
+   - What changed recently in this area
+   - Related commits: git log --oneline -- <file>
+   - Dependencies: What other code/tests depend on this
+
+5. Fix Complexity
+   - TRIVIAL: Simple fix, < 5 minutes
+   - SIMPLE: Straightforward fix, < 30 minutes
+   - MODERATE: Requires investigation, < 2 hours
+   - COMPLEX: Significant work, > 2 hours
+   - BLOCKED: Cannot fix without external dependency
+
+PHASE 4: Pattern Analysis
+--------------------------
+
+Identify patterns across failures:
+
+1. Common Root Causes
+   - What root cause appears most frequently?
+   - Are failures clustered in specific areas?
+   - Are certain types of tests failing more?
+
+2. Systemic Issues
+   - Infrastructure problems (database, services)
+   - Configuration issues affecting multiple tests
+   - Mock/fixture problems used across tests
+   - Breaking changes affecting many tests
+
+3. Dependency Chains
+   - Do some failures cascade to others?
+   - Are fixture failures causing test failures?
+   - Are shared utilities broken?
+
+4. Code Quality Indicators
+   - Which modules have most test failures?
+   - Are recent commits correlated with failures?
+   - Are certain authors' code failing more?
+
+DELIVERABLES:
+=============
+
+1. Executive Summary Report
+   Format:
+   ---
+   TEST SUITE HEALTH REPORT
+   Date: 2025-11-06
+
+   OVERALL STATISTICS:
+   - Total Tests: XXX
+   - Passed: XXX (XX%)
+   - Failed: XXX (XX%)
+   - Skipped: XXX (XX%)
+   - Errors: XXX (XX%)
+   - Duration: XX minutes
+
+   FAILURE BREAKDOWN BY SEVERITY:
+   - Critical: XX failures
+   - High: XX failures
+   - Medium: XX failures
+   - Low: XX failures
+
+   TOP 3 ROOT CAUSES:
+   1. [Cause]: XX failures
+   2. [Cause]: XX failures
+   3. [Cause]: XX failures
+
+   RECOMMENDED IMMEDIATE ACTIONS:
+   1. [Action]
+   2. [Action]
+   3. [Action]
+   ---
+
+2. Detailed Failure Analysis Report
+   Format per failure:
+   ---
+   FAILURE #1
+   Test: tests/test_auth.py::test_user_login
+   Type: AssertionError
+   Severity: CRITICAL
+   Scope: Single Test
+
+   ERROR MESSAGE:
+   assert response.status_code == 200
+   AssertionError: assert 401 == 200
+
+   ROOT CAUSE:
+   Type: Code Bug
+   Description: Authentication middleware not properly handling session tokens
+   First Occurred: Commit abc123 (2025-11-05)
+
+   ANALYSIS:
+   The test expects successful login but receives 401 Unauthorized.
+   Recent refactoring moved auth logic to new middleware module.
+   Session token validation logic was not properly migrated.
+
+   FIX COMPLEXITY: MODERATE (1-2 hours)
+
+   RECOMMENDED FIX:
+   1. Review session token handling in new middleware
+   2. Restore token validation logic from pre-refactor code
+   3. Add integration test for session flow
+
+   DEPENDENCIES:
+   - Requires access to auth middleware code
+   - May affect other auth-related tests
+
+   PRIORITY: HIGH (blocks user authentication)
+   ---
+
+3. Failure Pattern Report
+   - Common patterns identified
+   - Systemic issues summary
+   - Affected code areas
+   - Dependency chain diagram (if complex)
+
+4. Fix Priority Matrix
+   Table format:
+   | Priority | Test | Severity | Fix Complexity | Assigned To | Status |
+   |----------|------|----------|----------------|-------------|--------|
+   | P1       | test_login | CRITICAL | MODERATE | [Name] | TODO |
+   | P2       | test_api_auth | HIGH | SIMPLE | [Name] | TODO |
+   ...
+
+5. Quick Win List
+   - Failures that can be fixed quickly (< 30 min each)
+   - TRIVIAL and SIMPLE complexity fixes
+   - High impact relative to effort
+
+6. Blocked Issues List
+   - Failures that cannot be fixed immediately
+   - External dependencies needed
+   - Infrastructure/environment issues
+
+7. Recommendations Document
+   - Process improvements to prevent failures
+   - Test infrastructure improvements needed
+   - Code quality improvements
+   - CI/CD recommendations
+
+REQUIRED TOOLS:
+===============
+
+1. pytest plugins
+   - pytest-json-report: JSON output
+   - pytest-html: HTML reports
+   - pytest-cov: Coverage tracking
+   - pytest-xdist: Parallel execution (optional)
+
+2. Analysis scripts
+   - failure-categorizer.py: Auto-categorize failures
+   - pattern-analyzer.py: Identify patterns
+   - priority-calculator.py: Calculate fix priorities
+   - report-generator.py: Generate formatted reports
+
+3. Utilities
+   - git log parsing for commit correlation
+   - Graphing tool for dependency visualization
+   - Diff tool for comparing test runs
+
+TIMELINE:
+=========
+
+Hour 1-2: Test execution and data collection
+Hour 3-4: Initial failure review and categorization
+Hour 5-8: Detailed per-failure analysis
+Hour 9-10: Pattern analysis and synthesis
+Hour 11-12: Report generation and prioritization
+
+Total Estimated Effort: 12 hours (1.5 days)
+
+SUCCESS CRITERIA:
+=================
+
+[ ] Complete test suite executed
+[ ] All failures documented and analyzed
+[ ] Root causes identified for each failure
+[ ] Failures categorized by type, severity, scope
+[ ] Patterns and systemic issues identified
+[ ] Fix priority matrix created
+[ ] Executive summary completed
+[ ] Detailed analysis report completed
+[ ] Recommendations documented
+
+FOLLOW-UP TASKS:
+================
+
+Based on report findings:
+- Create individual bug fix tasks for each failure
+- Schedule infrastructure improvements
+- Plan refactoring to address systemic issues
+- Implement process improvements
+
+NOTES:
+======
+
+CRITICAL QUALITY GATE:
+This task determines the health of the entire test suite and codebase.
+Failures indicate potential production bugs.
+Prioritize understanding and fixing failures over feature work.
+
+COLLABORATION:
+- May need input from original test authors
+- May need input from code owners for affected modules
+- May need DevOps for infrastructure issues
+
+DOCUMENTATION:
+- Document any workarounds discovered
+- Update test documentation with findings
+- Share learnings with team

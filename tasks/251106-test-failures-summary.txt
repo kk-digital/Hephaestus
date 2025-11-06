@@ -1,0 +1,422 @@
+TEST FAILURES SUMMARY
+======================================================================
+Date: 2025-11-06 12:54:56
+Total Failures: 104
+
+FAILED TESTS:
+
+1. tests/integration/test_qdrant_mcp_integration.py::test_agent_prompt_includes_qdrant_instructions
+   Error: Test failed (no error message captured)...
+   Task: task-37
+
+2. tests/integration/test_task_deduplication_flow.py::test_deduplication_disabled
+   Error: Test failed (no error message captured)...
+   Task: task-38
+
+3. tests/integration/test_validation_flow.py::test_complete_validation_inheritance_flow
+   Error: Test failed (no error message captured)...
+   Task: task-39
+
+4. tests/integration/test_validation_flow.py::test_validation_feedback_loop
+   Error: Test failed (no error message captured)...
+   Task: task-40
+
+5. tests/sdk/test_config.py::test_config_auto_sets_model
+   Error: AssertionError......
+   Task: task-41
+
+6. tests/test_authentication.py::test_register_weak_password
+   Error: Test failed (no error message captured)...
+   Task: task-42
+
+7. tests/test_authentication.py::test_refresh_token_valid
+   Error: Test failed (no error message captured)...
+   Task: task-43
+
+8. tests/test_conductor.py::test_analyze_system_state_with_duplicates
+   Error: Test failed (no error message captured)...
+   Task: task-44
+
+9. tests/test_conductor.py::test_analyze_system_state_low_coherence
+   Error: Test failed (no error message captured)...
+   Task: task-45
+
+10. tests/test_conductor.py::test_analyze_system_state_coordination_needs
+   Error: Test failed (no error message captured)...
+   Task: task-46
+
+11. tests/test_conductor.py::test_execute_duplicate_termination
+   Error: Test failed (no error message captured)...
+   Task: task-47
+
+12. tests/test_conductor.py::test_execute_escalation
+   Error: Asse......
+   Task: task-48
+
+13. tests/test_conductor.py::test_generate_detailed_report
+   Error: Test failed (no error message captured)...
+   Task: task-49
+
+14. tests/test_conductor.py::test_execution_failure_handling
+   Error: Test failed (no error message captured)...
+   Task: task-50
+
+15. tests/test_diagnostic_agent.py::test_triggers_when_all_conditions_met
+   Error: Test failed (no error message captured)...
+   Task: task-51
+
+16. tests/test_diagnostic_integration.py::test_diagnostic_not_triggered_no_tasks
+   Error: Test failed (no error message captured)...
+   Task: task-52
+
+17. tests/test_diagnostic_integration.py::test_diagnostic_not_triggered_active_tasks
+   Error: Test failed (no error message captured)...
+   Task: task-53
+
+18. tests/test_diagnostic_integration.py::test_diagnostic_not_triggered_too_recent
+   Error: Test failed (no error message captured)...
+   Task: task-54
+
+19. tests/test_diagnostic_integration.py::test_diagnostic_triggered_workflow_stuck
+   Error: Test failed (no error message captured)...
+   Task: task-55
+
+20. tests/test_diagnostic_integration.py::test_diagnostic_respects_cooldown
+   Error: Test failed (no error message captured)...
+   Task: task-56
+
+21. tests/test_diagnostic_integration.py::test_full_diagnostic_flow_with_logging
+   Error: Test failed (no error message captured)...
+   Task: task-57
+
+22. tests/test_guardian.py::test_handle_missing_task
+   Error: KeyEr......
+   Task: task-58
+
+23. tests/test_guardian.py::test_llm_failure_handling
+   Error: KeyE......
+   Task: task-59
+
+24. tests/test_mcp_results_endpoint_async.py::test_integration_with_server
+   Error: Test failed (no error message captured)...
+   Task: task-60
+
+25. tests/test_mcp_server_tickets.py::test_01_create_ticket
+   Error: Test failed (no error message captured)...
+   Task: task-61
+
+26. tests/test_mcp_server_tickets.py::test_07_search_tickets
+   Error: Test failed (no error message captured)...
+   Task: task-62
+
+27. tests/test_mcp_server_tickets.py::test_09_get_ticket_stats
+   Error: Test failed (no error message captured)...
+   Task: task-63
+
+28. tests/test_mcp_server_tickets.py::test_create_task_requires_ticket_id_when_tracking_enabled
+   Error: Test failed (no error message captured)...
+   Task: task-64
+
+29. tests/test_mcp_server_tickets.py::test_create_task_allows_no_ticket_id_when_tracking_disabled
+   Error: Test failed (no error message captured)...
+   Task: task-65
+
+30. tests/test_monitoring_integration.py::test_full_monitoring_cycle_healthy_agents
+   Error: Test failed (no error message captured)...
+   Task: task-66
+
+31. tests/test_monitoring_integration.py::test_monitoring_with_duplicate_detection
+   Error: Test failed (no error message captured)...
+   Task: task-67
+
+32. tests/test_monitoring_integration.py::test_monitoring_with_steering_intervention
+   Error: Test failed (no error message captured)...
+   Task: task-68
+
+33. tests/test_monitoring_integration.py::test_monitoring_with_resource_coordination
+   Error: Test failed (no error message captured)...
+   Task: task-69
+
+34. tests/test_monitoring_integration.py::test_monitoring_escalation_on_low_coherence
+   Error: Test failed (no error message captured)...
+   Task: task-70
+
+35. tests/test_monitoring_integration.py::test_monitoring_cache_usage
+   Error: Test failed (no error message captured)...
+   Task: task-71
+
+36. tests/test_monitoring_integration.py::test_monitoring_error_recovery
+   Error: Test failed (no error message captured)...
+   Task: task-72
+
+37. tests/test_monitoring_integration.py::test_full_monitor_loop_simulation
+   Error: Test failed (no error message captured)...
+   Task: task-73
+
+38. tests/test_multi_provider_llm.py::test_get_model_for_component
+   Error: Test failed (no error message captured)...
+   Task: task-74
+
+39. tests/test_multi_provider_llm.py::test_get_model_name
+   Error: Test failed (no error message captured)...
+   Task: task-75
+
+40. tests/test_phases_config.py::test_crackme_challenge_config
+   Error: Test failed (no error message captured)...
+   Task: task-76
+
+41. tests/test_prompt_delivery.py::test_send_initial_prompt_without_verification
+   Error: Test failed (no error message captured)...
+   Task: task-77
+
+42. tests/test_prompt_delivery.py::test_send_initial_prompt_with_retry_success_first_attempt
+   Error: Test failed (no error message captured)...
+   Task: task-78
+
+43. tests/test_prompt_delivery.py::test_send_initial_prompt_with_retry_success_second_attempt
+   Error: Test failed (no error message captured)...
+   Task: task-79
+
+44. tests/test_prompt_delivery.py::test_send_initial_prompt_with_retry_success_third_attempt
+   Error: Test failed (no error message captured)...
+   Task: task-80
+
+45. tests/test_prompt_delivery.py::test_send_initial_prompt_with_retry_all_retries_fail
+   Error: Test failed (no error message captured)...
+   Task: task-81
+
+46. tests/test_prompt_delivery.py::test_send_initial_prompt_with_retry_custom_max_retries
+   Error: Test failed (no error message captured)...
+   Task: task-82
+
+47. tests/test_prompt_delivery.py::test_send_initial_prompt_with_chunking_large_message
+   Error: Test failed (no error message captured)...
+   Task: task-83
+
+48. tests/test_prompt_loader.py::test_format_guardian_prompt_long_output_truncation
+   Error: Test failed (no error message captured)...
+   Task: task-84
+
+49. tests/test_result_submission_flow.py::test_complete_submission_flow_stop_all
+   Error: Test failed (no error message captured)...
+   Task: task-85
+
+50. tests/test_steering_fix.py::test_monitoring_loop_uses_correct_steering_field
+   Error: Test failed (no error message captured)...
+   Task: task-86
+
+51. tests/test_steering_fix.py::test_steering_not_sent_when_needs_steering_false
+   Error: Test failed (no error message captured)...
+   Task: task-87
+
+52. tests/test_steering_fix.py::test_fallback_when_steering_message_missing
+   Error: Test failed (no error message captured)...
+   Task: task-88
+
+53. tests/test_steering_openai_integration.py::test_guardian_steering_with_real_openai_stuck_agent
+   Error: Test failed (no error message captured)...
+   Task: task-89
+
+54. tests/test_steering_openai_integration.py::test_guardian_steering_with_real_openai_constraint_violation
+   Error: Test failed (no error message captured)...
+   Task: task-90
+
+55. tests/test_structured_analysis.py::test_guardian_structured_analysis
+   Error: Test failed (no error message captured)...
+   Task: task-91
+
+56. tests/test_structured_analysis.py::test_conductor_structured_analysis
+   Error: Test failed (no error message captured)...
+   Task: task-92
+
+57. tests/test_structured_analysis.py::test_analysis_retry_mechanism
+   Error: Val......
+   Task: task-93
+
+58. tests/test_ticket_search.py::test_generate_ticket_embedding
+   Error: Test failed (no error message captured)...
+   Task: task-94
+
+59. tests/test_ticket_search.py::test_generate_query_embedding
+   Error: Test failed (no error message captured)...
+   Task: task-95
+
+60. tests/test_ticket_system.py::test_get_ticket_full_details
+   Error: KeyError: ......
+   Task: task-96
+
+61. tests/test_trajectory_context.py::test_build_accumulated_context_full
+   Error: Test failed (no error message captured)...
+   Task: task-97
+
+62. tests/test_trajectory_context.py::test_extract_constraints
+   Error: Test failed (no error message captured)...
+   Task: task-98
+
+63. tests/test_trajectory_context.py::test_extract_lifted_constraints
+   Error: Test failed (no error message captured)...
+   Task: task-99
+
+64. tests/test_trajectory_context.py::test_extract_standing_instructions
+   Error: Test failed (no error message captured)...
+   Task: task-100
+
+65. tests/test_trajectory_context.py::test_identify_current_focus
+   Error: Test failed (no error message captured)...
+   Task: task-101
+
+66. tests/test_trajectory_context.py::test_extract_discovered_blockers
+   Error: Test failed (no error message captured)...
+   Task: task-102
+
+67. tests/test_trajectory_context.py::test_empty_agent_history
+   Error: Test failed (no error message captured)...
+   Task: task-103
+
+68. tests/test_trajectory_context.py::test_agent_with_only_errors
+   Error: Test failed (no error message captured)...
+   Task: task-104
+
+69. tests/test_trajectory_context.py::test_pattern_extraction_edge_cases
+   Error: Test failed (no error message captured)...
+   Task: task-105
+
+70. tests/test_trajectory_context.py::test_session_duration_calculation
+   Error: Test failed (no error message captured)...
+   Task: task-106
+
+71. tests/test_trajectory_context.py::test_clear_agent_cache
+   Error: Test failed (no error message captured)...
+   Task: task-107
+
+72. tests/test_trajectory_context.py::test_cache_expiration
+   Error: Test failed (no error message captured)...
+   Task: task-108
+
+73. tests/test_trajectory_monitoring.py::test_guardian_trajectory_analysis
+   Error: Test failed (no error message captured)...
+   Task: task-109
+
+74. tests/test_trajectory_monitoring.py::test_guardian_detects_constraint_violation
+   Error: Test failed (no error message captured)...
+   Task: task-110
+
+75. tests/test_trajectory_monitoring.py::test_guardian_steering_decision
+   Error: Test failed (no error message captured)...
+   Task: task-111
+
+76. tests/test_trajectory_monitoring.py::test_conductor_detects_duplicates
+   Error: Test failed (no error message captured)...
+   Task: task-112
+
+77. tests/test_trajectory_monitoring.py::test_conductor_system_coherence
+   Error: Test failed (no error message captured)...
+   Task: task-113
+
+78. tests/test_trajectory_monitoring.py::test_conductor_makes_decisions
+   Error: Test failed (no error message captured)...
+   Task: task-114
+
+79. tests/test_validation_agent_protection.py::test_regular_agent_is_terminated
+   Error: Test failed (no error message captured)...
+   Task: task-115
+
+80. tests/test_validation_inheritance.py::test_validation_triggers_when_inherited
+   Error: Test failed (no error message captured)...
+   Task: task-116
+
+81. tests/test_validation_prompts.py::test_format_initial_message_for_result_validator
+   Error: Test failed (no error message captured)...
+   Task: task-117
+
+82. tests/test_validation_prompts.py::test_format_initial_message_for_task_validator
+   Error: Test failed (no error message captured)...
+   Task: task-118
+
+83. tests/test_validation_prompts.py::test_format_initial_message_for_regular_agent
+   Error: Test failed (no error message captured)...
+   Task: task-119
+
+84. tests/test_validation_prompts.py::test_validator_without_prompt_gets_fallback
+   Error: Test failed (no error message captured)...
+   Task: task-120
+
+85. tests/test_validation_system.py::test_build_validator_prompt
+   Error: Test failed (no error message captured)...
+   Task: task-121
+
+86. tests/test_validation_system.py::test_spawn_validator_agent
+   Error: Test failed (no error message captured)...
+   Task: task-122
+
+87. tests/test_vector_store.py::test_vector_store_operations
+   Error: AssertionEr......
+   Task: task-123
+
+88. tests/test_worktree_integration.py::test_agent_manager_with_worktree_integration
+   Error: Test failed (no error message captured)...
+   Task: task-124
+
+89. tests/test_worktree_integration.py::test_parent_child_agent_integration
+   Error: Test failed (no error message captured)...
+   Task: task-125
+
+90. tests/test_worktree_integration.py::test_agent_termination_with_merge
+   Error: Test failed (no error message captured)...
+   Task: task-126
+
+91. tests/test_worktree_integration.py::test_multiple_validation_commits
+   Error: Test failed (no error message captured)...
+   Task: task-127
+
+92. tests/test_worktree_integration.py::test_child_merge_with_active_parent_worktree
+   Error: Test failed (no error message captured)...
+   Task: task-128
+
+93. tests/test_worktree_integration.py::test_detached_head_after_child_merge
+   Error: Test failed (no error message captured)...
+   Task: task-129
+
+94. tests/test_worktree_manager.py::test_commit_for_validation
+   Error: git.exc.G......
+   Task: task-130
+
+95. tests/unit/test_embedding_service.py::test_calculate_batch_similarities_error_fallback
+   Error: Test failed (no error message captured)...
+   Task: task-131
+
+96. tests/unit/test_task_similarity_service.py::test_check_duplicates_exact_match
+   Error: Test failed (no error message captured)...
+   Task: task-132
+
+97. tests/unit/test_task_similarity_service.py::test_check_duplicates_above_threshold
+   Error: Test failed (no error message captured)...
+   Task: task-133
+
+98. tests/unit/test_task_similarity_service.py::test_check_duplicates_below_threshold
+   Error: Test failed (no error message captured)...
+   Task: task-134
+
+99. tests/unit/test_task_similarity_service.py::test_find_related_tasks
+   Error: Test failed (no error message captured)...
+   Task: task-135
+
+100. tests/unit/test_task_similarity_service.py::test_no_related_or_duplicates
+   Error: Test failed (no error message captured)...
+   Task: task-136
+
+101. tests/unit/test_task_similarity_service.py::test_multiple_related_tasks_sorted
+   Error: Test failed (no error message captured)...
+   Task: task-137
+
+102. tests/unit/test_task_similarity_service.py::test_handle_null_embeddings
+   Error: Test failed (no error message captured)...
+   Task: task-138
+
+103. tests/unit/test_task_similarity_service.py::test_handle_json_stored_embeddings
+   Error: Test failed (no error message captured)...
+   Task: task-139
+
+104. tests/unit/test_task_similarity_service.py::test_limit_related_tasks_to_ten
+   Error: Test failed (no error message captured)...
+   Task: task-140

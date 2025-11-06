@@ -1,0 +1,269 @@
+TASK-36: Master Test Fix Coordination
+======================================
+Date Created: 2025-11-06
+Status: ACTIVE
+Priority: CRITICAL
+Category: Quality Assurance, Coordination, Project Management
+
+OBJECTIVE:
+==========
+
+Coordinate systematic resolution of ALL test failures discovered in test suite.
+This is the master coordination task that tracks progress across all individual
+test fix tasks generated from test suite analysis.
+
+SCOPE:
+======
+
+Test Suite Analysis:
+- Total Tests: 456 tests (excluding manual_validation_test.py)
+- Test Run: Background process running
+- Output Log: reports/test-run-full.log
+
+Individual Task Generation:
+- Each failed test gets dedicated task file
+- Tasks numbered sequentially from task-37 onwards
+- Each task includes: analysis, fix, verification, reporting
+
+WORKFLOW:
+=========
+
+PHASE 1: Test Execution [IN PROGRESS]
+--------------------------------------
+- Run: pytest --ignore=tests/manual_validation_test.py --tb=line -v
+- Output: reports/test-run-full.log
+- Status: RUNNING (background process 62c7b6)
+
+PHASE 2: Failure Parsing [PENDING]
+-----------------------------------
+- Parse test-run-full.log for FAILED tests
+- Extract: test file, test name, error message
+- Count total failures
+- Categorize by error type
+
+PHASE 3: Task Generation [PENDING]
+-----------------------------------
+- Run: scripts/generate_test_failure_tasks.py reports/test-run-full.log
+- Generate individual task file for each failure
+- Tasks created in: tasks/
+- Naming: 251106-task-XX-fix-{test_name}.pending.txt
+
+PHASE 4: Priority Assignment [PENDING]
+---------------------------------------
+- Review all generated tasks
+- Assign priorities based on:
+  * Severity (CRITICAL/HIGH/MEDIUM/LOW)
+  * Impact (affects core functionality vs edge case)
+  * Dependencies (blocks other tests vs independent)
+  * Complexity (quick fix vs requires investigation)
+
+PHASE 5: Execution [PENDING]
+-----------------------------
+- Execute tasks in priority order
+- Mark tasks .active when starting
+- Mark tasks .done when complete
+- Generate reports in reports/test-failures/
+- Update this master task with progress
+
+PHASE 6: Verification [PENDING]
+--------------------------------
+- Run full test suite after all fixes
+- Verify all previously failing tests now pass
+- Verify no new test failures introduced
+- Generate final summary report
+
+TASK TRACKING:
+==============
+
+Total Tasks Generated: 104 (task-37 through task-140)
+Tasks Completed: 0
+Tasks In Progress: 0
+Tasks Pending: 104
+Tasks Blocked: 0
+
+INDIVIDUAL TASKS:
+-----------------
+
+All 104 tasks are in PENDING state. Task files created:
+- 251106-task-37-fix-test_agent_prompt_includes_qdrant_instructions.pending.txt
+- 251106-task-38-fix-test_deduplication_disabled.pending.txt
+- ... (102 more tasks)
+- 251106-task-140-fix-test_limit_related_tasks_to_ten.pending.txt
+
+See tasks/251106-test-failures-summary.txt for complete list.
+
+Task Categories (identified from test names):
+- Integration tests (qdrant, task deduplication, validation flow)
+- SDK config tests
+- Authentication tests
+- Conductor tests (system state analysis, coordination)
+- Diagnostic agent tests
+- Guardian tests
+- MCP server and ticket tests
+- Monitoring integration tests
+- Multi-provider LLM tests
+- Phases config tests
+- Prompt delivery tests
+- Structured analysis tests
+- Ticket system tests
+- Vector store tests
+- Worktree manager tests
+- Task similarity/deduplication tests
+
+DELIVERABLES:
+=============
+
+[X] Test suite execution completed (457 tests, 104 failures)
+[X] Test failures parsed and categorized
+[X] Individual task files generated for each failure (104 tasks)
+[ ] Tasks prioritized
+[ ] All tasks executed
+[ ] All reports generated
+[ ] Final summary report created
+[ ] Full test suite passing
+
+REPORTS:
+========
+
+Master Reports:
+- reports/test-run-full.log (full test output)
+- reports/test-failures-summary.txt (summary of all failures)
+- reports/test-fix-progress.txt (progress tracking)
+- reports/test-fix-final-summary.txt (final results)
+
+Individual Reports:
+- reports/test-failures/report-task-XX-{test_name}.txt (one per fix)
+
+SUCCESS CRITERIA:
+=================
+
+- All test failures identified
+- Individual tasks created for each failure
+- All tasks completed or documented as blocked
+- Full test suite passing
+- No regressions introduced
+- All reports generated
+
+CURRENT STATUS:
+===============
+
+Phase 1: COMPLETED - Test suite execution finished (457 tests, 104 failures)
+Phase 2: COMPLETED - Failures parsed and categorized
+Phase 3: COMPLETED - 104 individual task files generated
+Phase 4: IN PROGRESS - Prioritizing tasks
+Phase 5: PENDING - Awaiting prioritization completion
+Phase 6: PENDING - Will execute after all fixes
+
+ESTIMATED EFFORT:
+=================
+
+- Test execution: 5-10 minutes
+- Parsing and task generation: 10 minutes
+- Priority assignment: 30 minutes
+- Individual task execution: Variable (depends on failures count)
+- Verification: 10 minutes
+
+Total: TBD (depends on number of failures)
+
+DEPENDENCIES:
+=============
+
+- Test suite must complete
+- generate_test_failure_tasks.py script
+- Access to application code
+- Ability to run tests
+- Access to git history
+
+BLOCKING ISSUES:
+================
+
+None currently
+
+NOTES:
+======
+
+This is HIGHEST PRIORITY work as requested by user.
+
+Autonomous Operation Mode:
+- Continue working through tasks without pausing
+- Flag discoveries/improvements for user approval
+- Report progress between tasks
+- Work until all tasks complete
+
+Test Suite Issues Noted:
+- manual_validation_test.py excluded (requires server running)
+- Some deprecation warnings present (not failures)
+- May discover systemic issues requiring broader fixes
+
+[USER APPROVAL NEEDED]
+If systematic issues are discovered (e.g., all auth tests failing due to
+common root cause), may recommend creating umbrella fix task instead of
+individual tasks per test. Will flag for approval before proceeding.
+
+INTEGRATION WITH OTHER TASKS:
+==============================
+
+- Coordinates with Task-33: Documentation fixes may affect tests
+- Coordinates with Task-34: Test review may identify unnecessary fixes
+- Coordinates with Task-35: General test failure analysis
+- May generate additional tasks based on discoveries
+
+PROGRESS UPDATES:
+=================
+
+2025-11-06 12:46: Test suite started (456 tests)
+2025-11-06 12:46: Created master coordination task
+2025-11-06 12:46: Created task generator script
+2025-11-06 12:46: Awaiting test completion...
+2025-11-06 12:52: Test suite completed (457 tests collected, 104 failures)
+2025-11-06 12:52: Fixed task generator regex to handle class-based test names
+2025-11-06 12:54: Generated 104 individual task files (task-37 through task-140)
+2025-11-06 12:54: Created summary file: tasks/251106-test-failures-summary.txt
+2025-11-06 12:55: Updated master coordination task with results
+2025-11-06 12:55: Ready to begin task prioritization and execution
+2025-11-06 12:57: CRITICAL DISCOVERY - 23% of test suite failing (104/457 tests)
+2025-11-06 12:57: User requested scale review before mass execution
+2025-11-06 12:58: Created task-141: Review test deletions since refactor
+2025-11-06 12:58: Created task-142: Improve test failure messages
+2025-11-06 12:59: Strategy shift: Execute tasks 141-142 before individual fixes
+
+CRITICAL TASKS ADDED:
+======================
+
+task-141: Review Test Deletions Since Refactoring
+- PRIORITY: CRITICAL
+- OBJECTIVE: Investigate if tests were inappropriately removed vs properly deprecated
+- RATIONALE: High failure rate may indicate deleted tests rather than broken tests
+- EXECUTION: Should run before individual fixes to avoid wasted effort
+- ESTIMATED: 13-18 hours
+
+task-142: Improve Test Failure Messages
+- PRIORITY: CRITICAL
+- OBJECTIVE: Add specific, informative error messages to all 104 failing tests
+- RATIONALE: Most failures show "Test failed (no error message captured)"
+- EXECUTION: Should run before individual fixes to enable efficient diagnosis
+- ESTIMATED: 16-24 hours
+- ROI: 3-5x efficiency gain on all subsequent fixes
+
+REVISED EXECUTION STRATEGY:
+============================
+
+Phase 4-Revised: CRITICAL FOUNDATION TASKS (task-141, task-142)
+1. Execute task-142 Phase 1: Run sample tests with verbose output
+2. Execute task-141: Review commit history for test deletions
+3. Execute task-142 Phases 2-4: Improve all test messages
+4. Re-run test suite to capture specific error details
+5. Analyze findings to inform individual fix strategy
+
+Phase 5-Revised: EXECUTE INDIVIDUAL FIXES (task-37 through task-140)
+- With better diagnostics and deletion review complete
+- May reduce from 104 tasks if systematic issues found
+- May restore deleted tests instead of fixing current tests
+- Execute autonomously with improved efficiency
+
+NEXT STEPS:
+- Execute task-142 Phase 1 (quick diagnostic sample)
+- Execute task-141 (git history review)
+- Analyze findings and adjust strategy if needed
+- Complete task-142 (improve all test messages)
+- Resume individual test fixes with better foundation

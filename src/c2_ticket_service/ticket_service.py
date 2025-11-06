@@ -283,6 +283,7 @@ class TicketService:
         result = {
             "success": True,
             "ticket_id": ticket_id,
+            "workflow_id": workflow_id,
             "status": initial_status,
             "message": "Ticket created successfully",
             "embedding_created": embedding_created,
