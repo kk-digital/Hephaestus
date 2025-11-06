@@ -20,26 +20,101 @@ from src.core.database import DatabaseManager, get_db, Workflow, Agent, BoardCon
 @pytest.fixture(scope="module")
 def setup_test_database():
     """
-    Set up test database using e2e_test.db.
+    Set up test database for ticket endpoint tests.
 
-    This assumes e2e_test.db already exists from running e2e_ticket_test.py.
-    If it doesn't exist, you need to run: python tests/e2e_ticket_test.py first.
+    Creates a fresh test database with necessary tables and test data.
     """
     db_path = "e2e_test.db"
 
-    if not os.path.exists(db_path):
-        raise FileNotFoundError(
-            f"{db_path} not found. Please run 'python tests/e2e_ticket_test.py' first to create the test database."
-        )
+    # Remove existing test database
+    if os.path.exists(db_path):
+        os.remove(db_path)
 
-    # Set environment variable
+    # Set environment variable before creating DatabaseManager
     os.environ["HEPHAESTUS_TEST_DB"] = db_path
+
+    # Create database and tables
+    db_manager = DatabaseManager(db_path)
+    db_manager.create_tables()
+
+    # Create minimal test data
+    with db_manager.get_session() as session:
+        # Create workflow with tracking enabled
+        workflow = Workflow(
+            id="workflow-e2e-test",
+            name="Test Workflow",
+            phases_folder_path="/test/phases",
+            status="active",
+            created_at=datetime.utcnow(),
+        )
+        session.add(workflow)
+
+        # Create workflow without tracking
+        workflow_no_tracking = Workflow(
+            id="workflow-no-tracking",
+            name="Workflow Without Tracking",
+            phases_folder_path="/test/phases",
+            status="active",
+            created_at=datetime.utcnow(),
+        )
+        session.add(workflow_no_tracking)
+
+        # Create board config (enables ticket tracking for workflow-e2e-test)
+        board_config = BoardConfig(
+            id="board-e2e-test",
+            workflow_id=workflow.id,
+            name="Test Board",
+            columns=[
+                {"id": "backlog", "name": "Backlog", "order": 0, "color": "#9ca3af"},
+                {"id": "todo", "name": "To Do", "order": 1, "color": "#6b7280"},
+                {"id": "in_progress", "name": "In Progress", "order": 2, "color": "#3b82f6"},
+                {"id": "done", "name": "Done", "order": 3, "color": "#10b981"},
+            ],
+            ticket_types=[
+                {"id": "bug", "name": "Bug", "icon": "🐛", "color": "#ef4444"},
+                {"id": "feature", "name": "Feature", "icon": "✨", "color": "#3b82f6"},
+                {"id": "task", "name": "Task", "icon": "📋", "color": "#6b7280"},
+            ],
+            default_ticket_type="task",
+            initial_status="backlog",
+            auto_assign=False,
+            require_comments_on_status_change=False,
+            allow_reopen=True,
+            track_time=False,
+            created_at=datetime.utcnow(),
+        )
+        session.add(board_config)
+
+        # Create test agents
+        agent = Agent(
+            id="agent-e2e-test",
+            system_prompt="Test agent",
+            status="working",
+            cli_type="claude",
+            created_at=datetime.utcnow(),
+        )
+        session.add(agent)
+
+        agent_no_tracking = Agent(
+            id="agent-no-tracking",
+            system_prompt="Test agent without tracking",
+            status="working",
+            cli_type="claude",
+            created_at=datetime.utcnow(),
+        )
+        session.add(agent_no_tracking)
+
+        session.commit()
 
     yield db_path
 
     # Cleanup
     if "HEPHAESTUS_TEST_DB" in os.environ:
         del os.environ["HEPHAESTUS_TEST_DB"]
+
+    # Remove test database
+    if os.path.exists(db_path):
+        os.remove(db_path)
 
 
 @pytest.fixture
