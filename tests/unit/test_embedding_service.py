@@ -3,7 +3,7 @@
 import pytest
 import numpy as np
 from unittest.mock import Mock, MagicMock, patch
-from src.services.embedding_service import EmbeddingService
+from src.c2_embedding_service.embedding_service import EmbeddingService
 
 
 class TestEmbeddingService:
@@ -178,14 +178,23 @@ class TestEmbeddingService:
         assert similarities[1] == 0.0  # Zero vector
         assert abs(similarities[2] - 1.0) < 1e-6  # Same direction
 
-    @patch('src.services.embedding_service.logger')
+    @patch('src.c2_embedding_service.embedding_service.logger')
     def test_calculate_batch_similarities_error_fallback(self, mock_logger, embedding_service):
         """Test that batch calculation falls back to individual on error."""
         query = [1.0, 0.0]
+        embeddings = [[1.0, 0.0], [0.0, 1.0]]
 
-        # Mock numpy to raise error
-        with patch('numpy.array', side_effect=Exception("Numpy error")):
-            embeddings = [[1.0, 0.0], [0.0, 1.0]]
+        # Mock numpy.dot to raise error on first call (batch path) but work normally otherwise
+        original_dot = np.dot
+        call_count = [0]
+
+        def mock_dot_side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:  # First call is batch path
+                raise Exception("Numpy error")
+            return original_dot(*args, **kwargs)  # Subsequent calls work (fallback path)
+
+        with patch('src.c2_embedding_service.embedding_service.np.dot', side_effect=mock_dot_side_effect):
             similarities = embedding_service.calculate_batch_similarities(query, embeddings)
 
             # Should still get results from fallback
