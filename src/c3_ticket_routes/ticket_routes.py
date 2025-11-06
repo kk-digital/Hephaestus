@@ -584,7 +584,7 @@ def create_ticket_router(server_state):
             result = await TicketService.link_commit(
                 ticket_id=request.ticket_id,
                 agent_id=agent_id,
-                commit_hash=request.commit_hash,
+                commit_sha=request.commit_hash,  # Service expects commit_sha, not commit_hash
                 commit_message=request.commit_message,
                 repository_url=request.repository_url,
             )
