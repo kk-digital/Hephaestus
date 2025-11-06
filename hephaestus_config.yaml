@@ -23,8 +23,13 @@ git:
 
 # LLM Configuration
 llm:
-  # Keep OpenAI embeddings as requested
+  # Embedding configuration
+  # Supports OpenAI or LM Studio (OpenAI-compatible API)
+  embedding_provider: "openai"  # or "lmstudio"
   embedding_model: "text-embedding-3-large"
+  # For LM Studio, set embedding_base_url (e.g., "http://localhost:1234/v1")
+  # embedding_base_url: "http://localhost:1234/v1"
+  # embedding_model: "nomic-embed-text"  # Change model for LM Studio
 
   # Used by: SDK workflows, legacy single-provider mode, and when multi-provider config is unavailable
   # This replaces the deprecated LLM_MODEL env variable

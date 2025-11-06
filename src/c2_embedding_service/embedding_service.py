@@ -11,18 +11,36 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingService:
-    """Service for generating and comparing embeddings."""
+    """Service for generating and comparing embeddings.
 
-    def __init__(self, openai_api_key: str):
+    Supports both OpenAI and LM Studio (or any OpenAI-compatible API).
+    """
+
+    def __init__(
+        self,
+        openai_api_key: str,
+        base_url: Optional[str] = None,
+        model: Optional[str] = None
+    ):
         """Initialize the embedding service.
 
         Args:
-            openai_api_key: OpenAI API key for generating embeddings
+            openai_api_key: API key for the embedding service
+            base_url: Optional base URL for API (e.g., "http://localhost:1234/v1" for LM Studio)
+            model: Optional model override (if None, uses config)
         """
-        self.client = openai.OpenAI(api_key=openai_api_key)
+        # Initialize OpenAI client with optional base_url for LM Studio support
+        if base_url:
+            self.client = openai.OpenAI(api_key=openai_api_key, base_url=base_url)
+            logger.info(f"Initialized EmbeddingService with custom base_url: {base_url}")
+        else:
+            self.client = openai.OpenAI(api_key=openai_api_key)
+            logger.info("Initialized EmbeddingService with OpenAI API")
+
         self.config = get_config()
-        self.model = self.config.task_embedding_model
-        logger.info(f"Initialized EmbeddingService with model: {self.model}")
+        self.model = model if model else self.config.task_embedding_model
+        self.base_url = base_url
+        logger.info(f"Using embedding model: {self.model}")
 
     @retry(
         stop=stop_after_attempt(3),
