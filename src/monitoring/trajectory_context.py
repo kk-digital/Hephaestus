@@ -260,6 +260,8 @@ class TrajectoryContext:
         # Patterns for lifted constraints
         lift_patterns = [
             r"(?:you can now|feel free to|go ahead and)\s+(.+?)(?:\.|$)",
+            r"(?:actually|instead),?\s+you can (?:now\s+)?use\s+(\S+)",  # "Actually, you can use X now"
+            r"(?:don't|do not) need to (?:avoid|worry about)\s+(.+?)(?:\s+now)?(?:\.|$)",  # "don't need to avoid X"
             r"(?:constraint lifted:|no longer need to:|don't worry about)\s+(.+?)(?:\.|$)",
             r"(?:ignore|disregard) (?:the )? (?:previous )?(?:constraint|rule) (?:about )?\s+(.+?)(?:\.|$)",
         ]

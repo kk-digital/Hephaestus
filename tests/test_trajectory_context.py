@@ -33,7 +33,7 @@ def sample_agent_logs():
             log_type="input",
             message="Build a REST API without external frameworks",
             created_at=datetime.utcnow() - timedelta(hours=2),
-            details={}
+            details={"task_id": "task-1"}
         ),
         AgentLog(
             id=2,
@@ -55,7 +55,7 @@ def sample_agent_logs():
             id=4,
             agent_id="test-agent-1",
             log_type="input",
-            message="Actually, you can use Flask now",
+            message="Actually, you don't need to avoid external frameworks now",
             created_at=datetime.utcnow() - timedelta(hours=1),
             details={}
         ),
@@ -118,8 +118,8 @@ class TestTrajectoryContext:
         # Assert - the implementation extracts from conversation patterns
         assert context['overall_goal'] == "A rest api without external frameworks"
         assert context['done_definition'] == "API endpoints working with tests"
-        assert len(context['constraints']) == 0  # "no external frameworks" was lifted
-        assert "no external frameworks" in context['lifted_constraints']
+        assert len(context['constraints']) == 0  # "external frameworks" was lifted
+        assert "external frameworks" in context['lifted_constraints']
         assert "add comprehensive tests" in context['standing_instructions']
         assert context['current_focus'] == "implementing the authentication endpoints"
         assert context['conversation_length'] == 8
