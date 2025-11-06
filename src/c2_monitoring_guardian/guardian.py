@@ -258,6 +258,11 @@ class Guardian:
         """
         logger.info(f"Steering agent {agent.id}: {steering_type}")
 
+        # Use fallback message if message is None or empty
+        if not message:
+            message = "Please check your trajectory and current approach. The agent needs guidance."
+            logger.warning(f"No steering message provided for agent {agent.id}, using fallback")
+
         # Check if there's already a queued message (not yet read by Claude)
         tmux_output = self.agent_manager.get_agent_output(agent.id, lines=50)
         if "Press up to edit queued messages" in tmux_output:
