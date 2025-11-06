@@ -3,15 +3,36 @@
 import asyncio
 import logging
 import json
+from enum import Enum
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 
-from src.c1_guardian_enums import SteeringType, TrajectoryPhase
 from src.core.database import DatabaseManager, Agent, Task, AgentLog
 from src.agents.manager import AgentManager
 from src.interfaces import LLMProviderInterface
 
 logger = logging.getLogger(__name__)
+
+
+class SteeringType(Enum):
+    """Types of steering interventions."""
+    STUCK = "stuck"
+    DRIFTING = "drifting"
+    VIOLATING_CONSTRAINTS = "violating_constraints"
+    OVER_ENGINEERING = "over_engineering"
+    CONFUSED = "confused"
+    OFF_TRACK = "off_track"
+
+
+class TrajectoryPhase(Enum):
+    """Agent work phases."""
+    EXPLORATION = "exploration"
+    INFORMATION_GATHERING = "information_gathering"
+    PLANNING = "planning"
+    IMPLEMENTATION = "implementation"
+    VERIFICATION = "verification"
+    EXPLANATION = "explanation"
+    COMPLETED = "completed"
 
 
 class Guardian:
