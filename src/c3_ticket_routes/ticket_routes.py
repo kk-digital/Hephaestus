@@ -64,6 +64,21 @@ class ChangeTicketStatusResponse(BaseModel):
     message: str
 
 
+class AddCommentRequest(BaseModel):
+    ticket_id: str = Field(..., description="Ticket ID")
+    comment_text: str = Field(..., description="Comment text")
+    comment_type: str = Field("general", description="Comment type")
+    mentions: Optional[List[str]] = Field(None, description="Mentioned agent/ticket IDs")
+    attachments: Optional[List[str]] = Field(None, description="File attachments")
+
+
+class AddCommentResponse(BaseModel):
+    success: bool
+    comment_id: str
+    ticket_id: str
+    message: str
+
+
 class SearchTicketsRequest(BaseModel):
     workflow_id: Optional[str] = Field(None, description="Filter by workflow")
     ticket_type: Optional[str] = Field(None, description="Filter by type")
@@ -317,6 +332,33 @@ def create_ticket_router(server_state):
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             logger.error(f"Failed to change ticket status: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.post("/api/tickets/comment", response_model=AddCommentResponse)
+    async def add_comment_endpoint(
+        request: AddCommentRequest,
+        agent_id: str = Header(..., alias="X-Agent-ID"),
+    ):
+        """Add a comment to a ticket."""
+        logger.info(f"Agent {agent_id} adding comment to ticket {request.ticket_id}")
+
+        try:
+            result = await TicketService.add_comment(
+                ticket_id=request.ticket_id,
+                agent_id=agent_id,
+                comment_text=request.comment_text,
+                comment_type=request.comment_type,
+                mentions=request.mentions,
+                attachments=request.attachments,
+            )
+
+            return AddCommentResponse(**result)
+
+        except ValueError as e:
+            logger.error(f"Validation error adding comment: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error(f"Failed to add comment: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.get("/api/tickets/{ticket_id}")
