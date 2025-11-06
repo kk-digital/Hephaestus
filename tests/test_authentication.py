@@ -388,6 +388,10 @@ class TestAuthenticationAPI:
         )
         tokens = login_response.json()
 
+        # Sleep briefly to ensure different iat timestamp
+        import time
+        time.sleep(1)
+
         # Refresh token
         response = test_client.post(
             "/api/auth/refresh",
