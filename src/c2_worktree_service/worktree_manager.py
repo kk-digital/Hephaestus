@@ -6,6 +6,7 @@ import uuid
 import logging
 import fcntl
 import time
+from enum import Enum
 from pathlib import Path
 from typing import Optional, Dict, List, Any, Tuple
 from datetime import datetime
@@ -15,7 +16,6 @@ import git
 from git import Repo, GitCommandError
 from sqlalchemy.orm import Session
 
-from src.c1_worktree_enums import MergeStatus, CommitType
 from src.core.database import (
     DatabaseManager,
     AgentWorktree,
@@ -25,6 +25,23 @@ from src.core.database import (
 from src.core.simple_config import get_config
 
 logger = logging.getLogger(__name__)
+
+
+class MergeStatus(Enum):
+    """Enum for worktree merge status."""
+    ACTIVE = "active"
+    MERGED = "merged"
+    ABANDONED = "abandoned"
+    CLEANED = "cleaned"
+
+
+class CommitType(Enum):
+    """Enum for commit types."""
+    PARENT_CHECKPOINT = "parent_checkpoint"
+    VALIDATION_READY = "validation_ready"
+    FINAL = "final"
+    AUTO_SAVE = "auto_save"
+    CONFLICT_RESOLUTION = "conflict_resolution"
 
 
 @dataclass
