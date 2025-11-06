@@ -133,9 +133,9 @@ class TestMCPTicketEndpoints:
     """Test all 11 ticket endpoints via MCP server."""
 
     def test_01_create_ticket(self, client, headers):
-        """Test POST /tickets/create - Create a new ticket."""
+        """Test POST /api/tickets/create - Create a new ticket."""
         response = client.post(
-            "/tickets/create",
+            "/api/tickets/create",
             headers=headers,
             json={
                 "workflow_id": "workflow-e2e-test",
@@ -149,9 +149,11 @@ class TestMCPTicketEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["success"] is True
         assert "ticket_id" in data
-        assert data["message"] == "Ticket created successfully"
+        assert "ticket_number" in data
+        assert "workflow_id" in data
+        assert "status" in data
+        assert "message" in data
 
         # Store ticket_id for later tests
         TestMCPTicketEndpoints.ticket_id_1 = data["ticket_id"]
@@ -163,7 +165,7 @@ class TestMCPTicketEndpoints:
             pytest.skip("Requires ticket from test_01")
 
         response = client.get(
-            f"/tickets/{TestMCPTicketEndpoints.ticket_id_1}",
+            f"/api/tickets/{TestMCPTicketEndpoints.ticket_id_1}",
             headers=headers,
         )
 
@@ -188,7 +190,7 @@ class TestMCPTicketEndpoints:
             pytest.skip("Requires ticket from test_01")
 
         response = client.post(
-            "/tickets/comment",
+            "/api/tickets/comment",
             headers=headers,
             json={
                 "ticket_id": TestMCPTicketEndpoints.ticket_id_1,
@@ -209,7 +211,7 @@ class TestMCPTicketEndpoints:
             pytest.skip("Requires ticket from test_01")
 
         response = client.post(
-            "/tickets/update",
+            "/api/tickets/update",
             headers=headers,
             json={
                 "ticket_id": TestMCPTicketEndpoints.ticket_id_1,
@@ -236,7 +238,7 @@ class TestMCPTicketEndpoints:
             pytest.skip("Requires ticket from test_01")
 
         response = client.post(
-            "/tickets/change-status",
+            "/api/tickets/change-status",
             headers=headers,
             json={
                 "ticket_id": TestMCPTicketEndpoints.ticket_id_1,
@@ -254,7 +256,7 @@ class TestMCPTicketEndpoints:
     def test_07_search_tickets(self, client, headers):
         """Test POST /tickets/search - Search tickets."""
         response = client.post(
-            "/tickets/search",
+            "/api/tickets/search",
             headers=headers,
             json={
                 "workflow_id": "workflow-e2e-test",
@@ -276,7 +278,7 @@ class TestMCPTicketEndpoints:
             pytest.skip("Requires ticket from test_01")
 
         response = client.post(
-            "/tickets/link-commit",
+            "/api/tickets/link-commit",
             headers=headers,
             json={
                 "ticket_id": TestMCPTicketEndpoints.ticket_id_1,
@@ -295,7 +297,7 @@ class TestMCPTicketEndpoints:
     def test_09_get_ticket_stats(self, client, headers):
         """Test GET /tickets/stats/{workflow_id} - Get ticket statistics."""
         response = client.get(
-            "/tickets/stats/workflow-e2e-test",
+            "/api/tickets/stats/workflow-e2e-test",
             headers=headers,
         )
 
@@ -315,13 +317,13 @@ class TestMCPTicketEndpoints:
             pytest.skip("Requires ticket from test_01")
 
         # First check if ticket is already in 'done' status
-        get_response = client.get(f"/tickets/{TestMCPTicketEndpoints.ticket_id_1}", headers=headers)
+        get_response = client.get(f"/api/tickets/{TestMCPTicketEndpoints.ticket_id_1}", headers=headers)
         if get_response.status_code == 200:
             ticket_data = get_response.json()
             if ticket_data.get("status") != "done":
                 # Move to done first
                 client.post(
-                    "/tickets/change-status",
+                    "/api/tickets/change-status",
                     headers=headers,
                     json={
                         "ticket_id": TestMCPTicketEndpoints.ticket_id_1,
@@ -331,7 +333,7 @@ class TestMCPTicketEndpoints:
                 )
 
         response = client.post(
-            "/tickets/resolve",
+            "/api/tickets/resolve",
             headers=headers,
             json={
                 "ticket_id": TestMCPTicketEndpoints.ticket_id_1,
@@ -355,7 +357,7 @@ class TestMCPTicketEndpoints:
     def test_11_get_commit_diff(self, client, headers):
         """Test GET /tickets/commit-diff/{commit_sha} - Get commit diff."""
         response = client.get(
-            "/tickets/commit-diff/mcp123abc456",
+            "/api/tickets/commit-diff/mcp123abc456",
             headers=headers,
         )
 
@@ -380,7 +382,7 @@ class TestCreateTaskValidation:
         """Test that create_task rejects requests without ticket_id when tracking enabled."""
         # First, create a ticket to use
         ticket_response = client.post(
-            "/tickets/create",
+            "/api/tickets/create",
             headers=headers,
             json={
                 "workflow_id": "workflow-e2e-test",
