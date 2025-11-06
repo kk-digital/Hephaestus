@@ -433,31 +433,19 @@ def create_ticket_router(server_state):
             logger.error(f"Failed to search tickets: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/api/tickets/stats")
+    @router.get("/api/tickets/stats/{workflow_id}")
     async def get_ticket_stats_endpoint(
-        workflow_id: Optional[str] = None,
+        workflow_id: str,
         agent_id: str = Header(..., alias="X-Agent-ID"),
     ):
         """Get ticket statistics for a workflow."""
         logger.info(f"Agent {agent_id} requesting ticket stats for workflow {workflow_id}")
 
         try:
-            # Auto-detect workflow_id if not provided
+            # workflow_id is now a required path parameter
             if not workflow_id:
-                with get_db() as session:
-                    agent = session.query(Agent).filter_by(id=agent_id).first()
-                    if agent and agent.current_task_id:
-                        task = session.query(Task).filter_by(id=agent.current_task_id).first()
-                        if task and task.workflow_id:
-                            workflow_id = task.workflow_id
-
-                if not workflow_id:
-                    from src.mcp.server import get_single_active_workflow
-                    workflow_id = get_single_active_workflow()
-
-                if not workflow_id:
-                    raise HTTPException(
-                        status_code=400,
+                raise HTTPException(
+                    status_code=400,
                         detail="Could not determine workflow_id"
                     )
 
@@ -548,7 +536,7 @@ def create_ticket_router(server_state):
                 ticket_id=request.ticket_id,
                 agent_id=agent_id,
                 new_status=request.new_status,
-                resolution_notes=request.resolution_notes,
+                comment=request.resolution_notes or "",  # Service expects comment, not resolution_notes
             )
 
             # Broadcast update
@@ -585,8 +573,8 @@ def create_ticket_router(server_state):
                 ticket_id=request.ticket_id,
                 agent_id=agent_id,
                 commit_sha=request.commit_hash,  # Service expects commit_sha, not commit_hash
-                commit_message=request.commit_message,
-                repository_url=request.repository_url,
+                commit_message=request.commit_message or "",
+                # Note: repository_url is in the request model but service doesn't use it
             )
 
             # Broadcast update
@@ -597,7 +585,13 @@ def create_ticket_router(server_state):
                 "commit_hash": request.commit_hash,
             })
 
-            return LinkCommitResponse(**result)
+            # Transform service response to match API response model
+            # Service returns commit_sha, API returns commit_hash
+            return LinkCommitResponse(
+                ticket_id=result["ticket_id"],
+                commit_hash=result["commit_sha"],  # Map commit_sha → commit_hash
+                message=result["message"]
+            )
 
         except ValueError as e:
             logger.error(f"Validation error linking commit: {e}")
