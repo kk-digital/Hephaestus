@@ -281,6 +281,9 @@ class TestDiagnosticAgentTriggers:
     @pytest.mark.asyncio
     async def test_triggers_when_all_conditions_met(self, monitoring_loop, workflow_with_phases, db_manager):
         """Should trigger diagnostic when all conditions are met."""
+        # Enable diagnostic agent feature
+        monitoring_loop.config.diagnostic_agent_enabled = True
+
         session = db_manager.get_session()
         try:
             # Create old completed task
