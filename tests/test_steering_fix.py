@@ -32,6 +32,7 @@ def mock_agent_manager():
     # Mock tmux_server attribute
     mock.tmux_server = Mock()
     mock.tmux_server.has_session = Mock(return_value=True)
+    mock.tmux_server.sessions = []  # Must be iterable for cleanup code
 
     return mock
 
@@ -40,7 +41,8 @@ def mock_agent_manager():
 def mock_llm_provider():
     """Mock LLM provider."""
     mock = Mock(spec=LLMProviderInterface)
-    mock.analyze_agent_trajectory = AsyncMock()
+    # analyze_agent_trajectory is async, so use AsyncMock
+    mock.analyze_agent_trajectory = AsyncMock(return_value={})
     return mock
 
 
@@ -54,12 +56,15 @@ def mock_rag_system():
 @pytest.fixture
 def test_agent():
     """Test agent."""
+    from datetime import timedelta
+    # Make agent 60 seconds old to pass age check
     agent = Agent(
         id="test-agent-1",
         status="working",
         current_task_id="task-1",
         tmux_session_name="agent-session-1",
         cli_type="claude_code",
+        created_at=datetime.utcnow() - timedelta(seconds=60),
         last_activity=datetime.utcnow()
     )
     # Add missing attribute needed by monitor
@@ -149,8 +154,11 @@ class TestSteeringMessageFix:
         # Setup database session mock
         session_mock = Mock()
         session_mock.query.return_value.filter_by.return_value.first.return_value = test_task
+        session_mock.query.return_value.filter_by.return_value.all.return_value = []  # For Workflow queries
         session_mock.query.return_value.filter_by.return_value.order_by.return_value.all.return_value = []
+        session_mock.query.return_value.filter_by.return_value.count.return_value = 0  # For task count queries
         session_mock.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = []
+        session_mock.query.return_value.filter.return_value.count.return_value = 0  # For filtered count queries
         session_mock.add = Mock()
         session_mock.commit = Mock()
         session_mock.flush = Mock()
@@ -215,8 +223,11 @@ class TestSteeringMessageFix:
         # Setup database session mock
         session_mock = Mock()
         session_mock.query.return_value.filter_by.return_value.first.return_value = test_task
+        session_mock.query.return_value.filter_by.return_value.all.return_value = []  # For Workflow queries
         session_mock.query.return_value.filter_by.return_value.order_by.return_value.all.return_value = []
+        session_mock.query.return_value.filter_by.return_value.count.return_value = 0  # For task count queries
         session_mock.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = []
+        session_mock.query.return_value.filter.return_value.count.return_value = 0  # For filtered count queries
         session_mock.add = Mock()
         session_mock.commit = Mock()
         session_mock.flush = Mock()
@@ -269,8 +280,11 @@ class TestSteeringMessageFix:
         # Setup database session mock
         session_mock = Mock()
         session_mock.query.return_value.filter_by.return_value.first.return_value = test_task
+        session_mock.query.return_value.filter_by.return_value.all.return_value = []  # For Workflow queries
         session_mock.query.return_value.filter_by.return_value.order_by.return_value.all.return_value = []
+        session_mock.query.return_value.filter_by.return_value.count.return_value = 0  # For task count queries
         session_mock.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = []
+        session_mock.query.return_value.filter.return_value.count.return_value = 0  # For filtered count queries
         session_mock.add = Mock()
         session_mock.commit = Mock()
         session_mock.flush = Mock()
