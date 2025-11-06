@@ -292,17 +292,18 @@ class TestMCPTicketEndpoints:
             headers=headers,
             json={
                 "ticket_id": TestMCPTicketEndpoints.ticket_id_1,
-                "commit_sha": "mcp123abc456",
+                "commit_hash": "mcp123abc456",  # Model expects commit_hash, not commit_sha
                 "commit_message": "feat: Add MCP test feature",
-                "link_method": "manual",
             }
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["success"] is True
-        assert data["commit_sha"] == "mcp123abc456"
-        print(f"✅ Linked commit: {data['commit_sha']}")
+        # LinkCommitResponse has: ticket_id, commit_hash, message (no success field)
+        assert "ticket_id" in data
+        assert "commit_hash" in data
+        assert data["commit_hash"] == "mcp123abc456"
+        print(f"✅ Linked commit: {data['commit_hash']}")
 
     def test_09_get_ticket_stats(self, client, headers):
         """Test GET /tickets/stats/{workflow_id} - Get ticket statistics."""
@@ -347,8 +348,8 @@ class TestMCPTicketEndpoints:
             headers=headers,
             json={
                 "ticket_id": TestMCPTicketEndpoints.ticket_id_1,
-                "resolution_comment": "Resolved via MCP endpoint test",
-                "commit_sha": "mcp123abc456",
+                "resolution_notes": "Resolved via MCP endpoint test",  # Model expects resolution_notes
+                "new_status": "done",
             }
         )
 
@@ -360,8 +361,10 @@ class TestMCPTicketEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["success"] is True
-        assert data["is_resolved"] is True
+        # ResolveTicketResponse has: ticket_id, status, message (no success or is_resolved fields)
+        assert "ticket_id" in data
+        assert "status" in data
+        assert data["ticket_id"] == TestMCPTicketEndpoints.ticket_id_1
         print(f"✅ Resolved ticket: {TestMCPTicketEndpoints.ticket_id_1}")
 
     def test_11_get_commit_diff(self, client, headers):
