@@ -210,7 +210,8 @@ class TestLangChainLLMClient:
             "OPENROUTER_API_KEY": "test-key"
         }):
             with patch('src.interfaces.langchain_llm_client.ChatOpenAI'), \
-                 patch('src.interfaces.langchain_llm_client.ChatGroq'):
+                 patch('src.interfaces.langchain_llm_client.ChatGroq'), \
+                 patch('src.interfaces.langchain_llm_client.OpenAIEmbeddings'):
 
                 client = LangChainLLMClient(mock_config)
 
