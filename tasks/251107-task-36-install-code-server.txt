@@ -1,0 +1,224 @@
+TASK-36: Install code-server (OpenVSCode) in Docker Container
+
+OBJECTIVE:
+Install code-server (open-source VSCode in browser) in the Hephaestus Docker container and expose it on a port for browser access.
+
+PRIORITY: HIGH
+
+BACKGROUND:
+code-server allows running Visual Studio Code in a browser, providing full IDE capabilities remotely. This enables:
+- Browser-based code editing
+- Full VSCode extensions support
+- Remote development without SSH
+- Multiple users can access same environment
+
+═══════════════════════════════════════════════════════════════════
+INSTALLATION METHOD
+═══════════════════════════════════════════════════════════════════
+
+**Option 1: NPM Installation (Recommended)**
+
+Add to Dockerfile.new:
+```dockerfile
+# Install code-server via npm
+RUN npm install -g code-server
+
+# Configure code-server
+RUN mkdir -p /home/user/.config/code-server && \
+    echo "bind-addr: 0.0.0.0:8080" > /home/user/.config/code-server/config.yaml && \
+    echo "auth: password" >> /home/user/.config/code-server/config.yaml && \
+    echo "password: hephaestus" >> /home/user/.config/code-server/config.yaml && \
+    echo "cert: false" >> /home/user/.config/code-server/config.yaml && \
+    chown -R user:user /home/user/.config
+
+# Expose code-server port
+EXPOSE 8080
+```
+
+**Option 2: Binary Installation (Alternative)**
+
+```dockerfile
+# Install code-server from official script
+RUN curl -fsSL https://code-server.dev/install.sh | sh
+
+# Configure code-server
+RUN mkdir -p /home/user/.config/code-server && \
+    echo "bind-addr: 0.0.0.0:8080" > /home/user/.config/code-server/config.yaml && \
+    echo "auth: password" >> /home/user/.config/code-server/config.yaml && \
+    echo "password: hephaestus" >> /home/user/.config/code-server/config.yaml && \
+    echo "cert: false" >> /home/user/.config/code-server/config.yaml && \
+    chown -R user:user /home/user/.config
+
+# Expose code-server port
+EXPOSE 8080
+```
+
+═══════════════════════════════════════════════════════════════════
+DOCKER-COMPOSE CHANGES
+═══════════════════════════════════════════════════════════════════
+
+Add port mapping to docker-compose.yml:
+
+```yaml
+services:
+  docker-hephaestus:
+    ports:
+      - "2224:22"    # SSH access
+      - "8000:8000"  # MCP server
+      - "3001:3000"  # Frontend dev server
+      - "5555:5555"  # Custom port forwarding
+      - "6333:6333"  # Qdrant
+      - "8080:8080"  # code-server (VSCode in browser)
+```
+
+═══════════════════════════════════════════════════════════════════
+STARTUP CONFIGURATION
+═══════════════════════════════════════════════════════════════════
+
+**Option A: Manual Start**
+
+User runs inside container:
+```bash
+code-server /home/user/workspace/Hephaestus
+```
+
+**Option B: Auto-start with Supervisor**
+
+Add to supervisord.conf (if exists):
+```ini
+[program:code-server]
+command=/usr/local/bin/code-server /home/user/workspace/Hephaestus
+directory=/home/user/workspace/Hephaestus
+user=user
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/code-server.log
+stderr_logfile=/var/log/code-server-error.log
+```
+
+**Option C: Add to .bashrc for SSH sessions**
+
+Add to /home/user/.bashrc:
+```bash
+# Auto-start code-server if not running
+if ! pgrep -x "code-server" > /dev/null; then
+    nohup code-server /home/user/workspace/Hephaestus > /dev/null 2>&1 &
+fi
+```
+
+═══════════════════════════════════════════════════════════════════
+CONFIGURATION FILE
+═══════════════════════════════════════════════════════════════════
+
+Location: ~/.config/code-server/config.yaml
+
+Default configuration:
+```yaml
+bind-addr: 0.0.0.0:8080
+auth: password
+password: hephaestus
+cert: false
+```
+
+To change password:
+```bash
+echo "password: YOUR_PASSWORD" >> ~/.config/code-server/config.yaml
+```
+
+═══════════════════════════════════════════════════════════════════
+ACCESS
+═══════════════════════════════════════════════════════════════════
+
+After installation and container restart:
+
+1. Access from host browser: http://localhost:8080
+2. Login with password: hephaestus
+3. VSCode interface opens in browser
+4. Full IDE capabilities available
+
+═══════════════════════════════════════════════════════════════════
+INSTALLATION STEPS
+═══════════════════════════════════════════════════════════════════
+
+1. Edit docker-hephaestus/Dockerfile.new
+   - Add code-server installation (Option 1 or Option 2)
+   - Add EXPOSE 8080
+
+2. Edit docker-hephaestus/docker-compose.yml
+   - Add port mapping "8080:8080"
+
+3. Rebuild and restart container:
+   ```bash
+   cd /Users/sp/claude/claude-docker.hephaestus/docker-hephaestus
+   docker-compose build docker-hephaestus
+   docker-compose down
+   docker-compose up -d
+   ```
+
+4. Start code-server inside container:
+   ```bash
+   ssh user@localhost -p 2224
+   code-server /home/user/workspace/Hephaestus
+   ```
+
+5. Access from browser: http://localhost:8080
+
+═══════════════════════════════════════════════════════════════════
+VERIFICATION
+═══════════════════════════════════════════════════════════════════
+
+1. Check code-server is installed:
+   ```bash
+   ssh user@localhost -p 2224
+   which code-server
+   code-server --version
+   ```
+
+2. Check port is exposed:
+   ```bash
+   docker ps | grep docker-hephaestus | grep 8080
+   ```
+   Should show: 0.0.0.0:8080->8080/tcp
+
+3. Access from browser:
+   - Open: http://localhost:8080
+   - Enter password: hephaestus
+   - Should see VSCode interface
+
+═══════════════════════════════════════════════════════════════════
+EXTENSIONS
+═══════════════════════════════════════════════════════════════════
+
+Install VSCode extensions:
+```bash
+code-server --install-extension ms-python.python
+code-server --install-extension ms-python.vscode-pylance
+code-server --install-extension ms-vscode.cpptools
+```
+
+Or install via web UI: Extensions tab → Search → Install
+
+═══════════════════════════════════════════════════════════════════
+SECURITY NOTES
+═══════════════════════════════════════════════════════════════════
+
+- Default password is "hephaestus" (change in production)
+- Access is localhost only (not exposed to internet by default)
+- Consider using SSH tunnel for remote access
+- Can enable HTTPS with cert: true and SSL certificates
+
+═══════════════════════════════════════════════════════════════════
+BENEFITS
+═══════════════════════════════════════════════════════════════════
+
+- Full VSCode in browser (no local install needed)
+- Remote development capabilities
+- Extensions support
+- Integrated terminal
+- Git integration
+- Debugging support
+- Can access from any device with browser
+
+ESTIMATED TIME: 20 minutes (install + test)
+DIFFICULTY: Medium
+STATUS: HIGH PRIORITY

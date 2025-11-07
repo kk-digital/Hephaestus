@@ -1,0 +1,89 @@
+TASK-33: Add Port 5555 Forwarding to Docker Configuration
+
+OBJECTIVE:
+Configure Docker to forward port 5555 from the Hephaestus container to the host machine.
+
+PRIORITY: HIGH
+
+WHAT TO DO:
+Edit docker-compose.yml to add port mapping for 5555:5555.
+
+═══════════════════════════════════════════════════════════════════
+FILE TO EDIT
+═══════════════════════════════════════════════════════════════════
+
+File: docker-hephaestus/docker-compose.yml
+
+Current ports section:
+```yaml
+    ports:
+      - "2224:22"    # SSH access
+      - "8000:8000"  # MCP server
+      - "3001:3000"  # Frontend dev server (host 3001 to avoid conflict)
+      - "6333:6333"  # Qdrant (if running in same container)
+```
+
+Add new port mapping:
+```yaml
+    ports:
+      - "2224:22"    # SSH access
+      - "8000:8000"  # MCP server
+      - "3001:3000"  # Frontend dev server (host 3001 to avoid conflict)
+      - "5555:5555"  # Custom port forwarding
+      - "6333:6333"  # Qdrant (if running in same container)
+```
+
+═══════════════════════════════════════════════════════════════════
+STEPS
+═══════════════════════════════════════════════════════════════════
+
+1. Edit docker-hephaestus/docker-compose.yml
+2. Add "5555:5555" to ports section
+3. Add comment explaining purpose
+4. Restart Docker container for changes to take effect
+
+═══════════════════════════════════════════════════════════════════
+RESTART PROCEDURE
+═══════════════════════════════════════════════════════════════════
+
+After editing docker-compose.yml:
+
+```bash
+cd /Users/sp/claude/claude-docker.hephaestus/docker-hephaestus
+docker-compose down
+docker-compose up -d
+```
+
+Or if already running:
+```bash
+cd /Users/sp/claude/claude-docker.hephaestus/docker-hephaestus
+docker-compose restart docker-hephaestus
+```
+
+═══════════════════════════════════════════════════════════════════
+VERIFICATION
+═══════════════════════════════════════════════════════════════════
+
+1. Check port is mapped:
+   ```bash
+   docker ps | grep docker-hephaestus
+   ```
+   Should show "0.0.0.0:5555->5555/tcp" in the PORTS column
+
+2. Test connectivity (from host):
+   ```bash
+   nc -zv localhost 5555
+   ```
+   Should show "Connection to localhost port 5555 succeeded" if service is running
+
+═══════════════════════════════════════════════════════════════════
+NOTES
+═══════════════════════════════════════════════════════════════════
+
+- Port 5555 will be accessible from host at localhost:5555
+- Service inside container must listen on 0.0.0.0:5555 (not just 127.0.0.1)
+- No conflicts with existing port mappings (5555 not in use)
+
+ESTIMATED TIME: 5 minutes (edit + restart)
+DIFFICULTY: Easy
+STATUS: HIGH PRIORITY

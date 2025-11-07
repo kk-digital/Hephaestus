@@ -208,6 +208,24 @@
 
 ## Immediate Actions
 
+[TODO] Commit and push all changes after benchmark reviews complete
+    - Commit task files, review reports, and any fixes
+    - Push to both GitHub (origin) and Gogs
+    - Create pull request from dev-haltingstate-00 to main
+    - Merge pull request to main
+    - Push main to both remotes
+
+[TODO] Task-35: Fix bash locale warnings in Docker container
+    - Locale warnings appear when SSH into container
+    - Quick fix: Add ENV LANG=C.UTF-8 to Dockerfile
+    - Or add to .bashrc inside container
+    - See: tasks/251107-task-35-fix-locale-warnings.txt
+
+[DONE] Task-33: Add port 5555 forwarding to Docker
+    - Added port mapping 5555:5555 to docker-compose.yml
+    - Requires container restart: docker-compose restart docker-hephaestus
+    - See: tasks/251107-task-33-docker-port-5555.txt
+
 [DONE] Fix pip install dependency issues
     - LangChain dependency resolution conflicts - RESOLVED
     - Solution: Install LangChain 1.0.x series first with --no-deps

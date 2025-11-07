@@ -1,0 +1,155 @@
+TASK-35: Fix Bash Locale Warnings in Docker Container
+
+OBJECTIVE:
+Eliminate bash locale warnings that appear when using the Docker container.
+
+PRIORITY: MEDIUM
+
+PROBLEM:
+When connecting to docker-hephaestus container via SSH, bash displays locale warnings:
+```
+-bash: warning: setlocale: LC_CTYPE: cannot change locale (en_US.UTF-8): No such file or directory
+-bash: warning: setlocale: LC_COLLATE: cannot change locale (en_US.UTF-8): No such file or directory
+```
+
+These warnings appear because the container is trying to use en_US.UTF-8 locale which is not installed.
+
+═══════════════════════════════════════════════════════════════════
+ROOT CAUSE
+═══════════════════════════════════════════════════════════════════
+
+The locale environment variables are being set (likely by SSH or .bashrc) but the locale files are not installed in the container.
+
+Common sources:
+1. SSH client sends locale variables (SendEnv LANG LC_*)
+2. .bashrc or .bash_profile sets locale variables
+3. Container has LANG environment variable set but no locale data
+
+═══════════════════════════════════════════════════════════════════
+SOLUTION OPTIONS
+═══════════════════════════════════════════════════════════════════
+
+**Option 1: Install Locales in Container (Recommended)**
+
+Add to Dockerfile.new:
+```dockerfile
+# Install locales
+RUN apt-get update && apt-get install -y locales && \
+    locale-gen en_US.UTF-8 && \
+    update-locale LANG=en_US.UTF-8
+
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+```
+
+**Option 2: Use C.UTF-8 Locale (Simpler)**
+
+Add to Dockerfile.new:
+```dockerfile
+# Use C.UTF-8 locale (always available)
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+```
+
+**Option 3: Disable Locale in .bashrc**
+
+Add to /home/user/.bashrc in container:
+```bash
+# Disable locale to prevent warnings
+unset LANG
+unset LC_ALL
+unset LC_CTYPE
+unset LC_COLLATE
+```
+
+**Option 4: Disable SSH SendEnv (Host Side)**
+
+Add to ~/.ssh/config on host:
+```
+Host localhost
+    Port 2224
+    SendEnv -LANG
+    SendEnv -LC_*
+```
+
+═══════════════════════════════════════════════════════════════════
+RECOMMENDED APPROACH
+═══════════════════════════════════════════════════════════════════
+
+**Use Option 2 (C.UTF-8)** - Simplest and most reliable:
+
+1. Edit docker-hephaestus/Dockerfile.new
+2. Add environment variables:
+   ```dockerfile
+   ENV LANG=C.UTF-8
+   ENV LC_ALL=C.UTF-8
+   ```
+3. Rebuild container:
+   ```bash
+   cd /Users/sp/claude/claude-docker.hephaestus/docker-hephaestus
+   docker-compose build docker-hephaestus
+   docker-compose up -d
+   ```
+
+Why C.UTF-8:
+- Always available in Debian/Ubuntu containers (no installation needed)
+- UTF-8 compatible (handles unicode properly)
+- No locale data files required
+- Avoids all locale warnings
+
+═══════════════════════════════════════════════════════════════════
+ALTERNATIVE: Quick Fix Without Rebuild
+═══════════════════════════════════════════════════════════════════
+
+If you want to fix immediately without rebuilding:
+
+Inside container (/home/user/.bashrc):
+```bash
+# Add at top of .bashrc
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+```
+
+Then reconnect to SSH.
+
+═══════════════════════════════════════════════════════════════════
+VERIFICATION
+═══════════════════════════════════════════════════════════════════
+
+After fix, SSH into container and check:
+
+```bash
+ssh user@localhost -p 2224
+# Should see no locale warnings
+locale
+# Should show:
+# LANG=C.UTF-8
+# LC_ALL=C.UTF-8
+```
+
+═══════════════════════════════════════════════════════════════════
+FILES TO MODIFY
+═══════════════════════════════════════════════════════════════════
+
+**Option 2 (Recommended):**
+- File: docker-hephaestus/Dockerfile.new
+- Add: ENV LANG=C.UTF-8 and ENV LC_ALL=C.UTF-8
+- Rebuild: docker-compose build && docker-compose up -d
+
+**Quick Fix:**
+- File: /home/user/.bashrc (inside container)
+- Add: export LANG=C.UTF-8 and export LC_ALL=C.UTF-8
+- No rebuild needed
+
+═══════════════════════════════════════════════════════════════════
+NOTES
+═══════════════════════════════════════════════════════════════════
+
+- C.UTF-8 is a minimal UTF-8 locale (no localization, just encoding)
+- Sufficient for development work and Python/coding tasks
+- If you need full en_US localization (dates, currency), use Option 1
+- These warnings are harmless but annoying
+
+ESTIMATED TIME: 5 minutes (quick fix) or 10 minutes (rebuild)
+DIFFICULTY: Easy
+STATUS: MEDIUM PRIORITY

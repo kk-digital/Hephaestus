@@ -1,0 +1,223 @@
+TASK-36: Install OpenCode AI Coding Agent in Docker Container
+
+OBJECTIVE:
+Install OpenCode (https://github.com/sst/opencode) - a 100% open-source AI coding agent for the terminal - in the Hephaestus Docker container.
+
+PRIORITY: HIGH
+
+BACKGROUND:
+OpenCode is "The AI coding agent built for the terminal."
+- 100% open-source alternative to Claude Code
+- Provider-agnostic (Anthropic, OpenAI, Google, local models)
+- Built-in Language Server Protocol (LSP) support
+- Client/server architecture for remote operation
+- Terminal-focused UI (TUI)
+
+Repository: https://github.com/sst/opencode
+Documentation: https://opencode.ai/docs
+
+═══════════════════════════════════════════════════════════════════
+INSTALLATION METHODS
+═══════════════════════════════════════════════════════════════════
+
+**Option 1: Quick Install Script (Recommended for Docker)**
+
+```bash
+curl -fsSL https://opencode.ai/install | bash
+```
+
+**Option 2: npm/pnpm/yarn/bun**
+
+```bash
+npm i -g opencode-ai@latest
+```
+
+Or:
+```bash
+pnpm add -g opencode-ai@latest
+bun add -g opencode-ai@latest
+yarn global add opencode-ai@latest
+```
+
+**Option 3: Homebrew (macOS/Linux)**
+
+```bash
+brew install opencode
+```
+
+═══════════════════════════════════════════════════════════════════
+DOCKER INSTALLATION (DOCKERFILE)
+═══════════════════════════════════════════════════════════════════
+
+Add to docker-hephaestus/Dockerfile.new:
+
+**Method 1: Quick Install Script**
+```dockerfile
+# Install OpenCode via official installer
+RUN curl -fsSL https://opencode.ai/install | bash
+
+# Add OpenCode to PATH
+ENV PATH="/root/.opencode/bin:${PATH}"
+```
+
+**Method 2: npm Install**
+```dockerfile
+# Install OpenCode via npm
+RUN npm i -g opencode-ai@latest
+```
+
+Note: Check if Node.js/npm is already installed in Dockerfile. If not, add:
+```dockerfile
+# Install Node.js and npm (if not already present)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs
+
+# Then install OpenCode
+RUN npm i -g opencode-ai@latest
+```
+
+═══════════════════════════════════════════════════════════════════
+INSTALLATION IN RUNNING CONTAINER (QUICK TEST)
+═══════════════════════════════════════════════════════════════════
+
+1. SSH into container:
+   ```bash
+   ssh user@localhost -p 2224
+   ```
+
+2. Install OpenCode (Quick Install):
+   ```bash
+   curl -fsSL https://opencode.ai/install | bash
+   ```
+
+3. Add to PATH (if needed):
+   ```bash
+   echo 'export PATH="$HOME/.opencode/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+4. Or install via npm (if Node.js is available):
+   ```bash
+   npm i -g opencode-ai@latest
+   ```
+
+═══════════════════════════════════════════════════════════════════
+IMPORTANT NOTES
+═══════════════════════════════════════════════════════════════════
+
+- **Remove old versions**: If version < 0.1.x exists, remove before upgrading
+- **Custom install directory**: Use environment variables:
+  - `$OPENCODE_INSTALL_DIR`
+  - `$XDG_BIN_DIR`
+  - `$HOME/bin`
+  - Default: `$HOME/.opencode/bin`
+
+═══════════════════════════════════════════════════════════════════
+CONFIGURATION
+═══════════════════════════════════════════════════════════════════
+
+OpenCode is provider-agnostic and supports:
+- Anthropic (Claude)
+- OpenAI (GPT)
+- Google (Gemini)
+- Local models
+
+Configure API keys and providers according to documentation:
+https://opencode.ai/docs
+
+Likely configuration location: `~/.opencode/config` or similar
+
+═══════════════════════════════════════════════════════════════════
+USAGE
+═══════════════════════════════════════════════════════════════════
+
+After installation:
+
+```bash
+cd /home/user/workspace/Hephaestus
+opencode
+```
+
+OpenCode will start in terminal UI (TUI) mode.
+
+Refer to documentation for:
+- Commands
+- Configuration
+- Provider setup
+- Advanced features
+
+═══════════════════════════════════════════════════════════════════
+VERIFICATION
+═══════════════════════════════════════════════════════════════════
+
+1. Check OpenCode is installed:
+   ```bash
+   ssh user@localhost -p 2224
+   which opencode
+   opencode --version
+   ```
+
+2. Test OpenCode:
+   ```bash
+   opencode --help
+   ```
+
+3. Check LSP support:
+   ```bash
+   # OpenCode has built-in LSP support
+   # Test in your Hephaestus workspace
+   cd /home/user/workspace/Hephaestus
+   opencode
+   ```
+
+═══════════════════════════════════════════════════════════════════
+REBUILD DOCKER CONTAINER
+═══════════════════════════════════════════════════════════════════
+
+After adding to Dockerfile:
+
+```bash
+cd /Users/sp/claude/claude-docker.hephaestus/docker-hephaestus
+docker-compose build docker-hephaestus
+docker-compose down
+docker-compose up -d
+```
+
+Verify installation:
+```bash
+ssh user@localhost -p 2224
+opencode --version
+```
+
+═══════════════════════════════════════════════════════════════════
+ADVANTAGES OF OPENCODE
+═══════════════════════════════════════════════════════════════════
+
+- **Open Source**: 100% open-source (unlike Claude Code)
+- **Provider Choice**: Not locked to Anthropic
+- **Terminal-Native**: Built for CLI/terminal workflows
+- **LSP Integration**: Built-in language server support
+- **Remote Capable**: Client/server architecture
+- **Autonomous Coding**: Can perform tasks independently
+
+═══════════════════════════════════════════════════════════════════
+NEXT STEPS AFTER INSTALLATION
+═══════════════════════════════════════════════════════════════════
+
+1. Configure API keys for chosen provider (Anthropic/OpenAI/Google/Local)
+2. Test OpenCode in Hephaestus workspace
+3. Review OpenCode documentation: https://opencode.ai/docs
+4. Configure project-specific settings if needed
+5. Explore LSP features for Python development
+
+═══════════════════════════════════════════════════════════════════
+RESOURCES
+═══════════════════════════════════════════════════════════════════
+
+- GitHub: https://github.com/sst/opencode
+- Documentation: https://opencode.ai/docs
+- Quick Install: https://opencode.ai/install
+
+ESTIMATED TIME: 15-20 minutes (install + configure)
+DIFFICULTY: Easy to Medium
+STATUS: HIGH PRIORITY
