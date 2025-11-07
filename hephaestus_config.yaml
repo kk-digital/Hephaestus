@@ -102,7 +102,7 @@ agents:
 
 # Vector Store Configuration
 vector_store:
-  qdrant_url: "http://localhost:6333"
+  qdrant_url: "http://qdrant:6333"
   collection_prefix: "hephaestus"
   embedding_dimension: 1536
 

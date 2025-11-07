@@ -1,0 +1,226 @@
+TASK-39: Fix Qdrant Access from Inside Container
+
+OBJECTIVE:
+Enable Qdrant access from inside the Hephaestus Docker container for testing.
+
+PRIORITY: HIGH
+
+CURRENT PROBLEM:
+- Qdrant runs in separate Docker container (docker-hephaestus-qdrant)
+- Hephaestus container can access Qdrant via Docker network: http://qdrant:6333
+- BUT: Tests/scripts inside container may need different configuration
+- Docker daemon not available inside container (cannot run docker commands)
+
+═══════════════════════════════════════════════════════════════════
+CURRENT SETUP
+═══════════════════════════════════════════════════════════════════
+
+**Docker Compose Network:**
+```yaml
+networks:
+  hephaestus-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.0.0/16
+
+# Qdrant container:
+qdrant:
+  networks:
+    hephaestus-network:
+      ipv4_address: 10.10.0.20
+
+# Hephaestus container:
+docker-hephaestus:
+  networks:
+    hephaestus-network:
+      ipv4_address: 10.10.0.10
+  environment:
+    - QDRANT_URL=http://qdrant:6333
+```
+
+**Access Methods:**
+- From host: http://localhost:6334
+- From container: http://qdrant:6333 (Docker DNS)
+- From container: http://10.10.0.20:6333 (Direct IP)
+
+═══════════════════════════════════════════════════════════════════
+VERIFICATION STEPS
+═══════════════════════════════════════════════════════════════════
+
+1. **Test from inside Hephaestus container:**
+   ```bash
+   ssh user@localhost -p 2224
+
+   # Test DNS resolution
+   ping -c 1 qdrant
+
+   # Test Qdrant health endpoint
+   curl http://qdrant:6333/health
+
+   # Should return: {"title":"qdrant - vector search engine","version":"..."}
+   ```
+
+2. **Check environment variable:**
+   ```bash
+   echo $QDRANT_URL
+   # Should show: http://qdrant:6333
+   ```
+
+3. **Test from Python:**
+   ```bash
+   python3 -c "
+   from qdrant_client import QdrantClient
+   client = QdrantClient(url='http://qdrant:6333')
+   print('Qdrant version:', client.get_collection('test'))
+   "
+   ```
+
+═══════════════════════════════════════════════════════════════════
+SOLUTION: ENSURE CORRECT QDRANT_URL
+═══════════════════════════════════════════════════════════════════
+
+**Current Configuration (CORRECT):**
+```yaml
+environment:
+  - QDRANT_URL=http://qdrant:6333
+```
+
+**Application Code Must Use:**
+```python
+import os
+from qdrant_client import QdrantClient
+
+# Use environment variable
+qdrant_url = os.getenv('QDRANT_URL', 'http://qdrant:6333')
+client = QdrantClient(url=qdrant_url)
+```
+
+**Common Mistake to Avoid:**
+```python
+# DON'T hardcode localhost inside container!
+client = QdrantClient(url='http://localhost:6333')  # ❌ WRONG
+```
+
+═══════════════════════════════════════════════════════════════════
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════
+
+**Problem: "Connection refused" from inside container**
+
+Solution 1: Check both containers are on same network
+```bash
+docker inspect docker-hephaestus | grep NetworkMode
+docker inspect docker-hephaestus-qdrant | grep NetworkMode
+# Both should show: docker-hephaestus_hephaestus-network
+```
+
+Solution 2: Check Qdrant is running
+```bash
+docker ps | grep qdrant
+# Should show: docker-hephaestus-qdrant ... Up
+```
+
+Solution 3: Test direct IP access
+```bash
+curl http://10.10.0.20:6333/health
+```
+
+**Problem: "Could not resolve host: qdrant"**
+
+Solution: Restart container to refresh DNS
+```bash
+docker-compose restart docker-hephaestus
+```
+
+**Problem: Want to install Docker inside container**
+
+❌ **NOT RECOMMENDED**: Docker-in-Docker has security and complexity issues.
+
+✅ **Better approaches:**
+1. Use Docker network (current setup - BEST)
+2. Mount Docker socket (security risk)
+3. Use docker-compose exec from host
+
+═══════════════════════════════════════════════════════════════════
+ALTERNATIVE: DOCKER SOCKET MOUNT (NOT RECOMMENDED)
+═══════════════════════════════════════════════════════════════════
+
+If you REALLY need docker commands inside container:
+
+```yaml
+docker-hephaestus:
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+```
+
+Then install docker CLI:
+```dockerfile
+RUN apt-get update && apt-get install -y docker.io
+```
+
+**⚠️ SECURITY WARNING:**
+- Gives container root access to host Docker daemon
+- Container can control all containers on host
+- Can escape container and access host system
+- Only use for trusted development environments
+
+═══════════════════════════════════════════════════════════════════
+RECOMMENDED APPROACH
+═══════════════════════════════════════════════════════════════════
+
+**Current setup is CORRECT - no changes needed!**
+
+Just ensure:
+1. ✅ QDRANT_URL environment variable is set
+2. ✅ Application code reads from environment variable
+3. ✅ Both containers on same Docker network
+4. ✅ Tests use correct Qdrant URL
+
+**For testing from host:**
+```bash
+curl http://localhost:6334/health
+```
+
+**For testing from container:**
+```bash
+ssh user@localhost -p 2224
+curl http://qdrant:6333/health
+```
+
+**For Python tests inside container:**
+```python
+qdrant_url = os.getenv('QDRANT_URL', 'http://qdrant:6333')
+```
+
+═══════════════════════════════════════════════════════════════════
+VALIDATION
+═══════════════════════════════════════════════════════════════════
+
+Run these tests to verify setup:
+
+1. **Network connectivity:**
+   ```bash
+   ssh user@localhost -p 2224
+   curl http://qdrant:6333/health
+   ```
+   Expected: JSON response with Qdrant version
+
+2. **Environment variable:**
+   ```bash
+   ssh user@localhost -p 2224
+   echo $QDRANT_URL
+   ```
+   Expected: http://qdrant:6333
+
+3. **Python access:**
+   ```bash
+   ssh user@localhost -p 2224
+   cd /home/user/workspace/Hephaestus
+   python3 -c "import os; from qdrant_client import QdrantClient; print(QdrantClient(url=os.getenv('QDRANT_URL')).get_collections())"
+   ```
+   Expected: Collections list (may be empty)
+
+ESTIMATED TIME: 15 minutes (verification + documentation)
+DIFFICULTY: Easy
+STATUS: HIGH PRIORITY

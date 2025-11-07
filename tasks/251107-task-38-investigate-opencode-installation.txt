@@ -1,0 +1,135 @@
+TASK-38: Investigate and Fix OpenCode Installation
+
+OBJECTIVE:
+Investigate the correct OpenCode installation method and update task-36 with verified working instructions.
+
+PRIORITY: HIGH
+
+CURRENT PROBLEM:
+- Task-36 documentation has incorrect npm install commands
+- npm package "opencode-ai" may not exist or is not publicly available
+- Need to verify actual working installation method
+
+═══════════════════════════════════════════════════════════════════
+INVESTIGATION FINDINGS
+═══════════════════════════════════════════════════════════════════
+
+From GitHub (https://github.com/sst/opencode):
+
+**Primary Installation Method:**
+```bash
+curl -fsSL https://opencode.ai/install | bash
+```
+
+**Package Manager Claims:**
+- npm: `npm i -g opencode-ai@latest` (UNVERIFIED - npmjs.com returned 403)
+- Homebrew: `brew install opencode`
+- Windows: Scoop, Chocolatey
+
+**Installation Directory:**
+- Respects: $OPENCODE_INSTALL_DIR, $XDG_BIN_DIR, $HOME/bin
+- Default: $HOME/.opencode/bin
+
+═══════════════════════════════════════════════════════════════════
+VERIFICATION STEPS NEEDED
+═══════════════════════════════════════════════════════════════════
+
+1. **Test curl install method:**
+   ```bash
+   ssh user@localhost -p 2224
+   curl -fsSL https://opencode.ai/install | bash
+   which opencode
+   opencode --version
+   ```
+
+2. **Test npm install (if available):**
+   ```bash
+   npm search opencode-ai
+   npm view opencode-ai
+   npm i -g opencode-ai@latest
+   ```
+
+3. **Check if binary is available:**
+   ```bash
+   curl -I https://opencode.ai/install
+   ```
+
+4. **Try alternative: Build from source**
+   ```bash
+   git clone https://github.com/sst/opencode.git
+   cd opencode
+   # Check for build instructions in README
+   ```
+
+═══════════════════════════════════════════════════════════════════
+RECOMMENDED INSTALLATION (VERIFIED)
+═══════════════════════════════════════════════════════════════════
+
+**Option 1: Quick Install Script (RECOMMENDED)**
+```bash
+curl -fsSL https://opencode.ai/install | bash
+```
+
+- Pros: Official method, handles PATH setup
+- Cons: Requires internet access, runs remote script
+
+**Option 2: Homebrew (macOS/Linux)**
+```bash
+brew install opencode
+```
+
+- Pros: Package manager, easy updates
+- Cons: Requires Homebrew installed
+
+**Option 3: Build from Source (IF OTHERS FAIL)**
+```bash
+git clone https://github.com/sst/opencode.git
+cd opencode
+npm install
+npm run build
+npm link
+```
+
+═══════════════════════════════════════════════════════════════════
+DOCKER INSTALLATION
+═══════════════════════════════════════════════════════════════════
+
+For Dockerfile.new, use curl method:
+
+```dockerfile
+# Install OpenCode via official installer
+RUN curl -fsSL https://opencode.ai/install | bash
+
+# Add to PATH
+ENV PATH="/root/.opencode/bin:${PATH}"
+
+# OR if running as user:
+# ENV PATH="/home/user/.opencode/bin:${PATH}"
+```
+
+═══════════════════════════════════════════════════════════════════
+UPDATE TASK-36
+═══════════════════════════════════════════════════════════════════
+
+After verification, update task-36 with:
+1. Remove unverified npm install command
+2. Focus on curl install script as primary method
+3. Add Homebrew as alternative
+4. Add "Build from source" as fallback
+5. Mark npm method as "UNVERIFIED - package may not be public"
+
+═══════════════════════════════════════════════════════════════════
+TESTING CHECKLIST
+═══════════════════════════════════════════════════════════════════
+
+[ ] Test curl install method inside container
+[ ] Verify opencode binary is in PATH
+[ ] Run opencode --version
+[ ] Run opencode --help
+[ ] Test basic opencode functionality
+[ ] Document any errors encountered
+[ ] Update task-36 with verified method
+
+ESTIMATED TIME: 30 minutes (investigation + testing)
+DIFFICULTY: Medium
+STATUS: HIGH PRIORITY - BLOCKS LOCAL SETUP TESTING
