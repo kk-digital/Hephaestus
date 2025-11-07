@@ -1,0 +1,273 @@
+TASK-37: Sync Repositories from Gogs to GitHub with Pull Request
+
+OBJECTIVE:
+Pull latest changes from Gogs main branch, push to GitHub, and create pull request to merge dev branch into main.
+
+PRIORITY: MEDIUM
+
+WORKFLOW:
+For Hephaestus repository (and other repos with Gogs + GitHub remotes):
+1. Pull main from Gogs (most recent)
+2. Push main to GitHub
+3. Push dev branch to GitHub
+4. Create pull request from dev → main on GitHub
+5. Review and merge pull request
+
+═══════════════════════════════════════════════════════════════════
+PREREQUISITES
+═══════════════════════════════════════════════════════════════════
+
+Repository must have both remotes configured:
+- gogs: Gogs remote (local backup)
+- origin: GitHub remote (primary)
+
+Check remotes:
+```bash
+git remote -v
+# Should show:
+# origin  git@github.com:kk-digital/Hephaestus.git
+# gogs    http://gogs:TOKEN@localhost:3000/kk-digital/Hephaestus.git
+```
+
+═══════════════════════════════════════════════════════════════════
+STEP-BY-STEP WORKFLOW
+═══════════════════════════════════════════════════════════════════
+
+Navigate to repository:
+```bash
+cd ~/claude/claude-docker.hephaestus/Hephaestus/Hephaestus
+```
+
+**Step 1: Pull main from Gogs**
+```bash
+git checkout main
+git pull gogs main
+```
+
+**Step 2: Push main to GitHub**
+```bash
+git push origin main
+```
+
+**Step 3: Merge main into dev branch**
+```bash
+git checkout dev-haltingstate-00
+git pull origin dev-haltingstate-00  # Get latest dev from GitHub
+git merge main  # Merge main changes into dev
+```
+
+**Step 4: Push dev branch to GitHub**
+```bash
+git push origin dev-haltingstate-00
+```
+
+**Step 5: Push dev branch to Gogs (keep in sync)**
+```bash
+git push gogs dev-haltingstate-00
+```
+
+**Step 6: Create pull request on GitHub**
+```bash
+gh pr list --base main  # Check existing PRs
+
+# Create new PR from dev to main
+gh pr create --base main --head dev-haltingstate-00 \
+  --title "Merge dev-haltingstate-00 into main" \
+  --body "$(cat <<'EOF'
+## Changes
+
+Summary of changes since last merge to main.
+
+## Testing
+
+- [ ] All tests passing
+- [ ] Code reviewed
+- [ ] Ready for production
+
+🤖 Generated pull request
+EOF
+)"
+```
+
+**Step 7: Review and merge PR**
+```bash
+# View PR
+gh pr view <PR-number>
+
+# Review PR diff
+gh pr diff <PR-number>
+
+# Merge PR (if ready)
+gh pr merge <PR-number> --merge
+```
+
+**Step 8: Pull merged main back to local**
+```bash
+git checkout main
+git pull origin main
+```
+
+**Step 9: Push merged main to Gogs**
+```bash
+git push gogs main
+```
+
+**Step 10: Update dev branch with merged main**
+```bash
+git checkout dev-haltingstate-00
+git pull origin main  # Get merged main
+git push origin dev-haltingstate-00
+git push gogs dev-haltingstate-00
+```
+
+═══════════════════════════════════════════════════════════════════
+SIMPLIFIED WORKFLOW (If Gogs is just backup)
+═══════════════════════════════════════════════════════════════════
+
+If Gogs is only a backup and GitHub is primary:
+
+1. Pull dev from GitHub (most recent):
+   ```bash
+   git checkout dev-haltingstate-00
+   git pull origin dev-haltingstate-00
+   ```
+
+2. Create PR to main:
+   ```bash
+   gh pr create --base main --head dev-haltingstate-00 \
+     --title "Merge dev to main" \
+     --body "Latest changes from dev branch"
+   ```
+
+3. Merge PR:
+   ```bash
+   gh pr merge <PR-number> --merge
+   ```
+
+4. Pull merged main:
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+
+5. Sync to Gogs:
+   ```bash
+   git push gogs main
+   git push gogs dev-haltingstate-00
+   ```
+
+═══════════════════════════════════════════════════════════════════
+AUTOMATED SCRIPT
+═══════════════════════════════════════════════════════════════════
+
+Create script: sync-gogs-to-github.sh
+
+```bash
+#!/bin/bash
+set -e
+
+REPO_PATH="$HOME/claude/claude-docker.hephaestus/Hephaestus/Hephaestus"
+DEV_BRANCH="dev-haltingstate-00"
+
+cd "$REPO_PATH"
+
+echo "==> Pulling main from Gogs..."
+git checkout main
+git pull gogs main
+
+echo "==> Pushing main to GitHub..."
+git push origin main
+
+echo "==> Pulling dev branch from GitHub..."
+git checkout "$DEV_BRANCH"
+git pull origin "$DEV_BRANCH"
+
+echo "==> Merging main into dev..."
+git merge main
+
+echo "==> Pushing dev to GitHub and Gogs..."
+git push origin "$DEV_BRANCH"
+git push gogs "$DEV_BRANCH"
+
+echo "==> Creating pull request..."
+gh pr create --base main --head "$DEV_BRANCH" \
+  --title "Merge $DEV_BRANCH into main" \
+  --body "Automated sync from dev to main" || true
+
+echo "==> Done! Review PR on GitHub and merge when ready."
+```
+
+Make executable:
+```bash
+chmod +x sync-gogs-to-github.sh
+```
+
+Run:
+```bash
+./sync-gogs-to-github.sh
+```
+
+═══════════════════════════════════════════════════════════════════
+HANDLING CONFLICTS
+═══════════════════════════════════════════════════════════════════
+
+If merge conflicts occur:
+
+1. Identify conflicted files:
+   ```bash
+   git status
+   ```
+
+2. Edit conflicted files (look for <<<<<<< markers)
+
+3. Resolve conflicts manually
+
+4. Stage resolved files:
+   ```bash
+   git add <file>
+   ```
+
+5. Complete merge:
+   ```bash
+   git commit
+   ```
+
+6. Continue with push/PR workflow
+
+═══════════════════════════════════════════════════════════════════
+VERIFICATION
+═══════════════════════════════════════════════════════════════════
+
+After sync:
+
+1. Check both remotes have same commits:
+   ```bash
+   git log origin/main --oneline -5
+   git log gogs/main --oneline -5
+   # Should match
+   ```
+
+2. Check PR status:
+   ```bash
+   gh pr list --base main
+   ```
+
+3. Verify dev branch is up to date:
+   ```bash
+   git checkout dev-haltingstate-00
+   git log --oneline -10
+   ```
+
+═══════════════════════════════════════════════════════════════════
+NOTES
+═══════════════════════════════════════════════════════════════════
+
+- Always pull before pushing to avoid conflicts
+- Keep Gogs and GitHub in sync for redundancy
+- Review PRs before merging to main
+- Main branch should be stable, dev branch for active work
+- Use descriptive PR titles and bodies
+
+ESTIMATED TIME: 10-15 minutes (manual) or 5 minutes (automated script)
+DIFFICULTY: Medium
+STATUS: MEDIUM PRIORITY
